@@ -64,7 +64,7 @@ import {
   type InsertIntegration
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ilike, or, sql } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -82,7 +82,8 @@ export interface IStorage {
   getCase(id: string): Promise<Case | undefined>;
   getCases(filters?: { 
     status?: string; 
-    priority?: string; 
+    priorityValue?: string; 
+    priorityRuleId?: string;
     caseTypeId?: string; 
     categoryId?: string;
     customerId?: string;
@@ -238,7 +239,8 @@ export class DatabaseStorage implements IStorage {
 
   async getCases(filters?: { 
     status?: string; 
-    priority?: string; 
+    priorityValue?: string; 
+    priorityRuleId?: string;
     caseTypeId?: string; 
     categoryId?: string;
     customerId?: string;
@@ -248,10 +250,18 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
     
     if (filters?.status) conditions.push(eq(cases.status, filters.status as any));
-    if (filters?.priority) conditions.push(eq(cases.priority, filters.priority));
+    if (filters?.priorityRuleId) conditions.push(eq(cases.priorityRuleId, filters.priorityRuleId));
     if (filters?.caseTypeId) conditions.push(eq(cases.caseTypeId, filters.caseTypeId));
     if (filters?.categoryId) conditions.push(eq(cases.categoryId, filters.categoryId));
     if (filters?.customerId) conditions.push(eq(cases.customerId, filters.customerId));
+    
+    // If filtering by priority value, add condition using inArray with subquery
+    if (filters?.priorityValue) {
+      const priorityRuleIds = db.select({ id: priorityRules.id })
+        .from(priorityRules)
+        .where(eq(priorityRules.priorityValue, filters.priorityValue));
+      conditions.push(inArray(cases.priorityRuleId, priorityRuleIds));
+    }
     
     let baseQuery = db.select().from(cases);
     

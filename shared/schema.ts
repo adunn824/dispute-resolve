@@ -39,7 +39,7 @@ export const cases = pgTable("cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id),
   categoryId: varchar("category_id").notNull().references(() => categories.id),
-  priority: text("priority").notNull(),
+  priorityRuleId: varchar("priority_rule_id").notNull().references(() => priorityRules.id),
   customerId: varchar("customer_id").notNull().references(() => customers.id),
   loanId: text("loan_id"),
   state: text("state").notNull(),

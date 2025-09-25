@@ -240,13 +240,16 @@ async function seed() {
     { key: "document_ocr", on: false, audienceJson: { roles: ["agent", "compliance"] } }
   ]);
 
+  // Get the priority rules created for each category to link cases
+  const allPriorityRules = await db.select().from(priorityRules);
+
   // 12. Create Sample Cases
   console.log("Creating sample cases...");
   const sampleCases = await db.insert(cases).values([
     {
       caseTypeId: complaintType.id,
       categoryId: categoryRecords.find(c => c.code === "COMP_SVC")!.id,
-      priority: "High",
+      priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "COMP_SVC")!.id && pr.priorityValue === "Medium")!.id,
       customerId: customerRecords[0].id,
       loanId: "LOAN001",
       state: "CA",
@@ -256,7 +259,7 @@ async function seed() {
     {
       caseTypeId: disputeType.id,
       categoryId: categoryRecords.find(c => c.code === "DISP_TXN")!.id,
-      priority: "Critical",
+      priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "DISP_TXN")!.id && pr.priorityValue === "BK24")!.id,
       customerId: customerRecords[1].id,
       loanId: "LOAN002",
       state: "NY",
@@ -266,7 +269,7 @@ async function seed() {
     {
       caseTypeId: mailType.id,
       categoryId: categoryRecords.find(c => c.code === "MAIL_GEN")!.id,
-      priority: "Medium",
+      priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "MAIL_GEN")!.id && pr.priorityValue === "Medium")!.id,
       customerId: customerRecords[2].id,
       state: "TX",
       details: "General inquiry about account terms and conditions. Customer seeks clarification on recent policy changes.",
@@ -275,7 +278,7 @@ async function seed() {
     {
       caseTypeId: complaintType.id,
       categoryId: categoryRecords.find(c => c.code === "COMP_BILL")!.id,
-      priority: "High",
+      priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "COMP_BILL")!.id && pr.priorityValue === "High")!.id,
       customerId: customerRecords[3].id,
       loanId: "LOAN003",
       state: "WA",
@@ -285,7 +288,7 @@ async function seed() {
     {
       caseTypeId: disputeType.id,
       categoryId: categoryRecords.find(c => c.code === "DISP_BILL")!.id,
-      priority: "BK24",
+      priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "DISP_BILL")!.id && pr.priorityValue === "High")!.id,
       customerId: customerRecords[4].id,
       loanId: "LOAN004",
       state: "FL",
