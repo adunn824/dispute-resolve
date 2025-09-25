@@ -122,6 +122,8 @@ export const auditLogs = pgTable("audit_logs", {
 export const caseTypes = pgTable("case_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
+  description: text("description"),
+  color: text("color").default("#2563eb"),
   isActive: boolean("is_active").notNull().default(true),
 });
 
@@ -161,16 +163,26 @@ export const documentRequirements = pgTable("document_requirements", {
 
 export const priorityRules = pgTable("priority_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").notNull().references(() => categories.id),
-  ruleJson: json("rule_json").notNull(),
-  priorityValue: text("priority_value").notNull(),
+  categoryId: varchar("category_id").references(() => categories.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).notNull(),
+  conditions: text("conditions").notNull(),
+  ruleJson: json("rule_json"),
+  priorityValue: text("priority_value"),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const tagRules = pgTable("tag_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").notNull().references(() => categories.id),
-  ruleJson: json("rule_json").notNull(),
-  tags: json("tags").$type<string[]>().notNull(),
+  categoryId: varchar("category_id").references(() => categories.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  tag: text("tag").notNull(),
+  conditions: text("conditions").notNull(),
+  ruleJson: json("rule_json"),
+  tags: json("tags").$type<string[]>(),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const resolutionConfigs = pgTable("resolution_configs", {
@@ -181,10 +193,16 @@ export const resolutionConfigs = pgTable("resolution_configs", {
 
 export const slaPolicies = pgTable("sla_policies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").notNull().references(() => categories.id),
-  targetHours: integer("target_hours").notNull(),
-  clockStartsOn: text("clock_starts_on").notNull(),
+  categoryId: varchar("category_id").references(() => categories.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).notNull(),
+  responseTimeHours: integer("response_time_hours").notNull(),
+  resolutionTimeHours: integer("resolution_time_hours").notNull(),
+  targetHours: integer("target_hours"),
+  clockStartsOn: text("clock_starts_on"),
   pauseOnStatus: json("pause_on_status").$type<string[]>(),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const valueSets = pgTable("value_sets", {

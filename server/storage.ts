@@ -175,6 +175,11 @@ export interface IStorage {
   createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag>;
   updateFeatureFlag(id: string, updates: Partial<InsertFeatureFlag>): Promise<FeatureFlag>;
   deleteFeatureFlag(id: string): Promise<void>;
+  
+  // Admin methods for getting all rules (not tied to categories)
+  getAllPriorityRules(): Promise<PriorityRule[]>;
+  getAllTagRules(): Promise<TagRule[]>;
+  getAllSlaPolicies(): Promise<SlaPolicy[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -723,6 +728,19 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFeatureFlag(id: string): Promise<void> {
     await db.delete(featureFlags).where(eq(featureFlags.id, id));
+  }
+
+  // Admin methods for getting all rules (not tied to categories)
+  async getAllPriorityRules(): Promise<PriorityRule[]> {
+    return await db.select().from(priorityRules).orderBy(asc(priorityRules.name));
+  }
+
+  async getAllTagRules(): Promise<TagRule[]> {
+    return await db.select().from(tagRules).orderBy(asc(tagRules.name));
+  }
+
+  async getAllSlaPolicies(): Promise<SlaPolicy[]> {
+    return await db.select().from(slaPolicies).orderBy(asc(slaPolicies.name));
   }
 }
 

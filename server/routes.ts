@@ -252,6 +252,272 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Configuration APIs (Create, Update, Delete)
+  
+  // Case Types Admin Management  
+  app.post("/api/case-types", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, color, active } = req.body;
+      const caseType = await storage.createCaseType({
+        name,
+        description,
+        color,
+        isActive: active,
+      });
+      res.status(201).json(caseType);
+    } catch (error) {
+      console.error("Error creating case type:", error);
+      res.status(500).json({ message: "Failed to create case type" });
+    }
+  });
+
+  app.put("/api/case-types/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, color, active } = req.body;
+      const caseType = await storage.updateCaseType(id, {
+        name,
+        description,
+        color,
+        isActive: active,
+      });
+      res.json(caseType);
+    } catch (error) {
+      console.error("Error updating case type:", error);
+      res.status(500).json({ message: "Failed to update case type" });
+    }
+  });
+
+  app.delete("/api/case-types/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCaseType(id);
+      res.json({ message: "Case type deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting case type:", error);
+      res.status(500).json({ message: "Failed to delete case type" });
+    }
+  });
+
+  // Categories Admin Management
+  app.post("/api/categories", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, caseTypeId, active } = req.body;
+      const category = await storage.createCategory({
+        name,
+        description,
+        caseTypeId,
+        code: name.toUpperCase().replace(/\s+/g, '_'),
+        isActive: active,
+      });
+      res.status(201).json(category);
+    } catch (error) {
+      console.error("Error creating category:", error);
+      res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  app.put("/api/categories/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, caseTypeId, active } = req.body;
+      const category = await storage.updateCategory(id, {
+        name,
+        description,
+        caseTypeId,
+        isActive: active,
+      });
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/categories/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCategory(id);
+      res.json({ message: "Category deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  // Business Rules Management
+  app.get("/api/priority-rules", isAuthenticated, requireRole("compliance"), async (req, res) => {
+    try {
+      const rules = await storage.getAllPriorityRules();
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching priority rules:", error);
+      res.status(500).json({ message: "Failed to fetch priority rules" });
+    }
+  });
+
+  app.post("/api/priority-rules", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, priority, conditions, active } = req.body;
+      const rule = await storage.createPriorityRule({
+        name,
+        description,
+        priority,
+        conditions,
+        isActive: active,
+      });
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error("Error creating priority rule:", error);
+      res.status(500).json({ message: "Failed to create priority rule" });
+    }
+  });
+
+  app.put("/api/priority-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, priority, conditions, active } = req.body;
+      const rule = await storage.updatePriorityRule(id, {
+        name,
+        description,
+        priority,
+        conditions,
+        isActive: active,
+      });
+      res.json(rule);
+    } catch (error) {
+      console.error("Error updating priority rule:", error);
+      res.status(500).json({ message: "Failed to update priority rule" });
+    }
+  });
+
+  app.delete("/api/priority-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePriorityRule(id);
+      res.json({ message: "Priority rule deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting priority rule:", error);
+      res.status(500).json({ message: "Failed to delete priority rule" });
+    }
+  });
+
+  // Tag Rules Management
+  app.get("/api/tag-rules", isAuthenticated, requireRole("compliance"), async (req, res) => {
+    try {
+      const rules = await storage.getAllTagRules();
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching tag rules:", error);
+      res.status(500).json({ message: "Failed to fetch tag rules" });
+    }
+  });
+
+  app.post("/api/tag-rules", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, tag, conditions, active } = req.body;
+      const rule = await storage.createTagRule({
+        name,
+        description,
+        tag,
+        conditions,
+        isActive: active,
+      });
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error("Error creating tag rule:", error);
+      res.status(500).json({ message: "Failed to create tag rule" });
+    }
+  });
+
+  app.put("/api/tag-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, tag, conditions, active } = req.body;
+      const rule = await storage.updateTagRule(id, {
+        name,
+        description,
+        tag,
+        conditions,
+        isActive: active,
+      });
+      res.json(rule);
+    } catch (error) {
+      console.error("Error updating tag rule:", error);
+      res.status(500).json({ message: "Failed to update tag rule" });
+    }
+  });
+
+  app.delete("/api/tag-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTagRule(id);
+      res.json({ message: "Tag rule deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting tag rule:", error);
+      res.status(500).json({ message: "Failed to delete tag rule" });
+    }
+  });
+
+  // SLA Policies Management
+  app.get("/api/sla-policies", isAuthenticated, requireRole("compliance"), async (req, res) => {
+    try {
+      const policies = await storage.getAllSlaPolicies();
+      res.json(policies);
+    } catch (error) {
+      console.error("Error fetching SLA policies:", error);
+      res.status(500).json({ message: "Failed to fetch SLA policies" });
+    }
+  });
+
+  app.post("/api/sla-policies", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, priority, responseTimeHours, resolutionTimeHours, active } = req.body;
+      const policy = await storage.createSlaPolicy({
+        name,
+        description,
+        priority,
+        responseTimeHours,
+        resolutionTimeHours,
+        isActive: active,
+      });
+      res.status(201).json(policy);
+    } catch (error) {
+      console.error("Error creating SLA policy:", error);
+      res.status(500).json({ message: "Failed to create SLA policy" });
+    }
+  });
+
+  app.put("/api/sla-policies/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, priority, responseTimeHours, resolutionTimeHours, active } = req.body;
+      const policy = await storage.updateSlaPolicy(id, {
+        name,
+        description,
+        priority,
+        responseTimeHours,
+        resolutionTimeHours,
+        isActive: active,
+      });
+      res.json(policy);
+    } catch (error) {
+      console.error("Error updating SLA policy:", error);
+      res.status(500).json({ message: "Failed to update SLA policy" });
+    }
+  });
+
+  app.delete("/api/sla-policies/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSlaPolicy(id);
+      res.json({ message: "SLA policy deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting SLA policy:", error);
+      res.status(500).json({ message: "Failed to delete SLA policy" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

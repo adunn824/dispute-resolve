@@ -12,6 +12,8 @@ import { Dashboard } from "./components/Dashboard";
 import { CaseIntakeForm } from "./components/CaseIntakeForm";
 import { CaseDetailView } from "./components/CaseDetailView";
 import { AdminConfigPanel } from "./components/AdminConfigPanel";
+import CaseTypesManagement from "./pages/admin/case-types";
+import BusinessRulesManagement from "./pages/admin/business-rules";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -61,6 +63,12 @@ function Router() {
       </Route>
       <Route path="/admin">
         <AdminConfigPanel onPublishConfig={() => console.log("Config published")} />
+      </Route>
+      <Route path="/admin/case-types">
+        <CaseTypesManagement />
+      </Route>
+      <Route path="/admin/business-rules">
+        <BusinessRulesManagement />
       </Route>
       <Route path="/compliance">
         <Dashboard
