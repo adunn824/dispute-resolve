@@ -75,6 +75,7 @@ export interface IStorage {
   
   // Customer methods
   getCustomer(id: string): Promise<Customer | undefined>;
+  getCustomers(filters?: { limit?: number; offset?: number }): Promise<Customer[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   findCustomerByName(name: string): Promise<Customer[]>;
   
@@ -227,6 +228,20 @@ export class DatabaseStorage implements IStorage {
     return customer;
   }
 
+  async getCustomers(filters?: { limit?: number; offset?: number }): Promise<Customer[]> {
+    let query = db.select().from(customers).orderBy(desc(customers.createdAt));
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    
+    if (filters?.offset) {
+      query = query.offset(filters.offset);
+    }
+    
+    return await query.execute();
+  }
+
   async findCustomerByName(name: string): Promise<Customer[]> {
     return await db.select().from(customers).where(ilike(customers.name, `%${name}%`));
   }
@@ -279,7 +294,7 @@ export class DatabaseStorage implements IStorage {
       baseQuery = baseQuery.offset(filters.offset);
     }
     
-    return await baseQuery;
+    return await baseQuery.execute();
   }
 
   async createCase(insertCase: InsertCase): Promise<Case> {
