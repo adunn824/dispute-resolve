@@ -1,0 +1,229 @@
+You are building a stand-alone Complaint & Dispute Management platform as a single-repo Replit project using TypeScript, Next.js (App Router) for the UI, and an Express API in the same repo. Use a config-driven architecture (no hardcoded categories/checklists). Optimize for Replit constraints (ephemeral FS, limited background workers, no Redis by default).
+
+0) Tech baseline (Replit-friendly)
+
+Single repository, not a monorepo.
+
+Frontend: Next.js (App Router), React Query, Zod, Tailwind, shadcn/ui.
+
+Backend: Express + TypeScript (in /api folder or custom server under /server).
+
+ORM/DB: Prisma. Dev: SQLite if DATABASE_URL absent. Prod-ready: Postgres when DATABASE_URL present.
+
+Env: .env.local with typed access. Provide .env.example.
+
+Testing: Vitest for units; Playwright later for e2e.
+
+Lint/format: ESLint + Prettier.
+
+Health: /healthz (web) and /api/healthz (API).
+
+1) Functional goal (from workflow doc)
+
+Build a system to intake and resolve Mail, Complaint, and Dispute cases with:
+
+Universal fields (customer, loan, state, details, priority, etc.).
+
+Branching checklists by Case Type → Category, with required uploads/flags.
+
+Resolution module (disposition, sub-disposition, settlement, policy violation, etc.).
+
+Priority rules (e.g., Critical for AG/CFPB/Military/Search Warrant/Subpoena/Suspected ID Theft; High for BBB/BCA/C&D/Lawsuit/Loan Dispute/Private Attorney/Verbal/Written; Medium for Viking POA/FactorTrust/PDS/ACH Revoke; Low for E-Fax/Misc; BK-specific 24/48 hr SLAs). These must be admin-editable, not hardcoded.
+
+Flags/Tags (e.g., Do Not Contact, Complaint-Regulatory, Fraud Trigger Words), applied by rules.
+
+Documents (loan agreement, police report, POA, etc.) with S3 presigned upload/download.
+
+Audit trail, dashboards, and admin config panel to add/edit categories, checklists, rules, and value sets without code.
+
+2) Data model (Prisma schema)
+
+Create these runtime tables (simplified names → camelCase fields):
+
+User (id, email unique, name, role: ‘agent’|‘compliance’|‘admin’, status, createdAt, updatedAt)
+
+Customer (id, externalId?, name, state, createdAt, updatedAt)
+
+Case (id, caseType: ‘Mail’|‘Complaint’|‘Dispute’, categoryId FK, priority: ‘Low’|‘Medium’|‘High’|‘Critical’|‘BK24’|‘BK48’, customerId FK, loanId?, state, details text, status: ‘open’|‘pending’|‘resolved’|‘closed’, configVersion int, createdAt, updatedAt)
+
+ChecklistItem (id, caseId FK, key, label, isRequired bool, status: ‘open’|‘complete’, assignedToUserId?, completedAt?)
+
+Document (id, caseId FK, key, label, fileType, mime, storageKey, uploadedByUserId FK, uploadedAt)
+
+Resolution (id, caseId FK unique, disposition, subDisposition?, notes?, settlementAmount decimal?, forgivenAmount decimal?, policyViolation: ‘Yes’|‘No’|‘N/A’, resolvedAt)
+
+Flag (id, caseId FK, flagType, appliedByUserId FK, appliedAt)
+
+AuditLog (id, caseId FK, actorUserId?, action, details json, createdAt)
+
+Create these admin-config tables (no hardcoding; versionable):
+
+CaseType (id, name, isActive)
+
+Category (id, caseTypeId FK, name, code, description, sortOrder int, isActive, version int, effectiveFrom, effectiveTo?)
+
+ChecklistTemplate (id, categoryId FK, key, label, sortOrder int, isRequired bool, conditionJson json, helpText?)
+
+DocumentRequirement (id, categoryId FK, key, label, isRequired bool, mimeWhitelist string[], conditionJson json)
+
+PriorityRule (id, categoryId FK, ruleJson json, priorityValue string)
+
+TagRule (id, categoryId FK, ruleJson json, tags string[])
+
+ResolutionConfig (id, categoryId FK, fieldsJson json)
+
+SlaPolicy (id, categoryId FK, targetHours int, clockStartsOn string, pauseOnStatus string[])
+
+ValueSet (id, key unique, valuesJson json) // e.g., US states, dispositions
+
+ConfigAudit (id, userId FK, entity, entityId, action, beforeJson json, afterJson json, createdAt)
+
+FeatureFlag (id, key unique, on bool, audienceJson json)
+
+Webhook (id, name, eventKey, url, secret?, isActive, createdAt, updatedAt)
+
+Integration (id, name, settingsJson json, isActive, createdAt, updatedAt)
+
+Relations/Indexes:
+
+Case→Customer (many:1), Case→Category (many:1).
+
+Children (ChecklistItem, Document, Resolution, Flag, AuditLog) → Case (many:1).
+
+Indexes on Case(caseType, categoryId, priority, status, createdAt, customerId, loanId).
+
+Unique: Resolution(caseId).
+
+Use soft disable isActive in config tables; avoid hard deletes.
+
+Case.configVersion pins the config snapshot used at creation.
+
+3) Seeds (minimal, to prove flow)
+
+CaseTypes: Mail, Complaint, Dispute.
+
+ValueSet: states (US states), dispositions (Addressed, Inquiry Only, No Customer Info Found, Other, Resolved & Closed).
+
+Example Categories (admin-editable; just a few to start):
+
+Complaint: CFPB, BBB, Cease & Desist/Do Not Contact, Lawsuit, Loan Dispute, Military, Private Attorney, Verbal Complaint, Suspected Fraud/ID Theft, Search Warrant/Subpoena.
+
+Mail: Bankruptcy, ACH Revoke, E-Fax/Misc, TrustPilot.
+
+Dispute: FactorTrust, Viking POA Dispute, PDS Dispute, Inquiry/ID Theft Block, Third-Party Reinvestigation (Clarity/FactorTrust).
+
+For each sample Category, add a couple of ChecklistTemplate rows (e.g., “Upload Loan Agreement”, “Cease Communications”, “Complete Incident Info”), one DocumentRequirement (e.g., “police_report” PDF optional), one ResolutionConfig.fieldsJson set, and simple PriorityRule/TagRule/SlaPolicy.
+
+One demo User (admin) and one demo Customer, and one demo Case wired up.
+
+4) API endpoints (Express, JSON)
+
+Cases: POST /api/cases (create; assign configVersion), GET /api/cases/:id, PUT /api/cases/:id, GET /api/cases (filters: status, priority, type, category, state, date range, text).
+
+Checklist: GET /api/cases/:id/checklist (materialize from templates into per-case items on first fetch), PUT /api/checklist/:itemId (toggle complete/assign).
+
+Documents: POST /api/cases/:id/documents/presign (S3 presigned upload), GET /api/cases/:id/documents (list with presigned download).
+
+Resolution: POST /api/cases/:id/resolution (validate required items/docs, then lock case), GET /api/cases/:id/resolution.
+
+Flags/Notes/Audit: POST /api/cases/:id/flags, GET /api/cases/:id/audit, POST /api/cases/:id/notes.
+
+Config (admin): CRUD endpoints for all config tables; POST /api/admin/config/publish (snapshot current config into a new version; bump version; write ConfigAudit); POST /api/admin/config/cache/flush.
+
+Config read: GET /api/config/latest, GET /api/config/version/:v, GET /api/value-sets/:key.
+
+Health: /api/healthz.
+
+5) Frontend (Next.js)
+
+Auth stub for dev (simple username/password in memory). Leave Azure AD OIDC placeholders commented for later.
+
+Pages/Routes:
+
+Case Intake: universal fields + Case Type + Category; dynamic fields from config; “Create Case”.
+
+Case Detail: tabs → Checklist, Documents, Resolution, Audit; “Resolve” disabled until all required items validate via Zod.
+
+Dashboards:
+
+Agent: my open cases, SLA countdowns, blocked cases.
+
+Compliance: cases by type, trend charts, regulator/tribe response status, CSV export.
+
+Admin: config versions, feature flags, webhooks status; full Admin Config Panel (below).
+
+Admin Config Panel: tabs for Case Types, Categories, Checklist Templates, Document Requirements, Rules (Priority/Tags/SLA), Resolution Fields, Value Sets, Webhooks, Integrations, Feature Flags. Draft → Preview (simulate a case) → Publish flow with rollback and diff from ConfigAudit.
+
+FormRenderer: generic component reading config JSON to render fields, checklist, and upload widgets. All required/conditional logic in config.
+
+6) Rule engines (pure TS functions)
+
+PriorityEngine reads priority_rules.ruleJson + case context to set highest matching priority.
+
+TagEngine merges tag_rules.tags for case context.
+
+SLAEngine computes targetAt, respects pauseOnStatus.
+
+Trigger engines on case create/update and when category changes. Unit tests with sample rules.
+
+7) Files & storage
+
+Do not store binaries on Replit FS. Implement S3 presigned upload/download (R2 compatible).
+
+DocumentRequirement.mimeWhitelist enforced server-side.
+
+Add ClamAV placeholder hook (doc string explaining where to wire a scanner in prod).
+
+8) Background jobs & SLAs (Replit constraints)
+
+Use node-cron fallback to check SLA breaches hourly and send webhooks.
+
+Provide manual trigger endpoints (e.g., POST /api/admin/jobs/run-sla) since Replit may sleep.
+
+Code jobs to be idempotent.
+
+9) Security & reliability
+
+Global error handler with sanitized messages; 429 rate limits per user/IP; input size limits; PII masked in logs.
+
+Role-based checks (agent/compliance/admin) on admin and sensitive endpoints (even with dev auth stub).
+
+Field-level encryption helper example (e.g., for SSN if later added).
+
+10) Performance
+
+Add DB indexes for common filters (caseType, categoryId, priority, status, createdAt, customerId, loanId).
+
+Server-side pagination on lists and dashboard tables.
+
+11) Dev UX & scripts
+
+NPM scripts:
+
+dev (concurrently run Next.js and Express)
+
+db:gen (prisma generate), db:migrate, db:push, db:seed
+
+test, lint, format
+
+Provide prisma/seed.ts idempotent upserts to load sample config + demo user/customer/case.
+
+Provide README.md with setup steps (SQLite by default; Postgres via DATABASE_URL).
+
+Provide DEPLOYMENT.md with notes for Replit dev, Railway/Fly staging, AWS prod (S3/RDS), and environment variable matrix.
+
+12) Acceptance criteria (must all pass)
+
+npm run db:migrate then npm run db:seed succeeds on Replit.
+
+Can create a Complaint → CFPB case, complete a couple of checklist items, upload a doc via presigned S3 URL, and resolve the case only after required items are done.
+
+Admin can add a new Category (e.g., Complaint → “Attorney General”), attach checklist/doc requirements, Publish, and see it appear instantly in Case Intake without a code change.
+
+Priority rules, tag rules, and SLA target compute as expected for seeded examples (Critical vs High vs etc.).
+
+Dashboards load with filters and pagination under ~500ms on seeded data; CSV export works.
+
+Audit log shows create/edit/doc-upload/checklist-complete/resolve/config-publish entries.
+
+If any step is not supported in Replit’s environment, propose a lightweight fallback that maintains MVP function (e.g., in-memory cache instead of Redis, manual job triggers, etc.). Keep the implementation simple and production-migratable.
