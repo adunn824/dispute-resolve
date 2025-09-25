@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
 import { 
   insertCaseSchema, 
   insertCustomerSchema,
@@ -11,10 +12,25 @@ import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Setup authentication
+  await setupAuth(app);
+
+  // Auth endpoints
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+  
   // Case Management API Endpoints
   
   // GET /api/cases - List cases with filtering and pagination
-  app.get("/api/cases", async (req, res) => {
+  app.get("/api/cases", isAuthenticated, async (req, res) => {
     try {
       const querySchema = z.object({
         status: z.string().optional(),
@@ -48,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/cases/:id - Get single case by ID
-  app.get("/api/cases/:id", async (req, res) => {
+  app.get("/api/cases/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const caseRecord = await storage.getCase(id);
@@ -64,8 +80,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/cases - Create new case
-  app.post("/api/cases", async (req, res) => {
+  // POST /api/cases - Create new case (agents and above)
+  app.post("/api/cases", requireRole('agent'), async (req: any, res) => {
     try {
       const caseData = insertCaseSchema.parse(req.body);
       const newCase = await storage.createCase(caseData);
@@ -73,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create audit log for case creation
       await storage.createAuditLog({
         caseId: newCase.id,
-        actorUserId: null, // TODO: Get from auth session
+        actorUserId: req.dbUser.id,
         action: "case_created",
         details: { caseId: newCase.id, initialStatus: newCase.status }
       });
@@ -88,8 +104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PUT /api/cases/:id - Update existing case
-  app.put("/api/cases/:id", async (req, res) => {
+  // PUT /api/cases/:id - Update existing case (agents and above)
+  app.put("/api/cases/:id", requireRole('agent'), async (req: any, res) => {
     try {
       const { id } = req.params;
       const updates = insertCaseSchema.partial().parse(req.body);
@@ -105,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create audit log for case update
       await storage.createAuditLog({
         caseId: id,
-        actorUserId: null, // TODO: Get from auth session
+        actorUserId: req.dbUser.id,
         action: "case_updated", 
         details: { updates, previousStatus: existingCase.status, newStatus: updatedCase.status }
       });
@@ -123,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer Management API Endpoints
   
   // GET /api/customers - List customers
-  app.get("/api/customers", async (req, res) => {
+  app.get("/api/customers", isAuthenticated, async (req, res) => {
     try {
       const querySchema = z.object({
         name: z.string().optional(),
@@ -160,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/customers/:id - Get single customer by ID
-  app.get("/api/customers/:id", async (req, res) => {
+  app.get("/api/customers/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const customer = await storage.getCustomer(id);
@@ -176,8 +192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/customers - Create new customer
-  app.post("/api/customers", async (req, res) => {
+  // POST /api/customers - Create new customer (agents and above)
+  app.post("/api/customers", requireRole('agent'), async (req, res) => {
     try {
       const customerData = insertCustomerSchema.parse(req.body);
       const newCustomer = await storage.createCustomer(customerData);
@@ -194,8 +210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Configuration API Endpoints (Read-only for now)
   
-  // GET /api/case-types - List case types
-  app.get("/api/case-types", async (req, res) => {
+  // GET /api/case-types - List case types  
+  app.get("/api/case-types", isAuthenticated, async (req, res) => {
     try {
       const caseTypes = await storage.getCaseTypes();
       res.json({ data: caseTypes });
@@ -206,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/categories - List categories (optionally filtered by case type)
-  app.get("/api/categories", async (req, res) => {
+  app.get("/api/categories", isAuthenticated, async (req, res) => {
     try {
       const querySchema = z.object({
         caseTypeId: z.string().optional()
@@ -224,8 +240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/categories/:categoryId/priority-rules - Get priority rules for category
-  app.get("/api/categories/:categoryId/priority-rules", async (req, res) => {
+  // GET /api/categories/:categoryId/priority-rules - Get priority rules for category  
+  app.get("/api/categories/:categoryId/priority-rules", requireRole('compliance'), async (req, res) => {
     try {
       const { categoryId } = req.params;
       const priorityRules = await storage.getPriorityRules(categoryId);
