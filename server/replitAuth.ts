@@ -100,6 +100,14 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    // Development fallback for non-Replit domains
+    if (!process.env.REPLIT_DOMAINS || !process.env.REPLIT_DOMAINS.includes(req.hostname)) {
+      return res.status(400).json({ 
+        message: "Authentication only available on Replit platform",
+        dev_note: "This authentication system requires deployment on Replit for proper OIDC integration"
+      });
+    }
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
@@ -107,6 +115,11 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    // Development fallback for non-Replit domains
+    if (!process.env.REPLIT_DOMAINS || !process.env.REPLIT_DOMAINS.includes(req.hostname)) {
+      return res.redirect("/?auth=dev");
+    }
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
