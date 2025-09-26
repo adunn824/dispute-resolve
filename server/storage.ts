@@ -22,6 +22,7 @@ import {
   integrations,
   type User, 
   type InsertUser,
+  type UpsertUser,
   type Customer,
   type InsertCustomer,
   type Case,

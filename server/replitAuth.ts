@@ -38,7 +38,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
     },
   });
@@ -55,20 +55,38 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
-  const firstName = claims["first_name"] || "";
-  const lastName = claims["last_name"] || "";
-  const name = `${firstName} ${lastName}`.trim() || claims["email"]?.split("@")[0] || "User";
-  const role = claims["role"] || "agent"; // Default to 'agent' if role not provided
-  
-  await storage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: firstName,
-    lastName: lastName,
-    name: name,
-    role: role,
-    profileImageUrl: claims["profile_image_url"],
-  });
+  try {
+    console.log("Upserting user with claims:", JSON.stringify(claims, null, 2));
+    
+    // Create minimal user data matching the blueprint
+    const userData = {
+      id: claims["sub"],
+      email: claims["email"],
+      firstName: claims["first_name"],
+      lastName: claims["last_name"],
+      profileImageUrl: claims["profile_image_url"],
+    };
+    
+    // Add required fields for our schema
+    const firstName = claims["first_name"] || "";
+    const lastName = claims["last_name"] || "";
+    const name = `${firstName} ${lastName}`.trim() || claims["email"]?.split("@")[0] || "User";
+    
+    const finalUserData = {
+      ...userData,
+      name: name,
+      role: "agent", // Use default role
+    };
+    
+    console.log("Final user data for upsert:", JSON.stringify(finalUserData, null, 2));
+    
+    const result = await storage.upsertUser(finalUserData);
+    console.log("User upserted successfully:", result.id);
+    return result;
+  } catch (error) {
+    console.error("Error upserting user:", error);
+    throw error;
+  }
 }
 
 export async function setupAuth(app: Express) {
