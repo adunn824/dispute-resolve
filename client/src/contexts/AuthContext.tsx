@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 
 interface User {
   id: string;
@@ -50,22 +49,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refetchOnWindowFocus: false,
   });
 
-  // Logout mutation
-  const logoutMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
-      setIsAuthenticated(false);
-      queryClient.clear();
-      window.location.href = "/login";
-    },
-    onError: () => {
-      // Even if logout fails, clear local state
-      setIsAuthenticated(false);
-      queryClient.clear();
-      window.location.href = "/login";
-    },
-  });
-
   // Update authentication status based on user data
   useEffect(() => {
     if (user) {
@@ -80,7 +63,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
-    logoutMutation.mutate();
+    window.location.href = "/api/logout";
   };
 
   const contextValue: AuthContextType = {

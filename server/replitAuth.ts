@@ -63,11 +63,11 @@ async function upsertUser(claims: any) {
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
-    name: name,
     firstName: firstName,
     lastName: lastName,
-    profileImageUrl: claims["profile_image_url"],
+    name: name,
     role: role,
+    profileImageUrl: claims["profile_image_url"],
   });
 }
 
@@ -133,9 +133,14 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.post("/api/logout", (req, res) => {
+  app.get("/api/logout", (req, res) => {
     req.logout(() => {
-      res.json({ success: true, message: "Logged out successfully" });
+      res.redirect(
+        client.buildEndSessionUrl(config, {
+          client_id: process.env.REPL_ID!,
+          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+        }).href
+      );
     });
   });
 }
