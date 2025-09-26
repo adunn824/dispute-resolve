@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
+import { setupAuth } from "./auth";
 import { 
   insertCaseSchema, 
   insertCustomerSchema,
@@ -11,6 +11,47 @@ import {
 import { z } from "zod";
 import multer from "multer";
 
+// Simple authentication middleware that also populates req.dbUser
+const requireAuth = (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  // Populate req.dbUser for backward compatibility with existing route handlers
+  req.dbUser = req.user;
+  next();
+};
+
+// Role hierarchy: admin > compliance > agent
+const roleHierarchy = {
+  'admin': 3,
+  'compliance': 2,
+  'agent': 1
+};
+
+// Role-based authorization middleware with proper hierarchy (admin can access agent-level endpoints)
+const requireRole = (roles: string | string[]) => (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const roleArray = Array.isArray(roles) ? roles : [roles];
+  const userRoleLevel = roleHierarchy[req.user.role as keyof typeof roleHierarchy] || 0;
+  
+  // Check if user's role level meets or exceeds any of the required roles
+  const hasPermission = roleArray.some(requiredRole => {
+    const requiredLevel = roleHierarchy[requiredRole as keyof typeof roleHierarchy] || 0;
+    return userRoleLevel >= requiredLevel;
+  });
+  
+  if (!hasPermission) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  
+  // Populate req.dbUser for backward compatibility with existing route handlers
+  req.dbUser = req.user;
+  next();
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup multer for file uploads
@@ -19,25 +60,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
   });
   
-  // Setup authentication
-  await setupAuth(app);
-
-  // Auth endpoints
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // Setup authentication (sets up /api/register, /api/login, /api/logout, /api/user)
+  setupAuth(app);
   
   // Case Management API Endpoints
   
   // GET /api/cases - List cases with filtering and pagination
-  app.get("/api/cases", isAuthenticated, async (req, res) => {
+  app.get("/api/cases", requireAuth, async (req, res) => {
     try {
       const querySchema = z.object({
         status: z.string().optional(),
@@ -71,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/cases/:id - Get single case by ID
-  app.get("/api/cases/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/cases/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const caseRecord = await storage.getCase(id);
@@ -88,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/cases - Create new case (agents and above)
-  app.post("/api/cases", requireRole('agent'), async (req: any, res) => {
+  app.post("/api/cases", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {
       const caseData = insertCaseSchema.parse(req.body);
       const newCase = await storage.createCase(caseData);
@@ -112,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/cases/:id - Update existing case (agents and above)
-  app.put("/api/cases/:id", requireRole('agent'), async (req: any, res) => {
+  app.put("/api/cases/:id", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {
       const { id } = req.params;
       const updates = insertCaseSchema.partial().parse(req.body);
@@ -146,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer Management API Endpoints
   
   // GET /api/customers - List customers
-  app.get("/api/customers", isAuthenticated, async (req, res) => {
+  app.get("/api/customers", requireAuth, async (req, res) => {
     try {
       const querySchema = z.object({
         name: z.string().optional(),
@@ -183,7 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/customers/:id - Get single customer by ID
-  app.get("/api/customers/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/customers/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const customer = await storage.getCustomer(id);
@@ -200,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/customers - Create new customer (agents and above)
-  app.post("/api/customers", requireRole('agent'), async (req, res) => {
+  app.post("/api/customers", requireRole(['agent', 'admin']), async (req, res) => {
     try {
       const customerData = insertCustomerSchema.parse(req.body);
       const newCustomer = await storage.createCustomer(customerData);
@@ -218,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Configuration API Endpoints (Read-only for now)
   
   // GET /api/case-types - List case types  
-  app.get("/api/case-types", isAuthenticated, async (req, res) => {
+  app.get("/api/case-types", requireAuth, async (req, res) => {
     try {
       const caseTypes = await storage.getCaseTypes();
       res.json({ data: caseTypes });
@@ -229,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/categories - List categories (optionally filtered by case type)
-  app.get("/api/categories", isAuthenticated, async (req, res) => {
+  app.get("/api/categories", requireAuth, async (req, res) => {
     try {
       const querySchema = z.object({
         caseTypeId: z.string().optional()
@@ -262,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin Configuration APIs (Create, Update, Delete)
   
   // Case Types Admin Management  
-  app.post("/api/case-types", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/case-types", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { name, description, color, active } = req.body;
       const caseType = await storage.createCaseType({
@@ -278,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/case-types/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/case-types/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description, color, active } = req.body;
@@ -295,7 +324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/case-types/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/case-types/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteCaseType(id);
@@ -307,7 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Categories Admin Management
-  app.post("/api/categories", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/categories", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { name, description, caseTypeId, active } = req.body;
       const category = await storage.createCategory({
@@ -324,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/categories/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/categories/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description, caseTypeId, active } = req.body;
@@ -341,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/categories/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/categories/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteCategory(id);
@@ -353,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Business Rules Management
-  app.get("/api/priority-rules", isAuthenticated, requireRole("compliance"), async (req, res) => {
+  app.get("/api/priority-rules", requireAuth, requireRole("compliance"), async (req, res) => {
     try {
       const rules = await storage.getAllPriorityRules();
       res.json(rules);
@@ -363,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/priority-rules", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/priority-rules", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { name, description, priority, conditions, active } = req.body;
       const rule = await storage.createPriorityRule({
@@ -380,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/priority-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/priority-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description, priority, conditions, active } = req.body;
@@ -398,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/priority-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/priority-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deletePriorityRule(id);
@@ -410,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tag Rules Management
-  app.get("/api/tag-rules", isAuthenticated, requireRole("compliance"), async (req, res) => {
+  app.get("/api/tag-rules", requireAuth, requireRole("compliance"), async (req, res) => {
     try {
       const rules = await storage.getAllTagRules();
       res.json(rules);
@@ -420,7 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tag-rules", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/tag-rules", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { name, description, tag, conditions, active } = req.body;
       const rule = await storage.createTagRule({
@@ -437,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/tag-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/tag-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description, tag, conditions, active } = req.body;
@@ -455,7 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/tag-rules/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/tag-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteTagRule(id);
@@ -467,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // SLA Policies Management
-  app.get("/api/sla-policies", isAuthenticated, requireRole("compliance"), async (req, res) => {
+  app.get("/api/sla-policies", requireAuth, requireRole("compliance"), async (req, res) => {
     try {
       const policies = await storage.getAllSlaPolicies();
       res.json(policies);
@@ -477,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sla-policies", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/sla-policies", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { name, description, priority, responseTimeHours, resolutionTimeHours, active } = req.body;
       const policy = await storage.createSlaPolicy({
@@ -495,7 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/sla-policies/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/sla-policies/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description, priority, responseTimeHours, resolutionTimeHours, active } = req.body;
@@ -514,7 +543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/sla-policies/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/sla-policies/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteSlaPolicy(id);
@@ -526,7 +555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Checklist Templates Management
-  app.get("/api/categories/:categoryId/checklist-templates", isAuthenticated, async (req, res) => {
+  app.get("/api/categories/:categoryId/checklist-templates", requireAuth, async (req, res) => {
     try {
       const { categoryId } = req.params;
       const templates = await storage.getChecklistTemplates(categoryId);
@@ -537,7 +566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/categories/:categoryId/checklist-templates", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/categories/:categoryId/checklist-templates", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { categoryId } = req.params;
       const { key, label, sortOrder, isRequired, conditionJson, helpText } = req.body;
@@ -557,7 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/checklist-templates/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { key, label, sortOrder, isRequired, conditionJson, helpText } = req.body;
@@ -576,7 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/checklist-templates/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteChecklistTemplate(id);
@@ -588,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document Requirements Management  
-  app.get("/api/categories/:categoryId/document-requirements", isAuthenticated, async (req, res) => {
+  app.get("/api/categories/:categoryId/document-requirements", requireAuth, async (req, res) => {
     try {
       const { categoryId } = req.params;
       const requirements = await storage.getDocumentRequirements(categoryId);
@@ -599,7 +628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/categories/:categoryId/document-requirements", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.post("/api/categories/:categoryId/document-requirements", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { categoryId } = req.params;
       const { key, label, isRequired, mimeWhitelist, conditionJson } = req.body;
@@ -618,7 +647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/document-requirements/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.put("/api/document-requirements/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { key, label, isRequired, mimeWhitelist, conditionJson } = req.body;
@@ -636,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/document-requirements/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+  app.delete("/api/document-requirements/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteDocumentRequirement(id);
@@ -648,7 +677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document Management
-  app.get("/api/cases/:caseId/documents", isAuthenticated, async (req, res) => {
+  app.get("/api/cases/:caseId/documents", requireAuth, async (req, res) => {
     try {
       const { caseId } = req.params;
       const documents = await storage.getDocuments(caseId);
@@ -659,7 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cases/:caseId/documents/upload", isAuthenticated, upload.single('file'), async (req, res) => {
+  app.post("/api/cases/:caseId/documents/upload", requireAuth, upload.single('file'), async (req, res) => {
     try {
       const { caseId } = req.params;
       const { key, label } = req.body;
@@ -710,7 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/documents/:id/download", isAuthenticated, async (req, res) => {
+  app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -733,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/documents/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/documents/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.user!.id;
@@ -749,7 +778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Checklist Items Management
-  app.get("/api/cases/:caseId/checklist-items", isAuthenticated, async (req, res) => {
+  app.get("/api/cases/:caseId/checklist-items", requireAuth, async (req, res) => {
     try {
       const { caseId } = req.params;
       const checklistItems = await storage.getChecklistItems(caseId);
@@ -760,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cases/:caseId/checklist-items/generate", isAuthenticated, async (req, res) => {
+  app.post("/api/cases/:caseId/checklist-items/generate", requireAuth, async (req, res) => {
     try {
       const { caseId } = req.params;
       
@@ -797,7 +826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/checklist-items/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/checklist-items/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const { status, assignedToUserId } = req.body;
@@ -824,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/checklist-items/:id/complete", isAuthenticated, async (req, res) => {
+  app.post("/api/checklist-items/:id/complete", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.user!.id;
@@ -842,7 +871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/checklist-items/:id/reopen", isAuthenticated, async (req, res) => {
+  app.post("/api/checklist-items/:id/reopen", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -859,7 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get users for assignment
-  app.get("/api/users", isAuthenticated, async (req, res) => {
+  app.get("/api/users", requireAuth, async (req, res) => {
     try {
       // For now, return current user + mock agents for assignment
       // TODO: Implement proper user listing when user management is added

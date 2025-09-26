@@ -1,14 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LogIn, Shield, FileText, Users } from "lucide-react";
+import { LogIn, Shield, FileText, Users, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 export function LoginPage() {
-  const { isAuthenticated, login, isLoading } = useAuth();
+  const { isAuthenticated, refetchUser, isLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -16,6 +23,34 @@ export function LoginPage() {
       setLocation("/");
     }
   }, [isAuthenticated, setLocation]);
+
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: { username: string; password: string }) => {
+      const response = await apiRequest('POST', '/api/login', credentials);
+      return response;
+    },
+    onSuccess: () => {
+      // Refetch user data to update auth state
+      refetchUser();
+      setLocation("/");
+    },
+    onError: (err: any) => {
+      setError(err.message || "Login failed. Please check your credentials.");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    
+    if (!username || !password) {
+      setError("Please enter both username and password");
+      return;
+    }
+
+    loginMutation.mutate({ username, password });
+  };
 
   if (isLoading) {
     return (
@@ -49,24 +84,69 @@ export function LoginPage() {
           <CardHeader className="text-center">
             <CardTitle>Welcome Back</CardTitle>
             <CardDescription>
-              Sign in with your Replit account to continue
+              Sign in to your account to continue
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={login} 
-              className="w-full" 
-              size="lg"
-              data-testid="button-login"
-            >
-              <LogIn className="h-4 w-4 mr-2" />
-              Sign in with Replit
-            </Button>
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  data-testid="input-username"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  data-testid="input-password"
+                />
+              </div>
+
+              <Button 
+                type="submit"
+                className="w-full" 
+                size="lg"
+                disabled={loginMutation.isPending}
+                data-testid="button-login"
+              >
+                {loginMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Sign In
+                  </>
+                )}
+              </Button>
+            </form>
 
             <Alert>
               <Shield className="h-4 w-4" />
               <AlertDescription>
-                Secure authentication powered by Replit OAuth. Your credentials are never stored locally.
+                Your credentials are securely encrypted and protected.
               </AlertDescription>
             </Alert>
           </CardContent>
