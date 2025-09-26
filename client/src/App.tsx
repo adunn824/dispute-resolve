@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Switch, Route } from "wouter";
+import { useState, useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,6 +26,7 @@ import { UserMenu } from "./components/UserMenu";
 
 function Router() {
   const { user } = useAuth();
+  const [location, setLocation] = useLocation();
   const [currentView, setCurrentView] = useState<"dashboard" | "new-case" | "case-detail" | "admin">("dashboard");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
@@ -48,6 +49,13 @@ function Router() {
   };
 
   const userRole = (user?.role as "admin" | "agent" | "compliance") || "agent";
+
+  // Auto-redirect admin users from root to case types management
+  useEffect(() => {
+    if (user?.role === "admin" && (location === "/" || location === "/admin") && currentView === "dashboard") {
+      setLocation("/admin/case-types");
+    }
+  }, [user, location, currentView, setLocation]);
 
   return (
     <Switch>
@@ -79,7 +87,7 @@ function Router() {
       </Route>
       <Route path="/admin">
         <ProtectedRoute requiredRole="admin">
-          <AdminConfigPanel onPublishConfig={() => console.log("Config published")} />
+          <CaseTypesManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/case-types">

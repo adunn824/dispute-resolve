@@ -35,7 +35,6 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
   ];
 
   const adminItems = [
-    { title: "Dashboard", url: "/admin", icon: Shield },
     { title: "Case Types", url: "/admin/case-types", icon: FileText },
     { title: "Categories", url: "/admin/categories", icon: FileText },
     { title: "Rules", url: "/admin/rules", icon: Settings },

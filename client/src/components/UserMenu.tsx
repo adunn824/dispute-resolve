@@ -21,21 +21,25 @@ export function UserMenu() {
   if (!user) return null;
 
   const handleProfileClick = () => {
-    // For now, navigate to admin panel since profile page doesn't exist
-    setLocation("/admin");
+    // Navigate to case types for admin users, main dashboard for others
+    if (user.role === "admin") {
+      setLocation("/admin/case-types");
+    } else {
+      setLocation("/");
+    }
   };
 
   const handleSettingsClick = () => {
-    // Navigate to system settings for admin users, otherwise to admin panel
+    // Navigate to system settings for admin users, otherwise to main dashboard
     if (user.role === "admin") {
       setLocation("/admin/system");
     } else {
-      setLocation("/admin");
+      setLocation("/");
     }
   };
 
   const handleAdminPanelClick = () => {
-    setLocation("/admin");
+    setLocation("/admin/case-types");
   };
 
   const getInitials = (firstName: string, lastName: string) => {
