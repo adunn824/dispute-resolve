@@ -65,9 +65,21 @@ import {
   type InsertIntegration
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
 import session from "express-session";
 import ConnectPgSession from "connect-pg-simple";
+
+// Dashboard statistics interface
+export interface DashboardStats {
+  totalCases: number;
+  openCases: number;
+  pendingCases: number;
+  resolvedToday: number;
+  slaBreaches: number;
+  averageResolutionTime: string;
+  recentCases: Case[];
+  slaAlerts: { caseId: string; customerName: string; hoursRemaining: number; }[];
+}
 
 export interface IStorage {
   // Authentication
@@ -188,6 +200,9 @@ export interface IStorage {
   getAllPriorityRules(): Promise<PriorityRule[]>;
   getAllTagRules(): Promise<TagRule[]>;
   getAllSlaPolicies(): Promise<SlaPolicy[]>;
+  
+  // Dashboard methods
+  getDashboardStats(): Promise<DashboardStats>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -771,6 +786,48 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSlaPolicies(): Promise<SlaPolicy[]> {
     return await db.select().from(slaPolicies).orderBy(asc(slaPolicies.name));
+  }
+
+  // Dashboard methods
+  async getDashboardStats(): Promise<DashboardStats> {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Get basic case counts
+    const [
+      totalCases,
+      openCases,
+      pendingCases,
+      resolvedToday,
+    ] = await Promise.all([
+      db.select({ count: sql<number>`count(*)::int` }).from(cases).then(r => r[0]?.count || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(cases).where(eq(cases.status, 'open')).then(r => r[0]?.count || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(cases).where(eq(cases.status, 'pending')).then(r => r[0]?.count || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(cases)
+        .where(and(eq(cases.status, 'resolved'), gte(cases.updatedAt, startOfToday)))
+        .then(r => r[0]?.count || 0)
+    ]);
+
+    // Get recent cases (last 5)
+    const recentCases = await db.select().from(cases)
+      .orderBy(desc(cases.createdAt))
+      .limit(5);
+
+    // Mock SLA data for now (TODO: implement proper SLA calculation)
+    const slaBreaches = 0;
+    const averageResolutionTime = totalCases > 0 ? "2.1 days" : "0 days";
+    const slaAlerts: { caseId: string; customerName: string; hoursRemaining: number; }[] = [];
+
+    return {
+      totalCases,
+      openCases,
+      pendingCases,
+      resolvedToday,
+      slaBreaches,
+      averageResolutionTime,
+      recentCases,
+      slaAlerts
+    };
   }
 }
 

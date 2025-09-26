@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { CaseCard } from "./CaseCard";
 import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "../lib/queryClient";
 import { 
   AlertTriangle, 
   FileText, 
@@ -12,7 +14,8 @@ import {
   Users, 
   TrendingUp, 
   Filter,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
 
 interface DashboardProps {
@@ -21,59 +24,26 @@ interface DashboardProps {
   onViewCase: (id: string) => void;
 }
 
-// Mock dashboard data - TODO: remove mock functionality
-const mockStats = {
-  totalCases: 847,
-  openCases: 124,
-  pendingCases: 43,
-  resolvedToday: 15,
-  slaBreaches: 8,
-  averageResolutionTime: "3.2 days"
-};
-
-const mockRecentCases = [
-  {
-    id: "CASE-001",
-    caseType: "Complaint" as const,
-    category: "CFPB",
-    priority: "Critical" as const,
-    status: "open" as const,
-    customerName: "John Smith",
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    details: "Customer complaint regarding unauthorized charges on their account.",
-    slaDeadline: new Date(Date.now() + 22 * 60 * 60 * 1000)
-  },
-  {
-    id: "CASE-002", 
-    caseType: "Dispute" as const,
-    category: "FactorTrust",
-    priority: "High" as const,
-    status: "pending" as const,
-    customerName: "Sarah Johnson",
-    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-    details: "Dispute regarding credit report accuracy and information verification.",
-    slaDeadline: new Date(Date.now() + 40 * 60 * 60 * 1000)
-  },
-  {
-    id: "CASE-003",
-    caseType: "Mail" as const,
-    category: "Bankruptcy",
-    priority: "BK24" as const,
-    status: "open" as const,
-    customerName: "Michael Chen",
-    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    details: "Bankruptcy notification received requiring immediate processing.",
-    slaDeadline: new Date(Date.now() + 12 * 60 * 60 * 1000)
-  }
-];
-
-const mockSlaAlerts = [
-  { caseId: "CASE-001", customerName: "John Smith", hoursRemaining: 22 },
-  { caseId: "CASE-003", customerName: "Michael Chen", hoursRemaining: 12 },
-  { caseId: "CASE-015", customerName: "Lisa Rodriguez", hoursRemaining: 6 }
-];
+interface DashboardStats {
+  totalCases: number;
+  openCases: number;
+  pendingCases: number;
+  resolvedToday: number;
+  slaBreaches: number;
+  averageResolutionTime: string;
+  recentCases: any[];
+  slaAlerts: { caseId: string; customerName: string; hoursRemaining: number; }[];
+}
 
 export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: DashboardProps) {
+  // Fetch real dashboard data
+  const { data: dashboardData, isLoading, error } = useQuery<{data: DashboardStats}>({
+    queryKey: ["/api/dashboard"],
+    queryFn: () => apiRequest("GET", "/api/dashboard")
+  });
+
+  const stats = dashboardData?.data;
+
   const getDashboardTitle = () => {
     switch (userRole) {
       case "compliance":
@@ -86,28 +56,30 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
   };
 
   const getStatsCards = () => {
+    if (!stats) return [];
+
     const baseStats = [
       {
         title: "Total Cases",
-        value: mockStats.totalCases.toLocaleString(),
+        value: stats.totalCases.toLocaleString(),
         icon: FileText,
         change: "+12% from last month"
       },
       {
         title: "Open Cases",
-        value: mockStats.openCases.toString(),
+        value: stats.openCases.toString(),
         icon: AlertTriangle,
         change: "-5% from last week"
       },
       {
         title: "Pending Review",
-        value: mockStats.pendingCases.toString(),
+        value: stats.pendingCases.toString(),
         icon: Clock,
         change: "+8% from last week"
       },
       {
         title: "Resolved Today",
-        value: mockStats.resolvedToday.toString(),
+        value: stats.resolvedToday.toString(),
         icon: CheckCircle,
         change: "On track with goals"
       }
@@ -118,13 +90,13 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
         ...baseStats,
         {
           title: "SLA Breaches",
-          value: mockStats.slaBreaches.toString(),
+          value: stats.slaBreaches.toString(),
           icon: AlertTriangle,
           change: "-15% from last month"
         },
         {
           title: "Avg Resolution",
-          value: mockStats.averageResolutionTime,
+          value: stats.averageResolutionTime,
           icon: TrendingUp,
           change: "Improved by 0.5 days"
         }
@@ -133,6 +105,27 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
 
     return baseStats;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96" data-testid="dashboard-loading">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading dashboard...</span>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex items-center justify-center h-96 text-center" data-testid="dashboard-error">
+        <div>
+          <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+          <p>Failed to load dashboard data</p>
+          <p className="text-sm text-muted-foreground">Please try refreshing the page</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" data-testid="dashboard">
@@ -182,22 +175,29 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockSlaAlerts.map((alert) => (
-              <div key={alert.caseId} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                <div>
-                  <p className="font-medium">Case #{alert.caseId}</p>
-                  <p className="text-sm text-muted-foreground">{alert.customerName}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="destructive">
-                    {alert.hoursRemaining}h remaining
-                  </Badge>
-                  <Button size="sm" onClick={() => onViewCase(alert.caseId)} data-testid={`button-view-alert-${alert.caseId}`}>
-                    View
-                  </Button>
-                </div>
+            {stats.slaAlerts.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <CheckCircle className="h-8 w-8 mx-auto mb-2" />
+                <p>All SLAs on track</p>
               </div>
-            ))}
+            ) : (
+              stats.slaAlerts.map((alert) => (
+                <div key={alert.caseId} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <div>
+                    <p className="font-medium">Case #{alert.caseId}</p>
+                    <p className="text-sm text-muted-foreground">{alert.customerName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="destructive">
+                      {alert.hoursRemaining}h remaining
+                    </Badge>
+                    <Button size="sm" onClick={() => onViewCase(alert.caseId)} data-testid={`button-view-alert-${alert.caseId}`}>
+                      View
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -211,13 +211,33 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                {mockRecentCases.map((caseData) => (
-                  <CaseCard
-                    key={caseData.id}
-                    {...caseData}
-                    onViewCase={onViewCase}
-                  />
-                ))}
+                {stats.recentCases.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground col-span-full">
+                    <FileText className="h-8 w-8 mx-auto mb-2" />
+                    <p>No recent cases</p>
+                    <p className="text-sm">Cases will appear here once created</p>
+                  </div>
+                ) : (
+                  stats.recentCases.map((caseItem: any) => (
+                    <div key={caseItem.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{caseItem.id}</p>
+                        <p className="text-sm text-muted-foreground">{caseItem.details || "Case details"}</p>
+                      </div>
+                      <div className="text-right">
+                        <StatusBadge status={caseItem.status} />
+                        <Button 
+                          size="sm" 
+                          className="ml-2"
+                          onClick={() => onViewCase(caseItem.id)}
+                          data-testid="button-view-case"
+                        >
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

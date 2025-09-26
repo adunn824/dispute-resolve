@@ -342,6 +342,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Configuration API Endpoints (Read-only for now)
   
+  // GET /api/dashboard - Dashboard statistics
+  app.get("/api/dashboard", requireAuth, async (req, res) => {
+    try {
+      const stats = await storage.getDashboardStats();
+      res.json({ data: stats });
+    } catch (error) {
+      console.error("Failed to fetch dashboard stats:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
   // GET /api/case-types - List case types  
   app.get("/api/case-types", requireAuth, async (req, res) => {
     try {
