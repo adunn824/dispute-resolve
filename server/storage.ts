@@ -102,6 +102,7 @@ export interface IStorage {
   
   // Document methods
   getDocuments(caseId: string): Promise<Document[]>;
+  getDocument(id: string): Promise<Document | undefined>;
   createDocument(document: InsertDocument): Promise<Document>;
   deleteDocument(id: string): Promise<void>;
   
@@ -378,6 +379,11 @@ export class DatabaseStorage implements IStorage {
       .values(insertDocument)
       .returning();
     return document;
+  }
+
+  async getDocument(id: string): Promise<Document | undefined> {
+    const [document] = await db.select().from(documents).where(eq(documents.id, id));
+    return document || undefined;
   }
 
   async deleteDocument(id: string): Promise<void> {

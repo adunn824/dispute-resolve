@@ -241,14 +241,10 @@ export default function TemplatesManagement() {
   };
 
   const onSubmitTemplate = (data: ChecklistTemplateForm) => {
-    const processedData = {
-      ...data,
-      conditionJson: data.conditionJson ? JSON.parse(data.conditionJson) : null,
-    };
     if (editingTemplate) {
-      updateTemplateMutation.mutate({ id: editingTemplate.id, data: processedData });
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data });
     } else {
-      createTemplateMutation.mutate({ ...processedData, categoryId: selectedCategoryId });
+      createTemplateMutation.mutate({ ...data, categoryId: selectedCategoryId });
     }
   };
 
@@ -256,7 +252,6 @@ export default function TemplatesManagement() {
     const processedData = {
       ...data,
       mimeWhitelist: data.mimeWhitelist ? data.mimeWhitelist.split(',').map(s => s.trim()) : [],
-      conditionJson: data.conditionJson ? JSON.parse(data.conditionJson) : null,
     };
     if (editingRequirement) {
       updateRequirementMutation.mutate({ id: editingRequirement.id, data: processedData });

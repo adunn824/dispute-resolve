@@ -9,8 +9,15 @@ import {
   type Customer 
 } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Setup multer for file uploads
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  });
   
   // Setup authentication
   await setupAuth(app);
@@ -637,6 +644,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting document requirement:", error);
       res.status(500).json({ message: "Failed to delete document requirement" });
+    }
+  });
+
+  // Document Management
+  app.get("/api/cases/:caseId/documents", isAuthenticated, async (req, res) => {
+    try {
+      const { caseId } = req.params;
+      const documents = await storage.getDocuments(caseId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  app.post("/api/cases/:caseId/documents/upload", isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      const { caseId } = req.params;
+      const { key, label } = req.body;
+      const file = req.file;
+      const userId = req.user!.id;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+
+      // Generate unique storage key for object storage
+      const timestamp = Date.now();
+      const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageKey = `cases/${caseId}/documents/${timestamp}_${sanitizedFileName}`;
+
+      // Determine file type from MIME type
+      const getFileTypeFromMime = (mimeType: string): string => {
+        if (mimeType.startsWith('image/')) return 'IMAGE';
+        if (mimeType === 'application/pdf') return 'PDF';
+        if (mimeType.includes('document') || mimeType.includes('word')) return 'DOCUMENT';
+        if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'SPREADSHEET';
+        return 'OTHER';
+      };
+
+      // TODO: In a real implementation, upload file.buffer to object storage
+      // For now, we'll simulate storage by logging file info
+      console.log(`Uploading file: ${file.originalname}, Size: ${file.size} bytes, Type: ${file.mimetype}`);
+      console.log(`Storage path: ${process.env.PRIVATE_OBJECT_DIR}/${storageKey}`);
+
+      // Create document record in database
+      const document = await storage.createDocument({
+        caseId,
+        key: key || 'uploaded_document',
+        label: label || file.originalname,
+        fileType: getFileTypeFromMime(file.mimetype),
+        mime: file.mimetype,
+        storageKey,
+        uploadedByUserId: userId,
+      });
+
+      res.status(201).json({
+        document,
+        message: "File uploaded successfully"
+      });
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  app.get("/api/documents/:id/download", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get document from database to retrieve storage key
+      const document = await storage.getDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Return download info (in a real implementation, this would generate presigned URL)
+      res.json({
+        downloadUrl: `${process.env.PRIVATE_OBJECT_DIR}/${document.storageKey}`,
+        fileName: document.label,
+        mimeType: document.mime,
+      });
+    } catch (error) {
+      console.error("Error generating download URL:", error);
+      res.status(500).json({ message: "Failed to generate download URL" });
+    }
+  });
+
+  app.delete("/api/documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+
+      // TODO: In real implementation, also delete from object storage
+      await storage.deleteDocument(id);
+      
+      res.json({ message: "Document deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      res.status(500).json({ message: "Failed to delete document" });
     }
   });
 
