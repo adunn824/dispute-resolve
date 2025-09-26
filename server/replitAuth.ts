@@ -55,12 +55,19 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
+  const firstName = claims["first_name"] || "";
+  const lastName = claims["last_name"] || "";
+  const name = `${firstName} ${lastName}`.trim() || claims["email"]?.split("@")[0] || "User";
+  const role = claims["role"] || "agent"; // Default to 'agent' if role not provided
+  
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
+    name: name,
+    firstName: firstName,
+    lastName: lastName,
     profileImageUrl: claims["profile_image_url"],
+    role: role,
   });
 }
 
@@ -126,14 +133,9 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.get("/api/logout", (req, res) => {
+  app.post("/api/logout", (req, res) => {
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      res.json({ success: true, message: "Logged out successfully" });
     });
   });
 }
