@@ -14,6 +14,7 @@ import { CaseDetailView } from "./components/CaseDetailView";
 import { AdminConfigPanel } from "./components/AdminConfigPanel";
 import CaseTypesManagement from "./pages/admin/case-types";
 import BusinessRulesManagement from "./pages/admin/business-rules";
+import TemplatesManagement from "./pages/admin/templates";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -69,6 +70,9 @@ function Router() {
       </Route>
       <Route path="/admin/business-rules">
         <BusinessRulesManagement />
+      </Route>
+      <Route path="/admin/templates">
+        <TemplatesManagement />
       </Route>
       <Route path="/compliance">
         <Dashboard

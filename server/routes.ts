@@ -518,6 +518,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Checklist Templates Management
+  app.get("/api/categories/:categoryId/checklist-templates", isAuthenticated, async (req, res) => {
+    try {
+      const { categoryId } = req.params;
+      const templates = await storage.getChecklistTemplates(categoryId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching checklist templates:", error);
+      res.status(500).json({ message: "Failed to fetch checklist templates" });
+    }
+  });
+
+  app.post("/api/categories/:categoryId/checklist-templates", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { categoryId } = req.params;
+      const { key, label, sortOrder, isRequired, conditionJson, helpText } = req.body;
+      const template = await storage.createChecklistTemplate({
+        categoryId,
+        key,
+        label,
+        sortOrder: sortOrder || 0,
+        isRequired: isRequired || false,
+        conditionJson,
+        helpText,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating checklist template:", error);
+      res.status(500).json({ message: "Failed to create checklist template" });
+    }
+  });
+
+  app.put("/api/checklist-templates/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { key, label, sortOrder, isRequired, conditionJson, helpText } = req.body;
+      const template = await storage.updateChecklistTemplate(id, {
+        key,
+        label,
+        sortOrder,
+        isRequired,
+        conditionJson,
+        helpText,
+      });
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating checklist template:", error);
+      res.status(500).json({ message: "Failed to update checklist template" });
+    }
+  });
+
+  app.delete("/api/checklist-templates/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteChecklistTemplate(id);
+      res.json({ message: "Checklist template deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting checklist template:", error);
+      res.status(500).json({ message: "Failed to delete checklist template" });
+    }
+  });
+
+  // Document Requirements Management  
+  app.get("/api/categories/:categoryId/document-requirements", isAuthenticated, async (req, res) => {
+    try {
+      const { categoryId } = req.params;
+      const requirements = await storage.getDocumentRequirements(categoryId);
+      res.json(requirements);
+    } catch (error) {
+      console.error("Error fetching document requirements:", error);
+      res.status(500).json({ message: "Failed to fetch document requirements" });
+    }
+  });
+
+  app.post("/api/categories/:categoryId/document-requirements", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { categoryId } = req.params;
+      const { key, label, isRequired, mimeWhitelist, conditionJson } = req.body;
+      const requirement = await storage.createDocumentRequirement({
+        categoryId,
+        key,
+        label,
+        isRequired: isRequired || false,
+        mimeWhitelist,
+        conditionJson,
+      });
+      res.status(201).json(requirement);
+    } catch (error) {
+      console.error("Error creating document requirement:", error);
+      res.status(500).json({ message: "Failed to create document requirement" });
+    }
+  });
+
+  app.put("/api/document-requirements/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { key, label, isRequired, mimeWhitelist, conditionJson } = req.body;
+      const requirement = await storage.updateDocumentRequirement(id, {
+        key,
+        label,
+        isRequired,
+        mimeWhitelist,
+        conditionJson,
+      });
+      res.json(requirement);
+    } catch (error) {
+      console.error("Error updating document requirement:", error);
+      res.status(500).json({ message: "Failed to update document requirement" });
+    }
+  });
+
+  app.delete("/api/document-requirements/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteDocumentRequirement(id);
+      res.json({ message: "Document requirement deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting document requirement:", error);
+      res.status(500).json({ message: "Failed to delete document requirement" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
