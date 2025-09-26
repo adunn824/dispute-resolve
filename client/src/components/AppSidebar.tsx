@@ -19,6 +19,20 @@ interface AppSidebarProps {
 
 export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
   const [location] = useLocation();
+  
+  // For admin users, determine which panel they're viewing based on current route
+  const getCurrentPanelForAdmin = () => {
+    if (userRole !== "admin") return userRole;
+    
+    if (location.startsWith("/admin")) return "admin";
+    
+    // Check if current route is under compliance namespace
+    if (location.startsWith("/compliance")) return "compliance";
+    
+    return "agent"; // Default to agent for root route "/"
+  };
+  
+  const currentPanel = getCurrentPanelForAdmin();
 
   const agentItems = [
     { title: "Dashboard", url: "/", icon: Home },
@@ -29,9 +43,9 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
 
   const complianceItems = [
     { title: "Dashboard", url: "/compliance", icon: BarChart3 },
-    { title: "All Cases", url: "/cases", icon: FileText },
-    { title: "Reports", url: "/reports", icon: BarChart3 },
-    { title: "Regulatory", url: "/regulatory", icon: AlertTriangle },
+    { title: "All Cases", url: "/compliance/cases", icon: FileText },
+    { title: "Reports", url: "/compliance/reports", icon: BarChart3 },
+    { title: "Regulatory", url: "/compliance/regulatory", icon: AlertTriangle },
   ];
 
   const adminItems = [
@@ -43,7 +57,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
   ];
 
   const getMenuItems = () => {
-    switch (userRole) {
+    switch (currentPanel) {
       case "compliance":
         return complianceItems;
       case "admin":
@@ -54,7 +68,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
   };
 
   const getRoleLabel = () => {
-    switch (userRole) {
+    switch (currentPanel) {
       case "compliance":
         return "Compliance";
       case "admin":

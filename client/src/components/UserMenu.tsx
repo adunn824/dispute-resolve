@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, User, Settings, Shield } from "lucide-react";
+import { LogOut, User, Settings, Shield, Home, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
@@ -36,6 +36,14 @@ export function UserMenu() {
     } else {
       setLocation("/");
     }
+  };
+
+  const handleAgentDashboardClick = () => {
+    setLocation("/");
+  };
+
+  const handleComplianceDashboardClick = () => {
+    setLocation("/compliance");
   };
 
   const handleAdminPanelClick = () => {
@@ -95,13 +103,26 @@ export function UserMenu() {
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </DropdownMenuItem>
-          {user.role === "admin" && (
-            <DropdownMenuItem onClick={handleAdminPanelClick} data-testid="menu-item-admin-panel">
-              <Shield className="mr-2 h-4 w-4" />
-              <span>Admin Panel</span>
-            </DropdownMenuItem>
-          )}
         </DropdownMenuGroup>
+        {user.role === "admin" && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={handleAgentDashboardClick} data-testid="menu-item-agent-dashboard">
+                <Home className="mr-2 h-4 w-4" />
+                <span>Agent Dashboard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleComplianceDashboardClick} data-testid="menu-item-compliance-dashboard">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                <span>Compliance Dashboard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleAdminPanelClick} data-testid="menu-item-admin-panel">
+                <Shield className="mr-2 h-4 w-4" />
+                <span>Admin Panel</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} data-testid="button-logout">
           <LogOut className="mr-2 h-4 w-4" />

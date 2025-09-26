@@ -4,7 +4,7 @@ import { LoginPage } from "@/pages/LoginPage";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: string;
+  requiredRole?: string | string[];
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
@@ -28,20 +28,25 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   // Check role if required
-  if (requiredRole && user.role !== requiredRole && user.role !== "admin") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-          <p className="text-muted-foreground">
-            You don't have permission to access this page.
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Required role: {requiredRole}, Your role: {user.role}
-          </p>
+  if (requiredRole) {
+    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    const hasAccess = allowedRoles.includes(user.role) || user.role === "admin";
+    
+    if (!hasAccess) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+            <p className="text-muted-foreground">
+              You don't have permission to access this page.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Required role: {Array.isArray(requiredRole) ? requiredRole.join(" or ") : requiredRole}, Your role: {user.role}
+            </p>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   return <>{children}</>;

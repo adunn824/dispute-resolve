@@ -50,12 +50,7 @@ function Router() {
 
   const userRole = (user?.role as "admin" | "agent" | "compliance") || "agent";
 
-  // Auto-redirect admin users from root to case types management
-  useEffect(() => {
-    if (user?.role === "admin" && (location === "/" || location === "/admin") && currentView === "dashboard") {
-      setLocation("/admin/case-types");
-    }
-  }, [user, location, currentView, setLocation]);
+  // No auto-redirect for admin users - let them choose which panel to access
 
   return (
     <Switch>
@@ -126,7 +121,43 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/compliance">
-        <ProtectedRoute requiredRole="compliance">
+        <ProtectedRoute requiredRole={["compliance", "admin"]}>
+          <Dashboard
+            userRole="compliance"
+            onCreateCase={handleCreateCase}
+            onViewCase={handleViewCase}
+          />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cases">
+        <ProtectedRoute>
+          <Dashboard
+            userRole="agent"
+            onCreateCase={handleCreateCase}
+            onViewCase={handleViewCase}
+          />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/compliance/cases">
+        <ProtectedRoute requiredRole={["compliance", "admin"]}>
+          <Dashboard
+            userRole="compliance"
+            onCreateCase={handleCreateCase}
+            onViewCase={handleViewCase}
+          />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/compliance/reports">
+        <ProtectedRoute requiredRole={["compliance", "admin"]}>
+          <Dashboard
+            userRole="compliance"
+            onCreateCase={handleCreateCase}
+            onViewCase={handleViewCase}
+          />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/compliance/regulatory">
+        <ProtectedRoute requiredRole={["compliance", "admin"]}>
           <Dashboard
             userRole="compliance"
             onCreateCase={handleCreateCase}
