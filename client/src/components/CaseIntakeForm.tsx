@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const caseSchema = z.object({
-  caseType: z.enum(["Mail", "Complaint", "Dispute"]),
-  category: z.string().min(1, "Category is required"),
+  caseTypeId: z.string().min(1, "Case type is required"),
+  categoryId: z.string().min(1, "Category is required"),
   customerName: z.string().min(1, "Customer name is required"),
   customerState: z.string().min(2, "State is required"),
   loanId: z.string().optional(),
@@ -21,11 +23,23 @@ const caseSchema = z.object({
 
 type CaseFormValues = z.infer<typeof caseSchema>;
 
-const mockCategories = {
-  Mail: ["Bankruptcy", "ACH Revoke", "E-Fax/Misc", "TrustPilot"],
-  Complaint: ["CFPB", "BBB", "Cease & Desist", "Lawsuit", "Military", "Private Attorney"],
-  Dispute: ["FactorTrust", "Viking POA", "PDS Dispute", "ID Theft Block"],
-};
+// Interface for API data
+interface CaseType {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  isActive: boolean;
+}
+
+interface Category {
+  id: string;
+  caseTypeId: string;
+  name: string;
+  code: string;
+  description?: string;
+  isActive: boolean;
+}
 
 const usStates = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
@@ -40,14 +54,29 @@ interface CaseIntakeFormProps {
 }
 
 export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
-  const [selectedCaseType, setSelectedCaseType] = useState<keyof typeof mockCategories | null>(null);
+  const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Fetch case types from API
+  const { data: caseTypes, isLoading: loadingCaseTypes, error: caseTypesError } = useQuery<{data: CaseType[]}>({ 
+    queryKey: ["/api/case-types"],
+    queryFn: () => apiRequest("GET", "/api/case-types")
+  });
+
+  // Fetch categories filtered by selected case type
+  const { data: categoriesData, isLoading: loadingCategories, error: categoriesError } = useQuery<{data: Category[]}>({ 
+    queryKey: ["/api/categories", selectedCaseTypeId],
+    queryFn: () => apiRequest("GET", `/api/categories?caseTypeId=${selectedCaseTypeId}`),
+    enabled: !!selectedCaseTypeId,
+  });
+
+  const categories = categoriesData?.data || [];
 
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema),
     defaultValues: {
-      caseType: undefined,
-      category: "",
+      caseTypeId: "",
+      categoryId: "",
       customerName: "",
       customerState: "",
       loanId: "",
@@ -55,13 +84,34 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
     },
   });
 
+  // Case creation mutation
+  const createCaseMutation = useMutation({
+    mutationFn: (data: CaseFormValues) => apiRequest("POST", "/api/cases/create-intake", data),
+    onSuccess: (response) => {
+      toast({
+        title: "Case Created",
+        description: `Case ${response.data.id} has been created successfully.`,
+      });
+      form.reset();
+      
+      // Invalidate relevant queries to refresh dashboards
+      queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      
+      onSubmit(response.data);
+    },
+    onError: (error: any) => {
+      console.error("Failed to create case:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create case. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: CaseFormValues) => {
-    console.log("Case submitted:", data);
-    toast({
-      title: "Case Created",
-      description: `${data.caseType} case for ${data.customerName} has been created successfully.`,
-    });
-    onSubmit(data);
+    createCaseMutation.mutate(data);
   };
 
   return (
@@ -75,27 +125,36 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="caseType"
+                name="caseTypeId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Case Type</FormLabel>
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
-                        setSelectedCaseType(value as keyof typeof mockCategories);
-                        form.setValue("category", "");
+                        setSelectedCaseTypeId(value);
+                        form.setValue("categoryId", "");
                       }}
+                      disabled={loadingCaseTypes}
                       data-testid="select-case-type"
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select case type" />
+                          <SelectValue placeholder={loadingCaseTypes ? "Loading..." : "Select case type"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Mail">Mail</SelectItem>
-                        <SelectItem value="Complaint">Complaint</SelectItem>
-                        <SelectItem value="Dispute">Dispute</SelectItem>
+                        {caseTypesError ? (
+                          <div className="p-2 text-sm text-destructive">Failed to load case types</div>
+                        ) : caseTypes?.data?.length ? (
+                          caseTypes.data.map((caseType) => (
+                            <SelectItem key={caseType.id} value={caseType.id}>
+                              {caseType.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground">No case types available</div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -105,22 +164,35 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
 
               <FormField
                 control={form.control}
-                name="category"
+                name="categoryId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} disabled={!selectedCaseType} data-testid="select-category">
+                    <Select 
+                      onValueChange={field.onChange} 
+                      disabled={!selectedCaseTypeId || loadingCategories} 
+                      data-testid="select-category"
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
+                          <SelectValue placeholder={
+                            !selectedCaseTypeId ? "Select case type first" :
+                            loadingCategories ? "Loading..." : "Select category"
+                          } />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {selectedCaseType && mockCategories[selectedCaseType].map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
+                        {categoriesError ? (
+                          <div className="p-2 text-sm text-destructive">Failed to load categories</div>
+                        ) : categories.length ? (
+                          categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground">No categories available</div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -204,11 +276,21 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
             />
 
             <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => form.reset()} data-testid="button-reset">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => form.reset()}
+                disabled={createCaseMutation.isPending}
+                data-testid="button-reset"
+              >
                 Reset
               </Button>
-              <Button type="submit" data-testid="button-submit">
-                Create Case
+              <Button 
+                type="submit" 
+                disabled={createCaseMutation.isPending}
+                data-testid="button-submit"
+              >
+                {createCaseMutation.isPending ? "Creating..." : "Create Case"}
               </Button>
             </div>
           </form>

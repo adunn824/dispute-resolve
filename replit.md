@@ -6,6 +6,19 @@ This is a comprehensive Complaint & Dispute Management platform designed to stre
 
 The system is built as a single-repository full-stack application optimized for enterprise use, focusing on regulatory compliance, audit trails, and efficient case resolution workflows.
 
+## Recent Changes
+
+### Phase 1 Complete: Case Management System Operational (September 2024)
+- **Authentication System**: Fixed critical password hashing from bcrypt to scrypt format, resolving login failures
+- **Session Management**: Resolved session deserialization issues preventing API access after login
+- **Case Intake Form**: Successfully connected to live APIs (/api/case-types, /api/categories) with dynamic category loading
+- **API Integration**: Fixed apiRequest function to return parsed JSON instead of Response objects
+- **Routing**: Added missing /cases/new route for case intake form
+- **Query Management**: Added automatic cache invalidation after case creation to refresh dashboards
+- **End-to-End Testing**: Verified complete case creation workflow with Playwright automation
+
+**Status**: Core case management functionality is now operational. Users can log in, access the case intake form, select case types and categories from the database, and successfully create new cases with automatic priority assignment.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

@@ -138,6 +138,11 @@ function Router() {
           />
         </ProtectedRoute>
       </Route>
+      <Route path="/cases/new">
+        <ProtectedRoute>
+          <CaseIntakeForm onSubmit={handleCaseSubmit} />
+        </ProtectedRoute>
+      </Route>
       <Route path="/compliance/cases">
         <ProtectedRoute requiredRole={["compliance", "admin"]}>
           <Dashboard

@@ -77,11 +77,11 @@ async function seed() {
   // 3. Create Users
   console.log("Creating users...");
   const userRecords = await db.insert(users).values([
-    { email: "admin@company.com", name: "Admin User", role: "admin", status: "active" },
-    { email: "jane.smith@company.com", name: "Jane Smith", role: "compliance", status: "active" },
-    { email: "mike.johnson@company.com", name: "Mike Johnson", role: "agent", status: "active" },
-    { email: "sarah.wilson@company.com", name: "Sarah Wilson", role: "agent", status: "active" },
-    { email: "david.brown@company.com", name: "David Brown", role: "compliance", status: "active" },
+    { username: "admin", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "admin@company.com", name: "Admin User", role: "admin", status: "active" },
+    { username: "jane.smith", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "jane.smith@company.com", name: "Jane Smith", role: "compliance", status: "active" },
+    { username: "mike.johnson", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "mike.johnson@company.com", name: "Mike Johnson", role: "agent", status: "active" },
+    { username: "sarah.wilson", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "sarah.wilson@company.com", name: "Sarah Wilson", role: "agent", status: "active" },
+    { username: "david.brown", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "david.brown@company.com", name: "David Brown", role: "compliance", status: "active" },
   ]).returning();
 
   const adminUser = userRecords.find(u => u.role === "admin")!;
@@ -163,21 +163,21 @@ async function seed() {
     
     if (category.code.includes("BILL")) {
       rules.push(
-        { categoryId: category.id, ruleJson: { conditions: [{ field: "amount", operator: ">", value: 10000 }] }, priorityValue: "Critical" },
-        { categoryId: category.id, ruleJson: { conditions: [{ field: "amount", operator: ">", value: 1000 }] }, priorityValue: "High" }
+        { categoryId: category.id, name: "Critical Billing", description: "High value billing issues", priority: "critical", conditions: "amount > 10000", ruleJson: { conditions: [{ field: "amount", operator: ">", value: 10000 }] }, priorityValue: "Critical", isActive: true },
+        { categoryId: category.id, name: "High Priority Billing", description: "Medium value billing issues", priority: "high", conditions: "amount > 1000", ruleJson: { conditions: [{ field: "amount", operator: ">", value: 1000 }] }, priorityValue: "High", isActive: true }
       );
     }
     
     if (category.code.includes("DISP")) {
       rules.push(
-        { categoryId: category.id, ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 30 }] }, priorityValue: "BK24" },
-        { categoryId: category.id, ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 14 }] }, priorityValue: "BK48" }
+        { categoryId: category.id, name: "BK24 Priority", description: "Urgent dispute cases", priority: "high", conditions: "daysOld > 30", ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 30 }] }, priorityValue: "BK24", isActive: true },
+        { categoryId: category.id, name: "BK48 Priority", description: "Moderate dispute cases", priority: "medium", conditions: "daysOld > 14", ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 14 }] }, priorityValue: "BK48", isActive: true }
       );
     }
     
     // Default rule
     rules.push(
-      { categoryId: category.id, ruleJson: { conditions: [], default: true }, priorityValue: "Medium" }
+      { categoryId: category.id, name: "Default Priority", description: "Default medium priority for all cases", priority: "medium", conditions: "default", ruleJson: { conditions: [], default: true }, priorityValue: "Medium", isActive: true }
     );
     
     await db.insert(priorityRules).values(rules);

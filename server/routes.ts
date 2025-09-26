@@ -116,6 +116,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/cases/create-intake - Simplified case creation from intake form (agents and above)
+  app.post("/api/cases/create-intake", requireRole(['agent', 'admin']), async (req: any, res) => {
+    try {
+      // Define intake schema
+      const intakeSchema = z.object({
+        caseTypeId: z.string().min(1, "Case type is required"),
+        categoryId: z.string().min(1, "Category is required"),
+        customerName: z.string().min(1, "Customer name is required"),
+        customerState: z.string().min(2, "State is required"),
+        loanId: z.string().optional(),
+        details: z.string().min(10, "Details must be at least 10 characters"),
+      });
+
+      const intakeData = intakeSchema.parse(req.body);
+      
+      // Step 1: Find or create customer
+      let customer;
+      const existingCustomers = await storage.findCustomerByName(intakeData.customerName);
+      const matchingCustomer = existingCustomers.find(c => 
+        c.name === intakeData.customerName && c.state === intakeData.customerState
+      );
+      
+      if (matchingCustomer) {
+        customer = matchingCustomer;
+      } else {
+        customer = await storage.createCustomer({
+          name: intakeData.customerName,
+          state: intakeData.customerState,
+        });
+      }
+      
+      // Step 2: Find appropriate priority rule for the category
+      const priorityRules = await storage.getPriorityRules(intakeData.categoryId);
+      let selectedPriorityRule = priorityRules.find(rule => 
+        rule.ruleJson && typeof rule.ruleJson === 'object' && 
+        'default' in rule.ruleJson && rule.ruleJson.default === true
+      );
+      
+      // If no default rule found, use the first available rule
+      if (!selectedPriorityRule && priorityRules.length > 0) {
+        selectedPriorityRule = priorityRules[0];
+      }
+      
+      // If still no rule found, create a default medium priority rule
+      if (!selectedPriorityRule) {
+        selectedPriorityRule = await storage.createPriorityRule({
+          categoryId: intakeData.categoryId,
+          name: "Default Priority",
+          description: "Auto-generated default priority rule",
+          priority: "medium",
+          conditions: "default",
+          ruleJson: { conditions: [], default: true },
+          priorityValue: "Medium",
+          isActive: true,
+        });
+      }
+      
+      // Step 3: Create the case
+      const caseData = {
+        caseTypeId: intakeData.caseTypeId,
+        categoryId: intakeData.categoryId,
+        priorityRuleId: selectedPriorityRule.id,
+        customerId: customer.id,
+        loanId: intakeData.loanId || null,
+        state: intakeData.customerState,
+        details: intakeData.details,
+        status: "open" as const,
+        configVersion: 1,
+      };
+      
+      const newCase = await storage.createCase(caseData);
+      
+      // Create audit log for case creation
+      await storage.createAuditLog({
+        caseId: newCase.id,
+        actorUserId: req.dbUser.id,
+        action: "case_created",
+        details: { 
+          caseId: newCase.id, 
+          initialStatus: newCase.status,
+          customerName: intakeData.customerName,
+          customerState: intakeData.customerState,
+          priority: selectedPriorityRule.priorityValue
+        }
+      });
+      
+      res.status(201).json({ data: newCase });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid intake data", details: error.errors });
+      }
+      console.error("Failed to create case from intake:", error);
+      res.status(500).json({ error: "Failed to create case from intake" });
+    }
+  });
+
   // POST /api/cases - Create new case (agents and above)
   app.post("/api/cases", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {
