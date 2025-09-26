@@ -16,8 +16,13 @@ import CaseTypesManagement from "./pages/admin/case-types";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
 import NotFound from "@/pages/not-found";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { LoginPage } from "./pages/LoginPage";
+import { UserMenu } from "./components/UserMenu";
 
 function Router() {
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<"dashboard" | "new-case" | "case-detail" | "admin">("dashboard");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
@@ -39,81 +44,128 @@ function Router() {
     setSelectedCaseId(null);
   };
 
+  const userRole = (user?.role as "admin" | "agent" | "compliance") || "agent";
+
   return (
     <Switch>
+      <Route path="/login">
+        <LoginPage />
+      </Route>
       <Route path="/">
-        {currentView === "dashboard" && (
+        <ProtectedRoute>
+          {currentView === "dashboard" && (
+            <Dashboard
+              userRole={userRole}
+              onCreateCase={handleCreateCase}
+              onViewCase={handleViewCase}
+            />
+          )}
+          {currentView === "new-case" && (
+            <CaseIntakeForm onSubmit={handleCaseSubmit} />
+          )}
+          {currentView === "case-detail" && selectedCaseId && (
+            <CaseDetailView
+              caseId={selectedCaseId}
+              onBack={handleBackToDashboard}
+            />
+          )}
+          {currentView === "admin" && (
+            <AdminConfigPanel onPublishConfig={() => console.log("Config published")} />
+          )}
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute requiredRole="admin">
+          <AdminConfigPanel onPublishConfig={() => console.log("Config published")} />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/case-types">
+        <ProtectedRoute requiredRole="admin">
+          <CaseTypesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/business-rules">
+        <ProtectedRoute requiredRole="admin">
+          <CaseTypesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/templates">
+        <ProtectedRoute requiredRole="admin">
+          <TemplatesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/compliance">
+        <ProtectedRoute requiredRole="compliance">
           <Dashboard
-            userRole="agent"
+            userRole="compliance"
             onCreateCase={handleCreateCase}
             onViewCase={handleViewCase}
           />
-        )}
-        {currentView === "new-case" && (
-          <CaseIntakeForm onSubmit={handleCaseSubmit} />
-        )}
-        {currentView === "case-detail" && selectedCaseId && (
-          <CaseDetailView
-            caseId={selectedCaseId}
-            onBack={handleBackToDashboard}
-          />
-        )}
-        {currentView === "admin" && (
-          <AdminConfigPanel onPublishConfig={() => console.log("Config published")} />
-        )}
-      </Route>
-      <Route path="/admin">
-        <AdminConfigPanel onPublishConfig={() => console.log("Config published")} />
-      </Route>
-      <Route path="/admin/case-types">
-        <CaseTypesManagement />
-      </Route>
-      <Route path="/admin/business-rules">
-        <BusinessRulesManagement />
-      </Route>
-      <Route path="/admin/templates">
-        <TemplatesManagement />
-      </Route>
-      <Route path="/compliance">
-        <Dashboard
-          userRole="compliance"
-          onCreateCase={handleCreateCase}
-          onViewCase={handleViewCase}
-        />
+        </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+function AppContent() {
+  const { isAuthenticated, isLoading, user } = useAuth();
   const style = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
   };
 
+  // Show loading screen during auth check
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading application...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated and on a protected route
+  if (!isAuthenticated) {
+    return <Router />;
+  }
+
+  // Show authenticated app layout
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar userRole={(user?.role as "admin" | "agent" | "compliance") || "agent"} />
+        <div className="flex flex-col flex-1">
+          <header className="flex items-center justify-between p-4 border-b bg-background">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <h1 className="text-lg font-semibold">Complaint & Dispute Management</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <UserMenu />
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto p-6">
+            <Router />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="complaint-mgmt-theme">
         <TooltipProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar userRole="agent" />
-              <div className="flex flex-col flex-1">
-                <header className="flex items-center justify-between p-4 border-b bg-background">
-                  <div className="flex items-center gap-4">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <h1 className="text-lg font-semibold">Complaint & Dispute Management</h1>
-                  </div>
-                  <ThemeToggle />
-                </header>
-                <main className="flex-1 overflow-auto p-6">
-                  <Router />
-                </main>
-              </div>
-            </div>
-          </SidebarProvider>
-          <Toaster />
+          <AuthProvider>
+            <AppContent />
+            <Toaster />
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
