@@ -3,12 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 
 interface User {
   id: string;
+  username: string;
   email: string;
-  firstName: string;
-  lastName: string;
   name: string;
   role: string;
-  profileImageUrl?: string;
 }
 
 interface AuthContextType {
@@ -44,7 +42,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     error, 
     refetch: refetchUser 
   } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/user"],
     retry: false,
     refetchOnWindowFocus: false,
   });
