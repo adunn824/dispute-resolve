@@ -64,11 +64,13 @@ export default function CaseTypesManagement() {
   // Fetch case types
   const { data: caseTypes = [], isLoading: loadingCaseTypes } = useQuery<CaseType[]>({
     queryKey: ["/api/case-types"],
+    select: (response: any) => response.data || [],
   });
 
   // Fetch categories
   const { data: categories = [], isLoading: loadingCategories } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+    select: (response: any) => response.data || [],
   });
 
   // Case type form

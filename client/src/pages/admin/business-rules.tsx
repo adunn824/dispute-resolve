@@ -90,14 +90,17 @@ export default function BusinessRulesManagement() {
   // Fetch data
   const { data: priorityRules = [], isLoading: loadingPriorityRules } = useQuery<PriorityRule[]>({
     queryKey: ["/api/priority-rules"],
+    select: (response: any) => response.data || [],
   });
 
   const { data: tagRules = [], isLoading: loadingTagRules } = useQuery<TagRule[]>({
     queryKey: ["/api/tag-rules"],
+    select: (response: any) => response.data || [],
   });
 
   const { data: slaPolicies = [], isLoading: loadingSLAPolicies } = useQuery<SLAPolicy[]>({
     queryKey: ["/api/sla-policies"],
+    select: (response: any) => response.data || [],
   });
 
   // Forms

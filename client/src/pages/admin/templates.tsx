@@ -80,18 +80,21 @@ export default function TemplatesManagement() {
   // Fetch categories
   const { data: categories = [], isLoading: loadingCategories } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+    select: (response: any) => response.data || [],
   });
 
   // Fetch checklist templates for selected category
   const { data: checklistTemplates = [], isLoading: loadingTemplates, refetch: refetchTemplates } = useQuery<ChecklistTemplate[]>({
     queryKey: ["/api/categories", selectedCategoryId, "checklist-templates"],
     enabled: !!selectedCategoryId,
+    select: (response: any) => response.data || [],
   });
 
   // Fetch document requirements for selected category
   const { data: documentRequirements = [], isLoading: loadingRequirements, refetch: refetchRequirements } = useQuery<DocumentRequirement[]>({
     queryKey: ["/api/categories", selectedCategoryId, "document-requirements"],
     enabled: !!selectedCategoryId,
+    select: (response: any) => response.data || [],
   });
 
   // Forms

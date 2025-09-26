@@ -15,6 +15,9 @@ import { AdminConfigPanel } from "./components/AdminConfigPanel";
 import CaseTypesManagement from "./pages/admin/case-types";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
+import CategoriesManagement from "./pages/admin/categories";
+import UsersManagement from "./pages/admin/users";
+import SystemManagement from "./pages/admin/system";
 import NotFound from "@/pages/not-found";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -86,12 +89,32 @@ function Router() {
       </Route>
       <Route path="/admin/business-rules">
         <ProtectedRoute requiredRole="admin">
-          <CaseTypesManagement />
+          <BusinessRulesManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/templates">
         <ProtectedRoute requiredRole="admin">
           <TemplatesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/categories">
+        <ProtectedRoute requiredRole="admin">
+          <CategoriesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/rules">
+        <ProtectedRoute requiredRole="admin">
+          <BusinessRulesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/users">
+        <ProtectedRoute requiredRole="admin">
+          <UsersManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/system">
+        <ProtectedRoute requiredRole="admin">
+          <SystemManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/compliance">
