@@ -748,6 +748,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Checklist Items Management
+  app.get("/api/cases/:caseId/checklist-items", isAuthenticated, async (req, res) => {
+    try {
+      const { caseId } = req.params;
+      const checklistItems = await storage.getChecklistItems(caseId);
+      res.json(checklistItems);
+    } catch (error) {
+      console.error("Error fetching checklist items:", error);
+      res.status(500).json({ message: "Failed to fetch checklist items" });
+    }
+  });
+
+  app.post("/api/cases/:caseId/checklist-items/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { caseId } = req.params;
+      
+      // Get case to determine category
+      const caseRecord = await storage.getCase(caseId);
+      if (!caseRecord) {
+        return res.status(404).json({ message: "Case not found" });
+      }
+
+      // Get checklist templates for this category
+      const templates = await storage.getChecklistTemplates(caseRecord.categoryId);
+      
+      // Generate checklist items from templates
+      const checklistItems = [];
+      for (const template of templates) {
+        // TODO: Add condition evaluation here
+        const item = await storage.createChecklistItem({
+          caseId,
+          key: template.key,
+          label: template.label,
+          isRequired: template.isRequired,
+          status: "open",
+        });
+        checklistItems.push(item);
+      }
+
+      res.status(201).json({ 
+        message: `Generated ${checklistItems.length} checklist items`,
+        items: checklistItems
+      });
+    } catch (error) {
+      console.error("Error generating checklist items:", error);
+      res.status(500).json({ message: "Failed to generate checklist items" });
+    }
+  });
+
+  app.put("/api/checklist-items/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, assignedToUserId } = req.body;
+      const userId = req.user!.id;
+
+      const updates: any = {};
+      if (status !== undefined) {
+        updates.status = status;
+        if (status === "complete") {
+          updates.completedAt = new Date();
+        } else {
+          updates.completedAt = null;
+        }
+      }
+      if (assignedToUserId !== undefined) {
+        updates.assignedToUserId = assignedToUserId;
+      }
+
+      const item = await storage.updateChecklistItem(id, updates);
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating checklist item:", error);
+      res.status(500).json({ message: "Failed to update checklist item" });
+    }
+  });
+
+  app.post("/api/checklist-items/:id/complete", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+
+      const item = await storage.updateChecklistItem(id, {
+        status: "complete",
+        completedAt: new Date(),
+        assignedToUserId: userId,
+      });
+
+      res.json(item);
+    } catch (error) {
+      console.error("Error completing checklist item:", error);
+      res.status(500).json({ message: "Failed to complete checklist item" });
+    }
+  });
+
+  app.post("/api/checklist-items/:id/reopen", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const item = await storage.updateChecklistItem(id, {
+        status: "open",
+        completedAt: null,
+      });
+
+      res.json(item);
+    } catch (error) {
+      console.error("Error reopening checklist item:", error);
+      res.status(500).json({ message: "Failed to reopen checklist item" });
+    }
+  });
+
+  // Get users for assignment
+  app.get("/api/users", isAuthenticated, async (req, res) => {
+    try {
+      // For now, return current user + mock agents for assignment
+      // TODO: Implement proper user listing when user management is added
+      const mockUsers = [
+        { id: req.user!.id, name: req.user!.name, email: req.user!.email, role: req.user!.role },
+        { id: "agent-1", name: "Agent 1", email: "agent1@company.com", role: "agent" },
+        { id: "agent-2", name: "Agent 2", email: "agent2@company.com", role: "agent" },
+        { id: "compliance-1", name: "Compliance Officer", email: "compliance@company.com", role: "compliance" }
+      ];
+      res.json(mockUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
