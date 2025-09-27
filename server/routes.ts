@@ -302,7 +302,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: z.string().min(1, "Customer name is required"),
         customerState: z.string().min(2, "State is required"),
         loanId: z.string().optional(),
+        lenderName: z.string().optional(),
         details: z.string().min(10, "Details must be at least 10 characters"),
+        hasRepresentative: z.boolean().optional().default(false),
+        representativeCompanyName: z.string().optional(),
+        representativePersonName: z.string().optional(),
+        representativeAddress: z.string().optional(),
+        representativeEmail: z.string().email().optional().or(z.literal("")),
+        representativePhone: z.string().optional(),
       });
 
       const intakeData = intakeSchema.parse(req.body);
@@ -356,9 +363,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priorityRuleId: selectedPriorityRule.id,
         customerId: customer.id,
         loanId: intakeData.loanId || null,
+        lenderName: intakeData.lenderName || null,
         state: intakeData.customerState,
         details: intakeData.details,
         status: "open" as const,
+        hasRepresentative: intakeData.hasRepresentative || false,
+        representativeCompanyName: intakeData.representativeCompanyName || null,
+        representativePersonName: intakeData.representativePersonName || null,
+        representativeAddress: intakeData.representativeAddress || null,
+        representativeEmail: intakeData.representativeEmail || null,
+        representativePhone: intakeData.representativePhone || null,
         configVersion: 1,
       };
       
