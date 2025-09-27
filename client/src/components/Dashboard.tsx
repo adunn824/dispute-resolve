@@ -28,7 +28,7 @@ interface DashboardProps {
 interface DashboardStats {
   totalCases: number;
   openCases: number;
-  pendingCases: number;
+  inProgressCases: number;
   resolvedToday: number;
   slaBreaches: number;
   averageResolutionTime: string;
@@ -79,8 +79,8 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
         change: "-5% from last week"
       },
       {
-        title: "Pending Review",
-        value: stats.pendingCases.toString(),
+        title: "In Progress",
+        value: stats.inProgressCases.toString(),
         icon: Clock,
         change: "+8% from last week"
       },

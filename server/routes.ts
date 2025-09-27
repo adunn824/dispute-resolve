@@ -116,6 +116,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/cases/:id/status - Update case status
+  app.patch("/api/cases/:id/status", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      if (!status || !["open", "in_progress", "resolved"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be one of: open, in_progress, resolved" });
+      }
+
+      const updatedCase = await storage.updateCaseStatus(id, status, userId);
+      res.json({ data: updatedCase });
+    } catch (error) {
+      console.error("Failed to update case status:", error);
+      if (error instanceof Error && error.message === "Case not found") {
+        return res.status(404).json({ error: "Case not found" });
+      }
+      res.status(500).json({ error: "Failed to update case status" });
+    }
+  });
+
   // POST /api/cases/create-intake - Simplified case creation from intake form (agents and above)
   app.post("/api/cases/create-intake", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {

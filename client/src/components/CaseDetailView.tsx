@@ -9,10 +9,12 @@ import { ChecklistTab } from "./tabs/ChecklistTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
-import { ArrowLeft, User, Calendar, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Loader2, Settings } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "../lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "../lib/queryClient";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 interface CaseDetailViewProps {
   caseId: string;
@@ -27,7 +29,7 @@ interface CaseDetailData {
   loanId?: string;
   state: string;
   details: string;
-  status: "open" | "pending" | "resolved" | "closed";
+  status: "open" | "in_progress" | "resolved";
   createdAt: string;
   updatedAt: string;
   customerName: string;
@@ -42,6 +44,7 @@ interface CaseDetailData {
 
 export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState("checklist");
+  const { toast } = useToast();
   
   // Fetch case details from API
   const { data: caseData, isLoading, error } = useQuery<{data: CaseDetailData}>({
@@ -50,10 +53,36 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   });
 
   const caseDetails = caseData?.data;
+
+  // Mutation for updating case status
+  const updateStatusMutation = useMutation({
+    mutationFn: (newStatus: "open" | "in_progress" | "resolved") =>
+      apiRequest("PATCH", `/api/cases/${caseId}/status`, { status: newStatus }),
+    onSuccess: () => {
+      // Invalidate and refetch case details
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      // Also invalidate dashboard to update case counts
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({
+        title: "Status Updated",
+        description: "Case status has been successfully updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update case status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStatusChange = (newStatus: "open" | "in_progress" | "resolved") => {
+    updateStatusMutation.mutate(newStatus);
+  };
   
   const handleResolveCase = () => {
-    console.log("Resolving case:", caseId);
-    // TODO: Implement case resolution logic
+    handleStatusChange("resolved");
   };
 
   if (isLoading) {
@@ -94,9 +123,28 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
           <h1 className="text-2xl font-bold">Case #{caseDetails.id}</h1>
           <p className="text-muted-foreground">{caseDetails.caseTypeName} • {caseDetails.categoryName}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <PriorityBadge priority={caseDetails.priorityValue as "Low" | "Medium" | "High"} />
-          <StatusBadge status={caseDetails.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={caseDetails.status} />
+            <Select
+              value={caseDetails.status}
+              onValueChange={handleStatusChange}
+              disabled={updateStatusMutation.isPending}
+            >
+              <SelectTrigger className="w-32" data-testid="select-case-status">
+                <Settings className="h-4 w-4" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open" data-testid="option-status-open">Open</SelectItem>
+                <SelectItem value="in_progress" data-testid="option-status-in-progress">In Progress</SelectItem>
+                <SelectItem value="resolved" data-testid="option-status-resolved">Resolved</SelectItem>
+              </SelectContent>
+            </Select>
+            {updateStatusMutation.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -171,7 +219,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         <Button variant="outline" data-testid="button-edit-case">
           Edit Case
         </Button>
-        <Button onClick={handleResolveCase} disabled={caseDetails.status === "resolved" || caseDetails.status === "closed"} data-testid="button-resolve-case">
+        <Button onClick={handleResolveCase} disabled={caseDetails.status === "resolved"} data-testid="button-resolve-case">
           Resolve Case
         </Button>
       </div>

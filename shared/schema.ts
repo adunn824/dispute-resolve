@@ -62,7 +62,7 @@ export const cases = pgTable("cases", {
   loanId: text("loan_id"),
   state: text("state").notNull(),
   details: text("details").notNull(),
-  status: text("status", { enum: ["open", "pending", "resolved", "closed"] }).notNull().default("open"),
+  status: text("status", { enum: ["open", "in_progress", "resolved"] }).notNull().default("open"),
   configVersion: integer("config_version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -73,7 +73,7 @@ import ConnectPgSession from "connect-pg-simple";
 export interface DashboardStats {
   totalCases: number;
   openCases: number;
-  pendingCases: number;
+  inProgressCases: number;
   resolvedToday: number;
   slaBreaches: number;
   averageResolutionTime: string;
@@ -354,6 +354,36 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
 
     return result[0] || undefined;
+  }
+
+  // Update case status
+  async updateCaseStatus(caseId: string, status: "open" | "in_progress" | "resolved", actorUserId: string) {
+    // First, update the case status
+    const updatedCase = await db
+      .update(cases)
+      .set({ 
+        status,
+        updatedAt: new Date()
+      })
+      .where(eq(cases.id, caseId))
+      .returning();
+
+    if (updatedCase.length === 0) {
+      throw new Error("Case not found");
+    }
+
+    // Log the status change in audit log
+    await db.insert(auditLogs).values({
+      caseId,
+      actorUserId,
+      action: "case_status_changed",
+      details: {
+        newStatus: status,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    return updatedCase[0];
   }
 
   async getCases(filters?: { 
@@ -840,12 +870,12 @@ export class DatabaseStorage implements IStorage {
     const [
       totalCases,
       openCases,
-      pendingCases,
+      inProgressCases,
       resolvedToday,
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)::int` }).from(cases).then(r => r[0]?.count || 0),
       db.select({ count: sql<number>`count(*)::int` }).from(cases).where(eq(cases.status, 'open')).then(r => r[0]?.count || 0),
-      db.select({ count: sql<number>`count(*)::int` }).from(cases).where(eq(cases.status, 'pending')).then(r => r[0]?.count || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(cases).where(eq(cases.status, 'in_progress')).then(r => r[0]?.count || 0),
       db.select({ count: sql<number>`count(*)::int` }).from(cases)
         .where(and(eq(cases.status, 'resolved'), gte(cases.updatedAt, startOfToday)))
         .then(r => r[0]?.count || 0)
@@ -864,7 +894,7 @@ export class DatabaseStorage implements IStorage {
     return {
       totalCases,
       openCases,
-      pendingCases,
+      inProgressCases,
       resolvedToday,
       slaBreaches,
       averageResolutionTime,
