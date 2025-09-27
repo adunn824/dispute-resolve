@@ -99,11 +99,11 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   });
 
   if (searchTerm) queryParams.set("search", searchTerm);
-  if (statusFilter) queryParams.set("status", statusFilter);
-  if (priorityFilter) queryParams.set("priorityValue", priorityFilter);
-  if (caseTypeFilter) queryParams.set("caseTypeId", caseTypeFilter);
-  if (categoryFilter) queryParams.set("categoryId", categoryFilter);
-  if (assigneeFilter) queryParams.set("assignedToUserId", assigneeFilter);
+  if (statusFilter && statusFilter !== "all") queryParams.set("status", statusFilter);
+  if (priorityFilter && priorityFilter !== "all") queryParams.set("priorityValue", priorityFilter);
+  if (caseTypeFilter && caseTypeFilter !== "all") queryParams.set("caseTypeId", caseTypeFilter);
+  if (categoryFilter && categoryFilter !== "all") queryParams.set("categoryId", categoryFilter);
+  if (assigneeFilter && assigneeFilter !== "all") queryParams.set("assignedToUserId", assigneeFilter);
 
   // Fetch cases with filters
   const { data: casesData, isLoading, error, refetch } = useQuery<{
@@ -151,11 +151,11 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setStatusFilter("");
-    setPriorityFilter("");
-    setCaseTypeFilter("");
-    setCategoryFilter("");
-    setAssigneeFilter("");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setCaseTypeFilter("all");
+    setCategoryFilter("all");
+    setAssigneeFilter("all");
     setCurrentPage(1);
   };
 
@@ -271,7 +271,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
@@ -283,7 +283,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                 <SelectValue placeholder="All Priorities" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Priorities</SelectItem>
+                <SelectItem value="all">All Priorities</SelectItem>
                 <SelectItem value="Critical">Critical</SelectItem>
                 <SelectItem value="High">High</SelectItem>
                 <SelectItem value="Medium">Medium</SelectItem>
@@ -296,12 +296,14 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                 <SelectValue placeholder="All Case Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Case Types</SelectItem>
-                {caseTypes.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">All Case Types</SelectItem>
+                {caseTypes
+                  .filter((type) => type.id && type.id.trim() !== "")
+                  .map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
 
@@ -310,12 +312,14 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
-                {filteredCategories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">All Categories</SelectItem>
+                {filteredCategories
+                  .filter((category) => category.id && category.id.trim() !== "")
+                  .map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
 
@@ -324,13 +328,15 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                 <SelectValue placeholder="All Assignees" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Assignees</SelectItem>
+                <SelectItem value="all">All Assignees</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                {assignees.map((assignee) => (
-                  <SelectItem key={assignee.id} value={assignee.id}>
-                    {assignee.name}
-                  </SelectItem>
-                ))}
+                {assignees
+                  .filter((assignee) => assignee.id && assignee.id.trim() !== "")
+                  .map((assignee) => (
+                    <SelectItem key={assignee.id} value={assignee.id}>
+                      {assignee.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

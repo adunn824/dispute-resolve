@@ -98,10 +98,7 @@ export default function CaseTypesManagement() {
   // Case type mutations
   const createCaseTypeMutation = useMutation({
     mutationFn: (data: CaseTypeForm) => 
-      apiRequest("/api/case-types", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("POST", "/api/case-types", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/case-types"] });
       setShowCaseTypeDialog(false);
@@ -115,10 +112,7 @@ export default function CaseTypesManagement() {
 
   const updateCaseTypeMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CaseTypeForm }) => 
-      apiRequest(`/api/case-types/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("PUT", `/api/case-types/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/case-types"] });
       setShowCaseTypeDialog(false);
@@ -133,7 +127,7 @@ export default function CaseTypesManagement() {
 
   const deleteCaseTypeMutation = useMutation({
     mutationFn: (id: string) => 
-      apiRequest(`/api/case-types/${id}`, { method: "DELETE" }),
+      apiRequest("DELETE", `/api/case-types/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/case-types"] });
       toast({ title: "Success", description: "Case type deleted successfully" });
@@ -146,10 +140,7 @@ export default function CaseTypesManagement() {
   // Category mutations
   const createCategoryMutation = useMutation({
     mutationFn: (data: CategoryForm) => 
-      apiRequest("/api/categories", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("POST", "/api/categories", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       setShowCategoryDialog(false);
@@ -163,10 +154,7 @@ export default function CaseTypesManagement() {
 
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CategoryForm }) => 
-      apiRequest(`/api/categories/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("PUT", `/api/categories/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       setShowCategoryDialog(false);
@@ -181,7 +169,7 @@ export default function CaseTypesManagement() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: (id: string) => 
-      apiRequest(`/api/categories/${id}`, { method: "DELETE" }),
+      apiRequest("DELETE", `/api/categories/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Success", description: "Category deleted successfully" });
