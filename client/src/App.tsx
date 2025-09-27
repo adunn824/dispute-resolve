@@ -13,6 +13,7 @@ import { CaseIntakeForm } from "./components/CaseIntakeForm";
 import { CaseDetailView } from "./components/CaseDetailView";
 import { AdminConfigPanel } from "./components/AdminConfigPanel";
 import { CaseListPage } from "./pages/CaseListPage";
+import SearchPage from "./pages/SearchPage";
 import CaseTypesManagement from "./pages/admin/case-types";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
@@ -128,6 +129,11 @@ function Router() {
             onCreateCase={handleCreateCase}
             onViewCase={handleViewCase}
           />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/search">
+        <ProtectedRoute>
+          <SearchPage userRole="agent" />
         </ProtectedRoute>
       </Route>
       <Route path="/cases">
