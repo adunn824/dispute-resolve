@@ -253,15 +253,15 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                       </TableCell>
                       <TableCell>
                         <Select
-                          value={item.assignedToUserId || ""}
-                          onValueChange={(value) => handleAssignItem(item.id, value)}
+                          value={item.assignedToUserId || "unassigned"}
+                          onValueChange={(value) => handleAssignItem(item.id, value === "unassigned" ? null : value)}
                           disabled={assignMutation.isPending}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue placeholder="Assign" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Unassigned</SelectItem>
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
                             {users.map(user => (
                               <SelectItem key={user.id} value={user.id}>
                                 {user.name}
