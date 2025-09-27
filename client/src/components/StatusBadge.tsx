@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-type Status = "open" | "pending" | "resolved" | "closed";
+type Status = "open" | "pending" | "in_progress" | "resolved" | "closed";
 
 interface StatusBadgeProps {
   status: Status;
@@ -14,6 +14,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       case "open":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
       case "pending":
+      case "in_progress":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400";
       case "resolved":
         return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
@@ -34,7 +35,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       )}
       data-testid={`badge-status-${status}`}
     >
-      {status}
+      {status === "in_progress" ? "In Progress" : status}
     </Badge>
   );
 }
