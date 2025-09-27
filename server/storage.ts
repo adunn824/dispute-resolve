@@ -7,6 +7,7 @@ import {
   resolutions, 
   flags, 
   auditLogs,
+  caseNotes,
   caseTypes,
   categories,
   checklistTemplates,
@@ -37,6 +38,8 @@ import {
   type InsertFlag,
   type AuditLog,
   type InsertAuditLog,
+  type CaseNote,
+  type InsertCaseNote,
   type CaseType,
   type InsertCaseType,
   type Category,
@@ -116,6 +119,11 @@ export interface IStorage {
   updateCase(id: string, updates: Partial<InsertCase>): Promise<Case>;
   assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case>;
   getAvailableAssignees(): Promise<User[]>;
+  
+  // Case notes methods
+  getCaseNotes(caseId: string): Promise<Array<CaseNote & { authorUser: { name: string; role: string } }>>;
+  createCaseNote(noteData: InsertCaseNote): Promise<CaseNote>;
+  updateCaseNote(id: string, updates: Partial<InsertCaseNote>): Promise<CaseNote>;
   
   // Checklist methods
   getChecklistItems(caseId: string): Promise<ChecklistItem[]>;
@@ -503,6 +511,46 @@ export class DatabaseStorage implements IStorage {
         eq(users.status, "active")
       ))
       .orderBy(asc(users.name));
+  }
+
+  // Case notes methods
+  async getCaseNotes(caseId: string): Promise<Array<CaseNote & { authorUser: { name: string; role: string } }>> {
+    return await db.select({
+      id: caseNotes.id,
+      caseId: caseNotes.caseId,
+      authorUserId: caseNotes.authorUserId,
+      content: caseNotes.content,
+      isPublic: caseNotes.isPublic,
+      createdAt: caseNotes.createdAt,
+      updatedAt: caseNotes.updatedAt,
+      authorUser: {
+        name: users.name,
+        role: users.role,
+      },
+    })
+    .from(caseNotes)
+    .innerJoin(users, eq(caseNotes.authorUserId, users.id))
+    .where(eq(caseNotes.caseId, caseId))
+    .orderBy(desc(caseNotes.createdAt));
+  }
+
+  async createCaseNote(noteData: InsertCaseNote): Promise<CaseNote> {
+    const [caseNote] = await db.insert(caseNotes).values(noteData).returning();
+    return caseNote;
+  }
+
+  async updateCaseNote(id: string, updates: Partial<InsertCaseNote>): Promise<CaseNote> {
+    const [caseNote] = await db
+      .update(caseNotes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(caseNotes.id, id))
+      .returning();
+    
+    if (!caseNote) {
+      throw new Error("Case note not found");
+    }
+    
+    return caseNote;
   }
 
   // Checklist methods

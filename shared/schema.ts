@@ -121,6 +121,16 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const caseNotes = pgTable("case_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => cases.id),
+  authorUserId: varchar("author_user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  isPublic: boolean("is_public").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Admin Config Tables
 
 export const caseTypes = pgTable("case_types", {
@@ -261,6 +271,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
   flags: many(flags),
   auditLogs: many(auditLogs),
+  caseNotes: many(caseNotes),
   configAudits: many(configAudits),
 }));
 
@@ -290,6 +301,7 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
   resolution: one(resolutions),
   flags: many(flags),
   auditLogs: many(auditLogs),
+  caseNotes: many(caseNotes),
 }));
 
 export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
@@ -339,6 +351,17 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
   actorUser: one(users, {
     fields: [auditLogs.actorUserId],
+    references: [users.id],
+  }),
+}));
+
+export const caseNotesRelations = relations(caseNotes, ({ one }) => ({
+  case: one(cases, {
+    fields: [caseNotes.caseId],
+    references: [cases.id],
+  }),
+  authorUser: one(users, {
+    fields: [caseNotes.authorUserId],
     references: [users.id],
   }),
 }));
@@ -455,6 +478,12 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+export const insertCaseNoteSchema = createInsertSchema(caseNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCaseTypeSchema = createInsertSchema(caseTypes).omit({
   id: true,
 });
@@ -539,6 +568,9 @@ export type InsertFlag = z.infer<typeof insertFlagSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type CaseNote = typeof caseNotes.$inferSelect;
+export type InsertCaseNote = z.infer<typeof insertCaseNoteSchema>;
 
 export type CaseType = typeof caseTypes.$inferSelect;
 export type InsertCaseType = z.infer<typeof insertCaseTypeSchema>;

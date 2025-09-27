@@ -9,7 +9,8 @@ import { ChecklistTab } from "./tabs/ChecklistTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
-import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck } from "lucide-react";
+import { CaseNotesTab } from "./tabs/CaseNotesTab";
+import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -290,9 +291,13 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="checklist" data-testid="tab-checklist">Checklist</TabsTrigger>
           <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+          <TabsTrigger value="notes" data-testid="tab-notes">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Notes
+          </TabsTrigger>
           <TabsTrigger value="resolution" data-testid="tab-resolution">Resolution</TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">Audit Log</TabsTrigger>
         </TabsList>
@@ -303,6 +308,10 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
         <TabsContent value="documents" className="mt-6">
           <DocumentsTab caseId={caseId} />
+        </TabsContent>
+
+        <TabsContent value="notes" className="mt-6">
+          <CaseNotesTab caseId={caseId} />
         </TabsContent>
 
         <TabsContent value="resolution" className="mt-6">

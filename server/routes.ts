@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { 
   insertCaseSchema, 
   insertCustomerSchema,
+  insertCaseNoteSchema,
   type Case,
   type Customer 
 } from "@shared/schema";
@@ -177,6 +178,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to get assignees:", error);
       res.status(500).json({ error: "Failed to get assignees" });
+    }
+  });
+
+  // GET /api/cases/:id/notes - Get all notes for a case (agents and above)
+  app.get("/api/cases/:id/notes", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const notes = await storage.getCaseNotes(id);
+      res.json({ data: notes });
+    } catch (error) {
+      console.error("Failed to get case notes:", error);
+      res.status(500).json({ error: "Failed to get case notes" });
+    }
+  });
+
+  // POST /api/cases/:id/notes - Create a new note for a case (agents and above)
+  app.post("/api/cases/:id/notes", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Validate request body using Zod schema
+      const noteSchema = insertCaseNoteSchema.omit({ caseId: true, authorUserId: true });
+      const validatedData = noteSchema.parse(req.body);
+
+      const noteData = {
+        caseId: id,
+        authorUserId: userId,
+        content: validatedData.content,
+        isPublic: validatedData.isPublic,
+      };
+
+      const newNote = await storage.createCaseNote(noteData);
+      
+      // Log the note creation in audit log
+      await storage.createAuditLog({
+        caseId: id,
+        actorUserId: userId,
+        action: "case_note_added",
+        details: {
+          noteId: newNote.id,
+          isPublic: noteData.isPublic,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      res.json({ data: newNote });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid note data", details: error.errors });
+      }
+      console.error("Failed to create case note:", error);
+      res.status(500).json({ error: "Failed to create case note" });
+    }
+  });
+
+  // PUT /api/notes/:id - Update a case note (agents and above)
+  app.put("/api/notes/:id", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Validate request body using Zod schema
+      const updateSchema = insertCaseNoteSchema.omit({ caseId: true, authorUserId: true }).partial();
+      const validatedData = updateSchema.parse(req.body);
+
+      const updatedNote = await storage.updateCaseNote(id, validatedData);
+
+      // Log the note update in audit log
+      await storage.createAuditLog({
+        caseId: updatedNote.caseId,
+        actorUserId: userId,
+        action: "case_note_updated",
+        details: {
+          noteId: id,
+          isPublic: updatedNote.isPublic,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      res.json({ data: updatedNote });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid note data", details: error.errors });
+      }
+      console.error("Failed to update case note:", error);
+      if (error instanceof Error && error.message === "Case note not found") {
+        return res.status(404).json({ error: "Case note not found" });
+      }
+      res.status(500).json({ error: "Failed to update case note" });
     }
   });
 
