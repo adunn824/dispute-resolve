@@ -451,6 +451,136 @@ export class DatabaseStorage implements IStorage {
     return await baseQuery.execute();
   }
 
+  async getCasesWithDetails(filters?: { 
+    status?: string; 
+    priorityValue?: string; 
+    priorityRuleId?: string;
+    caseTypeId?: string; 
+    categoryId?: string;
+    customerId?: string;
+    assignedToUserId?: string;
+    search?: string;
+    sortField?: string;
+    sortDirection?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any[]> {
+    const conditions = [];
+    
+    if (filters?.status) conditions.push(eq(cases.status, filters.status as any));
+    if (filters?.priorityRuleId) conditions.push(eq(cases.priorityRuleId, filters.priorityRuleId));
+    if (filters?.caseTypeId) conditions.push(eq(cases.caseTypeId, filters.caseTypeId));
+    if (filters?.categoryId) conditions.push(eq(cases.categoryId, filters.categoryId));
+    if (filters?.customerId) conditions.push(eq(cases.customerId, filters.customerId));
+    if (filters?.assignedToUserId) conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
+    
+    // If filtering by priority value, add condition using inArray with subquery
+    if (filters?.priorityValue) {
+      const priorityRuleIds = db.select({ id: priorityRules.id })
+        .from(priorityRules)
+        .where(eq(priorityRules.priorityValue, filters.priorityValue));
+      conditions.push(inArray(cases.priorityRuleId, priorityRuleIds));
+    }
+
+    // Add search functionality across multiple fields
+    if (filters?.search) {
+      const searchTerm = `%${filters.search.toLowerCase()}%`;
+      conditions.push(
+        or(
+          sql`LOWER(${customers.name}) LIKE ${searchTerm}`,
+          sql`LOWER(${cases.details}) LIKE ${searchTerm}`,
+          sql`LOWER(${cases.loanId}) LIKE ${searchTerm}`,
+          sql`LOWER(${caseTypes.name}) LIKE ${searchTerm}`,
+          sql`LOWER(${categories.name}) LIKE ${searchTerm}`
+        )
+      );
+    }
+    
+    let baseQuery = db
+      .select({
+        // Case fields
+        id: cases.id,
+        caseTypeId: cases.caseTypeId,
+        categoryId: cases.categoryId,
+        priorityRuleId: cases.priorityRuleId,
+        customerId: cases.customerId,
+        assignedToUserId: cases.assignedToUserId,
+        loanId: cases.loanId,
+        state: cases.state,
+        details: cases.details,
+        status: cases.status,
+        createdAt: cases.createdAt,
+        updatedAt: cases.updatedAt,
+        
+        // Customer fields
+        customerName: customers.name,
+        customerState: customers.state,
+        
+        // Case type fields
+        caseTypeName: caseTypes.name,
+        caseTypeColor: caseTypes.color,
+        
+        // Category fields
+        categoryName: categories.name,
+        categoryCode: categories.code,
+        
+        // Priority rule fields
+        priorityValue: priorityRules.priorityValue,
+        priorityDescription: priorityRules.description,
+        
+        // Assigned user fields
+        assignedUserName: users.name,
+        assignedUserEmail: users.email,
+        assignedUserRole: users.role,
+      })
+      .from(cases)
+      .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .leftJoin(categories, eq(cases.categoryId, categories.id))
+      .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
+      .leftJoin(users, eq(cases.assignedToUserId, users.id));
+    
+    if (conditions.length > 0) {
+      baseQuery = baseQuery.where(and(...conditions));
+    }
+    
+    // Handle sorting
+    const sortField = filters?.sortField || "createdAt";
+    const sortDirection = filters?.sortDirection || "desc";
+    
+    let orderByClause;
+    switch (sortField) {
+      case "customerName":
+        orderByClause = sortDirection === "asc" ? asc(customers.name) : desc(customers.name);
+        break;
+      case "status":
+        orderByClause = sortDirection === "asc" ? asc(cases.status) : desc(cases.status);
+        break;
+      case "priorityValue":
+        orderByClause = sortDirection === "asc" ? asc(priorityRules.priorityValue) : desc(priorityRules.priorityValue);
+        break;
+      case "updatedAt":
+        orderByClause = sortDirection === "asc" ? asc(cases.updatedAt) : desc(cases.updatedAt);
+        break;
+      case "createdAt":
+      default:
+        orderByClause = sortDirection === "asc" ? asc(cases.createdAt) : desc(cases.createdAt);
+        break;
+    }
+    
+    baseQuery = baseQuery.orderBy(orderByClause);
+    
+    if (filters?.limit) {
+      baseQuery = baseQuery.limit(filters.limit);
+    }
+    
+    if (filters?.offset) {
+      baseQuery = baseQuery.offset(filters.offset);
+    }
+    
+    return await baseQuery.execute();
+  }
+
   async createCase(insertCase: InsertCase): Promise<Case> {
     const [caseRecord] = await db
       .insert(cases)

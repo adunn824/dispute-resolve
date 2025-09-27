@@ -76,12 +76,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         caseTypeId: z.string().optional(),
         categoryId: z.string().optional(),
         customerId: z.string().optional(),
+        assignedToUserId: z.string().optional(),
+        search: z.string().optional(),
+        detailed: z.coerce.boolean().default(false),
+        sortField: z.enum(["createdAt", "customerName", "status", "priorityValue", "updatedAt"]).default("createdAt"),
+        sortDirection: z.enum(["asc", "desc"]).default("desc"),
         limit: z.coerce.number().min(1).max(100).default(20),
         offset: z.coerce.number().min(0).default(0)
       });
 
       const filters = querySchema.parse(req.query);
-      const cases = await storage.getCases(filters);
+      
+      // Use detailed view if requested, otherwise basic view
+      const cases = filters.detailed 
+        ? await storage.getCasesWithDetails(filters)
+        : await storage.getCases(filters);
       
       res.json({
         data: cases,

@@ -12,6 +12,7 @@ import { Dashboard } from "./components/Dashboard";
 import { CaseIntakeForm } from "./components/CaseIntakeForm";
 import { CaseDetailView } from "./components/CaseDetailView";
 import { AdminConfigPanel } from "./components/AdminConfigPanel";
+import { CaseListPage } from "./pages/CaseListPage";
 import CaseTypesManagement from "./pages/admin/case-types";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
@@ -131,11 +132,7 @@ function Router() {
       </Route>
       <Route path="/cases">
         <ProtectedRoute>
-          <Dashboard
-            userRole="agent"
-            onCreateCase={handleCreateCase}
-            onViewCase={handleViewCase}
-          />
+          <CaseListPage userRole="agent" />
         </ProtectedRoute>
       </Route>
       <Route path="/cases/new">
@@ -155,11 +152,7 @@ function Router() {
       </Route>
       <Route path="/compliance/cases">
         <ProtectedRoute requiredRole={["compliance", "admin"]}>
-          <Dashboard
-            userRole="compliance"
-            onCreateCase={handleCreateCase}
-            onViewCase={handleViewCase}
-          />
+          <CaseListPage userRole="compliance" />
         </ProtectedRoute>
       </Route>
       <Route path="/compliance/reports">
