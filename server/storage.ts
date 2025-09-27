@@ -108,11 +108,14 @@ export interface IStorage {
     caseTypeId?: string; 
     categoryId?: string;
     customerId?: string;
+    assignedToUserId?: string;
     limit?: number;
     offset?: number;
   }): Promise<Case[]>;
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, updates: Partial<InsertCase>): Promise<Case>;
+  assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case>;
+  getAvailableAssignees(): Promise<User[]>;
   
   // Checklist methods
   getChecklistItems(caseId: string): Promise<ChecklistItem[]>;
@@ -322,6 +325,7 @@ export class DatabaseStorage implements IStorage {
         categoryId: cases.categoryId,
         priorityRuleId: cases.priorityRuleId,
         customerId: cases.customerId,
+        assignedToUserId: cases.assignedToUserId,
         loanId: cases.loanId,
         state: cases.state,
         details: cases.details,
@@ -344,12 +348,18 @@ export class DatabaseStorage implements IStorage {
         // Priority rule fields
         priorityValue: priorityRules.priorityValue,
         priorityDescription: priorityRules.description,
+        
+        // Assigned user fields
+        assignedUserName: users.name,
+        assignedUserEmail: users.email,
+        assignedUserRole: users.role,
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
+      .leftJoin(users, eq(cases.assignedToUserId, users.id))
       .where(eq(cases.id, id))
       .limit(1);
 
@@ -393,6 +403,7 @@ export class DatabaseStorage implements IStorage {
     caseTypeId?: string; 
     categoryId?: string;
     customerId?: string;
+    assignedToUserId?: string;
     limit?: number;
     offset?: number;
   }): Promise<Case[]> {
@@ -403,6 +414,7 @@ export class DatabaseStorage implements IStorage {
     if (filters?.caseTypeId) conditions.push(eq(cases.caseTypeId, filters.caseTypeId));
     if (filters?.categoryId) conditions.push(eq(cases.categoryId, filters.categoryId));
     if (filters?.customerId) conditions.push(eq(cases.customerId, filters.customerId));
+    if (filters?.assignedToUserId) conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
     
     // If filtering by priority value, add condition using inArray with subquery
     if (filters?.priorityValue) {
@@ -452,6 +464,45 @@ export class DatabaseStorage implements IStorage {
       .where(eq(cases.id, id))
       .returning();
     return caseRecord;
+  }
+
+  async assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case> {
+    // Update the case assignment
+    const updatedCases = await db
+      .update(cases)
+      .set({ 
+        assignedToUserId,
+        updatedAt: new Date()
+      })
+      .where(eq(cases.id, id))
+      .returning();
+
+    if (updatedCases.length === 0) {
+      throw new Error("Case not found");
+    }
+
+    // Log the assignment change in audit log
+    await db.insert(auditLogs).values({
+      caseId: id,
+      actorUserId,
+      action: "case_assigned",
+      details: {
+        assignedToUserId,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    return updatedCases[0];
+  }
+
+  async getAvailableAssignees(): Promise<User[]> {
+    // Return users with agent or compliance roles who are active
+    return await db.select().from(users)
+      .where(and(
+        inArray(users.role, ["agent", "compliance"]),
+        eq(users.status, "active")
+      ))
+      .orderBy(asc(users.name));
   }
 
   // Checklist methods

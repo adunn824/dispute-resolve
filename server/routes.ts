@@ -142,6 +142,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/cases/:id/assign - Assign case to user (agents and above)
+  app.patch("/api/cases/:id/assign", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { assignedToUserId } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Validate assignedToUserId if provided (can be null to unassign)
+      if (assignedToUserId !== null && typeof assignedToUserId !== 'string') {
+        return res.status(400).json({ error: "Invalid assignedToUserId. Must be a string or null." });
+      }
+
+      const updatedCase = await storage.assignCase(id, assignedToUserId, userId);
+      res.json({ data: updatedCase });
+    } catch (error) {
+      console.error("Failed to assign case:", error);
+      if (error instanceof Error && error.message === "Case not found") {
+        return res.status(404).json({ error: "Case not found" });
+      }
+      res.status(500).json({ error: "Failed to assign case" });
+    }
+  });
+
+  // GET /api/assignees - Get available users for case assignment
+  app.get("/api/assignees", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const assignees = await storage.getAvailableAssignees();
+      res.json({ data: assignees });
+    } catch (error) {
+      console.error("Failed to get assignees:", error);
+      res.status(500).json({ error: "Failed to get assignees" });
+    }
+  });
+
   // POST /api/cases/create-intake - Simplified case creation from intake form (agents and above)
   app.post("/api/cases/create-intake", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {

@@ -79,8 +79,8 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
         change: "-5% from last week"
       },
       {
-        title: "In Progress",
-        value: stats.inProgressCases.toString(),
+        title: "In Progress", 
+        value: (stats.inProgressCases || 0).toString(),
         icon: Clock,
         change: "+8% from last week"
       },

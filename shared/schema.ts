@@ -59,6 +59,7 @@ export const cases = pgTable("cases", {
   categoryId: varchar("category_id").notNull().references(() => categories.id),
   priorityRuleId: varchar("priority_rule_id").notNull().references(() => priorityRules.id),
   customerId: varchar("customer_id").notNull().references(() => customers.id),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
   loanId: text("loan_id"),
   state: text("state").notNull(),
   details: text("details").notNull(),
@@ -279,6 +280,10 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
   category: one(categories, {
     fields: [cases.categoryId],
     references: [categories.id],
+  }),
+  assignedToUser: one(users, {
+    fields: [cases.assignedToUserId],
+    references: [users.id],
   }),
   checklistItems: many(checklistItems),
   documents: many(documents),

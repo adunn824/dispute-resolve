@@ -9,7 +9,7 @@ import { ChecklistTab } from "./tabs/ChecklistTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
-import { ArrowLeft, User, Calendar, FileText, Loader2, Settings } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -26,6 +26,7 @@ interface CaseDetailData {
   caseTypeId: string;
   categoryId: string;
   customerId: string;
+  assignedToUserId?: string;
   loanId?: string;
   state: string;
   details: string;
@@ -40,6 +41,16 @@ interface CaseDetailData {
   categoryCode: string;
   priorityValue: string;
   priorityDescription?: string;
+  assignedUserName?: string;
+  assignedUserEmail?: string;
+  assignedUserRole?: string;
+}
+
+interface Assignee {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }
 
 export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
@@ -52,7 +63,14 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     queryFn: () => apiRequest("GET", `/api/cases/${caseId}`)
   });
 
+  // Fetch available assignees
+  const { data: assigneesData } = useQuery<{data: Assignee[]}>({
+    queryKey: ["/api/assignees"],
+    queryFn: () => apiRequest("GET", "/api/assignees")
+  });
+
   const caseDetails = caseData?.data;
+  const assignees = assigneesData?.data || [];
 
   // Mutation for updating case status
   const updateStatusMutation = useMutation({
@@ -77,8 +95,35 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     },
   });
 
+  // Mutation for assigning case
+  const assignCaseMutation = useMutation({
+    mutationFn: (assignedToUserId: string | null) =>
+      apiRequest("PATCH", `/api/cases/${caseId}/assign`, { assignedToUserId }),
+    onSuccess: () => {
+      // Invalidate and refetch case details
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      toast({
+        title: "Assignment Updated",
+        description: "Case assignment has been successfully updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update case assignment",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (newStatus: "open" | "in_progress" | "resolved") => {
     updateStatusMutation.mutate(newStatus);
+  };
+
+  const handleAssignmentChange = (assignedToUserId: string) => {
+    // If "unassigned" is selected, pass null, otherwise pass the user ID
+    const actualUserId = assignedToUserId === "unassigned" ? null : assignedToUserId;
+    assignCaseMutation.mutate(actualUserId);
   };
   
   const handleResolveCase = () => {
@@ -179,6 +224,61 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
             <div>
               <p className="text-sm font-medium">{caseDetails.customerState}</p>
               <p className="text-xs text-muted-foreground">State</p>
+            </div>
+          </div>
+          
+          {/* Assignment Section */}
+          <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Assignment</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground mb-2">Assigned to:</p>
+                <Select
+                  value={caseDetails.assignedToUserId || "unassigned"}
+                  onValueChange={handleAssignmentChange}
+                  disabled={assignCaseMutation.isPending}
+                  data-testid="select-case-assignment"
+                >
+                  <SelectTrigger className="w-full" data-testid="trigger-assignment-dropdown">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent data-testid="content-assignment-options">
+                    <SelectItem value="unassigned" data-testid="option-unassigned">Unassigned</SelectItem>
+                    {assignees.map((assignee) => (
+                      <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-assignee-${assignee.id}`}>
+                        <div className="flex items-center gap-2">
+                          <span>{assignee.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {assignee.role}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {caseDetails.assignedUserName && (
+                <div className="flex-1" data-testid="section-current-assignee">
+                  <p className="text-xs text-muted-foreground mb-1">Current assignee:</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium" data-testid="text-assignee-name">{caseDetails.assignedUserName}</span>
+                    <Badge variant="secondary" className="text-xs" data-testid="badge-assignee-role">
+                      {caseDetails.assignedUserRole}
+                    </Badge>
+                  </div>
+                  {caseDetails.assignedUserEmail && (
+                    <p className="text-xs text-muted-foreground" data-testid="text-assignee-email">{caseDetails.assignedUserEmail}</p>
+                  )}
+                </div>
+              )}
+              {assignCaseMutation.isPending && (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              )}
             </div>
           </div>
           <div className="mt-4">
