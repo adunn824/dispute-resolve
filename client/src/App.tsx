@@ -14,12 +14,15 @@ import { CaseDetailView } from "./components/CaseDetailView";
 import { AdminConfigPanel } from "./components/AdminConfigPanel";
 import { CaseListPage } from "./pages/CaseListPage";
 import SearchPage from "./pages/SearchPage";
+import KnowledgeBasePage from "./pages/KnowledgeBasePage";
+import KnowledgeBaseArticlePage from "./pages/KnowledgeBaseArticlePage";
 import CaseTypesManagement from "./pages/admin/case-types";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
 import CategoriesManagement from "./pages/admin/categories";
 import UsersManagement from "./pages/admin/users";
 import SystemManagement from "./pages/admin/system";
+import KnowledgeBaseManagement from "./pages/admin/KnowledgeBaseManagement";
 import NotFound from "@/pages/not-found";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -120,6 +123,23 @@ function Router() {
       <Route path="/admin/system">
         <ProtectedRoute requiredRole="admin">
           <SystemManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/knowledge-base">
+        <ProtectedRoute>
+          <KnowledgeBasePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/knowledge-base/article/:slug">
+        {params => (
+          <ProtectedRoute>
+            <KnowledgeBaseArticlePage />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/knowledge-base/admin">
+        <ProtectedRoute requiredRole={["admin", "compliance"]}>
+          <KnowledgeBaseManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/compliance">

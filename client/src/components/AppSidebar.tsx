@@ -1,4 +1,4 @@
-import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog } from "lucide-react";
+import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -39,6 +39,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "New Case", url: "/cases/new", icon: Plus },
     { title: "My Cases", url: "/cases", icon: FileText },
     { title: "Search", url: "/search", icon: Search },
+    { title: "Knowledge Base", url: "/knowledge-base", icon: BookOpen },
   ];
 
   const complianceItems = [
@@ -46,6 +47,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "All Cases", url: "/compliance/cases", icon: FileText },
     { title: "Reports", url: "/compliance/reports", icon: BarChart3 },
     { title: "Regulatory", url: "/compliance/regulatory", icon: AlertTriangle },
+    { title: "Knowledge Base", url: "/knowledge-base", icon: BookOpen },
   ];
 
   const adminItems = [
@@ -54,6 +56,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "Rules", url: "/admin/rules", icon: Settings },
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "System", url: "/admin/system", icon: Cog },
+    { title: "Knowledge Base", url: "/knowledge-base/admin", icon: BookOpen },
   ];
 
   const getMenuItems = () => {
