@@ -82,8 +82,12 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
     toggleMutation.mutate({ id: item.id, action });
   };
 
-  const handleAssignItem = (itemId: string, assignedToUserId: string) => {
-    assignMutation.mutate({ id: itemId, assignedToUserId });
+  const handleAssignItem = (itemId: string, assignedToUserId: string | null) => {
+    if (assignedToUserId === null) {
+      assignMutation.mutate({ id: itemId, assignedToUserId: "" });
+    } else {
+      assignMutation.mutate({ id: itemId, assignedToUserId });
+    }
   };
 
   const handleGenerateItems = () => {

@@ -610,3 +610,136 @@ export type InsertWebhook = z.infer<typeof insertWebhookSchema>;
 
 export type Integration = typeof integrations.$inferSelect;
 export type InsertIntegration = z.infer<typeof insertIntegrationSchema>;
+
+// Knowledge Base Tables
+
+export const kbCategories = pgTable("kb_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  slug: text("slug").unique().notNull(),
+  parentId: varchar("parent_id").references(() => kbCategories.id),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const kbArticles = pgTable("kb_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").unique().notNull(),
+  summary: text("summary"),
+  content: text("content").notNull(),
+  categoryId: varchar("category_id").references(() => kbCategories.id),
+  authorId: varchar("author_id").references(() => users.id),
+  lastModifiedBy: varchar("last_modified_by").references(() => users.id),
+  status: text("status", { enum: ["draft", "review", "published", "archived"] }).default("draft"),
+  visibility: text("visibility", { enum: ["public", "agent", "compliance", "admin"] }).default("public"),
+  tags: text("tags").array(),
+  searchVector: text("search_vector"), // For full-text search
+  viewCount: integer("view_count").default(0),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_kb_articles_status").on(table.status),
+  index("idx_kb_articles_category").on(table.categoryId),
+  index("idx_kb_articles_visibility").on(table.visibility),
+]);
+
+export const kbArticleVersions = pgTable("kb_article_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  articleId: varchar("article_id").notNull().references(() => kbArticles.id),
+  versionNumber: integer("version_number").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  summary: text("summary"),
+  changeDescription: text("change_description"),
+  authorId: varchar("author_id").references(() => users.id),
+  isPublished: boolean("is_published").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_kb_article_versions_article").on(table.articleId),
+  unique("uq_kb_article_version").on(table.articleId, table.versionNumber),
+]);
+
+export const kbChangeEvents = pgTable("kb_change_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text("event_type").notNull(), // 'case_workflow_update', 'admin_config_change', 'api_endpoint_modified', etc.
+  entityType: text("entity_type").notNull(), // 'case_type', 'category', 'workflow', 'api_route', etc.
+  entityId: varchar("entity_id"),
+  eventData: jsonb("event_data"),
+  description: text("description").notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  severity: text("severity", { enum: ["low", "medium", "high", "critical"] }).default("medium"),
+  isProcessed: boolean("is_processed").default(false),
+  relatedArticleId: varchar("related_article_id").references(() => kbArticles.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_kb_change_events_type").on(table.eventType),
+  index("idx_kb_change_events_entity").on(table.entityType, table.entityId),
+  index("idx_kb_change_events_processed").on(table.isProcessed),
+]);
+
+export const kbArticleLinks = pgTable("kb_article_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  articleId: varchar("article_id").notNull().references(() => kbArticles.id),
+  linkedEntityType: text("linked_entity_type").notNull(), // 'case', 'case_type', 'category', 'workflow', etc.
+  linkedEntityId: varchar("linked_entity_id").notNull(),
+  linkType: text("link_type").notNull(), // 'explains', 'references', 'troubleshoots', 'procedure_for', etc.
+  contextDescription: text("context_description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_kb_article_links_article").on(table.articleId),
+  index("idx_kb_article_links_entity").on(table.linkedEntityType, table.linkedEntityId),
+  unique("uq_kb_article_entity_link").on(table.articleId, table.linkedEntityType, table.linkedEntityId, table.linkType),
+]);
+
+// Knowledge Base Insert Schemas
+export const insertKbCategorySchema = createInsertSchema(kbCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertKbArticleSchema = createInsertSchema(kbArticles).omit({
+  id: true,
+  searchVector: true,
+  viewCount: true,
+  publishedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertKbArticleVersionSchema = createInsertSchema(kbArticleVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertKbChangeEventSchema = createInsertSchema(kbChangeEvents).omit({
+  id: true,
+  isProcessed: true,
+  createdAt: true,
+});
+
+export const insertKbArticleLinkSchema = createInsertSchema(kbArticleLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Knowledge Base Types
+export type KbCategory = typeof kbCategories.$inferSelect;
+export type InsertKbCategory = z.infer<typeof insertKbCategorySchema>;
+
+export type KbArticle = typeof kbArticles.$inferSelect;
+export type InsertKbArticle = z.infer<typeof insertKbArticleSchema>;
+
+export type KbArticleVersion = typeof kbArticleVersions.$inferSelect;
+export type InsertKbArticleVersion = z.infer<typeof insertKbArticleVersionSchema>;
+
+export type KbChangeEvent = typeof kbChangeEvents.$inferSelect;
+export type InsertKbChangeEvent = z.infer<typeof insertKbChangeEventSchema>;
+
+export type KbArticleLink = typeof kbArticleLinks.$inferSelect;
+export type InsertKbArticleLink = z.infer<typeof insertKbArticleLinkSchema>;
