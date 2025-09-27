@@ -9,37 +9,79 @@ import { ChecklistTab } from "./tabs/ChecklistTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
-import { ArrowLeft, User, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "../lib/queryClient";
 
 interface CaseDetailViewProps {
   caseId: string;
   onBack: () => void;
 }
 
-// Mock case data - TODO: remove mock functionality
-const mockCase = {
-  id: "CASE-001",
-  caseType: "Complaint" as const,
-  category: "CFPB",
-  priority: "High" as const,
-  status: "open" as const,
-  customerName: "John Smith",
-  customerState: "CA",
-  loanId: "LOAN-12345",
-  details: "Customer complaint regarding unauthorized charges on their account. They claim they never authorized the payment and are requesting a full refund.",
-  createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-  assignedTo: "Sarah Johnson",
-  slaDeadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-};
+interface CaseDetailData {
+  id: string;
+  caseTypeId: string;
+  categoryId: string;
+  customerId: string;
+  loanId?: string;
+  state: string;
+  details: string;
+  status: "open" | "pending" | "resolved" | "closed";
+  createdAt: string;
+  updatedAt: string;
+  customerName: string;
+  customerState: string;
+  caseTypeName: string;
+  caseTypeColor?: string;
+  categoryName: string;
+  categoryCode: string;
+  priorityValue: string;
+  priorityDescription?: string;
+}
 
 export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState("checklist");
+  
+  // Fetch case details from API
+  const { data: caseData, isLoading, error } = useQuery<{data: CaseDetailData}>({
+    queryKey: ["/api/cases", caseId],
+    queryFn: () => apiRequest("GET", `/api/cases/${caseId}`)
+  });
+
+  const caseDetails = caseData?.data;
   
   const handleResolveCase = () => {
     console.log("Resolving case:", caseId);
     // TODO: Implement case resolution logic
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading case details...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !caseDetails) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Case not found</h2>
+          <p className="text-muted-foreground mb-4">
+            The case you're looking for doesn't exist or you don't have permission to view it.
+          </p>
+          <Button onClick={onBack} data-testid="button-back-error">
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" data-testid="view-case-detail">
@@ -49,12 +91,12 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">Case #{mockCase.id}</h1>
-          <p className="text-muted-foreground">{mockCase.caseType} • {mockCase.category}</p>
+          <h1 className="text-2xl font-bold">Case #{caseDetails.id}</h1>
+          <p className="text-muted-foreground">{caseDetails.caseTypeName} • {caseDetails.categoryName}</p>
         </div>
         <div className="flex gap-2">
-          <PriorityBadge priority={mockCase.priority} />
-          <StatusBadge status={mockCase.status} />
+          <PriorityBadge priority={caseDetails.priorityValue as "Low" | "Medium" | "High"} />
+          <StatusBadge status={caseDetails.status} />
         </div>
       </div>
 
@@ -68,32 +110,32 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">{mockCase.customerName}</p>
+                <p className="text-sm font-medium">{caseDetails.customerName}</p>
                 <p className="text-xs text-muted-foreground">Customer</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">{formatDistanceToNow(mockCase.createdAt, { addSuffix: true })}</p>
+                <p className="text-sm font-medium">{formatDistanceToNow(new Date(caseDetails.createdAt), { addSuffix: true })}</p>
                 <p className="text-xs text-muted-foreground">Created</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">{mockCase.loanId}</p>
+                <p className="text-sm font-medium">{caseDetails.loanId || "N/A"}</p>
                 <p className="text-xs text-muted-foreground">Loan ID</p>
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium">{mockCase.assignedTo}</p>
-              <p className="text-xs text-muted-foreground">Assigned To</p>
+              <p className="text-sm font-medium">{caseDetails.customerState}</p>
+              <p className="text-xs text-muted-foreground">State</p>
             </div>
           </div>
           <div className="mt-4">
             <p className="text-sm text-muted-foreground">Case Details</p>
-            <p className="text-sm mt-1">{mockCase.details}</p>
+            <p className="text-sm mt-1">{caseDetails.details}</p>
           </div>
         </CardContent>
       </Card>
@@ -129,7 +171,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         <Button variant="outline" data-testid="button-edit-case">
           Edit Case
         </Button>
-        <Button onClick={handleResolveCase} disabled={mockCase.status === "resolved" || mockCase.status === "closed"} data-testid="button-resolve-case">
+        <Button onClick={handleResolveCase} disabled={caseDetails.status === "resolved" || caseDetails.status === "closed"} data-testid="button-resolve-case">
           Resolve Case
         </Button>
       </div>

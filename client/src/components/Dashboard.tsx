@@ -6,6 +6,7 @@ import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient";
+import { useLocation } from "wouter";
 import { 
   AlertTriangle, 
   FileText, 
@@ -36,6 +37,8 @@ interface DashboardStats {
 }
 
 export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: DashboardProps) {
+  const [, setLocation] = useLocation();
+  
   // Fetch real dashboard data
   const { data: dashboardData, isLoading, error } = useQuery<{data: DashboardStats}>({
     queryKey: ["/api/dashboard"],
@@ -43,6 +46,10 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
   });
 
   const stats = dashboardData?.data;
+  
+  const handleViewCase = (caseId: string) => {
+    setLocation(`/cases/${caseId}`);
+  };
 
   const getDashboardTitle = () => {
     switch (userRole) {
@@ -229,7 +236,7 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
                         <Button 
                           size="sm" 
                           className="ml-2"
-                          onClick={() => onViewCase(caseItem.id)}
+                          onClick={() => handleViewCase(caseItem.id)}
                           data-testid="button-view-case"
                         >
                           View

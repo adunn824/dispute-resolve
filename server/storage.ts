@@ -313,6 +313,49 @@ export class DatabaseStorage implements IStorage {
     return caseRecord || undefined;
   }
 
+  async getCaseWithDetails(id: string): Promise<any | undefined> {
+    const result = await db
+      .select({
+        // Case fields
+        id: cases.id,
+        caseTypeId: cases.caseTypeId,
+        categoryId: cases.categoryId,
+        priorityRuleId: cases.priorityRuleId,
+        customerId: cases.customerId,
+        loanId: cases.loanId,
+        state: cases.state,
+        details: cases.details,
+        status: cases.status,
+        createdAt: cases.createdAt,
+        updatedAt: cases.updatedAt,
+        
+        // Customer fields
+        customerName: customers.name,
+        customerState: customers.state,
+        
+        // Case type fields
+        caseTypeName: caseTypes.name,
+        caseTypeColor: caseTypes.color,
+        
+        // Category fields
+        categoryName: categories.name,
+        categoryCode: categories.code,
+        
+        // Priority rule fields
+        priorityValue: priorityRules.priorityValue,
+        priorityDescription: priorityRules.description,
+      })
+      .from(cases)
+      .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .leftJoin(categories, eq(cases.categoryId, categories.id))
+      .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
+      .where(eq(cases.id, id))
+      .limit(1);
+
+    return result[0] || undefined;
+  }
+
   async getCases(filters?: { 
     status?: string; 
     priorityValue?: string; 

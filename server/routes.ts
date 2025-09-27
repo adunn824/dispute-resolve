@@ -99,11 +99,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/cases/:id - Get single case by ID
+  // GET /api/cases/:id - Get single case by ID with detailed information
   app.get("/api/cases/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const caseRecord = await storage.getCase(id);
+      const caseRecord = await storage.getCaseWithDetails(id);
       
       if (!caseRecord) {
         return res.status(404).json({ error: "Case not found" });

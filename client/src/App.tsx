@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, useParams } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -142,6 +142,16 @@ function Router() {
         <ProtectedRoute>
           <CaseIntakeForm onSubmit={handleCaseSubmit} />
         </ProtectedRoute>
+      </Route>
+      <Route path="/cases/:id">
+        {params => (
+          <ProtectedRoute>
+            <CaseDetailView
+              caseId={params.id}
+              onBack={() => setLocation("/cases")}
+            />
+          </ProtectedRoute>
+        )}
       </Route>
       <Route path="/compliance/cases">
         <ProtectedRoute requiredRole={["compliance", "admin"]}>
