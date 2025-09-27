@@ -6,6 +6,10 @@ import {
   insertCaseSchema, 
   insertCustomerSchema,
   insertCaseNoteSchema,
+  insertKbCategorySchema,
+  insertKbArticleSchema,
+  insertKbChangeEventSchema,
+  insertKbArticleLinkSchema,
   type Case,
   type Customer 
 } from "@shared/schema";
@@ -1169,18 +1173,352 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get users for assignment
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
-      // For now, return current user + mock agents for assignment
-      // TODO: Implement proper user listing when user management is added
-      const mockUsers = [
-        { id: req.user!.id, name: req.user!.name, email: req.user!.email, role: req.user!.role },
-        { id: "agent-1", name: "Agent 1", email: "agent1@company.com", role: "agent" },
-        { id: "agent-2", name: "Agent 2", email: "agent2@company.com", role: "agent" },
-        { id: "compliance-1", name: "Compliance Officer", email: "compliance@company.com", role: "compliance" }
-      ];
-      res.json(mockUsers);
+      // Return actual database users instead of mock data
+      const users = await storage.getAvailableAssignees();
+      res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Knowledge Base API Endpoints
+  
+  // Knowledge Base Categories
+  app.get("/api/knowledge-base/categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getKbCategories();
+      res.json({ data: categories });
+    } catch (error) {
+      console.error("Error fetching knowledge base categories:", error);
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/knowledge-base/categories/:id", requireAuth, async (req, res) => {
+    try {
+      const category = await storage.getKbCategory(req.params.id);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json({ data: category });
+    } catch (error) {
+      console.error("Error fetching knowledge base category:", error);
+      res.status(500).json({ message: "Failed to fetch category" });
+    }
+  });
+
+  app.post("/api/knowledge-base/categories", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const categoryData = insertKbCategorySchema.parse(req.body);
+      const category = await storage.createKbCategory(categoryData);
+      res.status(201).json({ data: category });
+    } catch (error) {
+      console.error("Error creating knowledge base category:", error);
+      res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  app.put("/api/knowledge-base/categories/:id", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const updates = insertKbCategorySchema.partial().parse(req.body);
+      const category = await storage.updateKbCategory(req.params.id, updates);
+      res.json({ data: category });
+    } catch (error) {
+      console.error("Error updating knowledge base category:", error);
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/knowledge-base/categories/:id", requireRole(["admin"]), async (req, res) => {
+    try {
+      await storage.deleteKbCategory(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting knowledge base category:", error);
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  // Knowledge Base Articles
+  app.get("/api/knowledge-base/articles", requireAuth, async (req, res) => {
+    try {
+      const querySchema = z.object({
+        categoryId: z.string().optional(),
+        status: z.string().optional(),
+        visibility: z.string().optional(),
+        search: z.string().optional(),
+        limit: z.coerce.number().optional(),
+        offset: z.coerce.number().optional(),
+      });
+      
+      const filters = querySchema.parse(req.query);
+      const articles = await storage.getKbArticles(filters);
+      res.json({ data: articles });
+    } catch (error) {
+      console.error("Error fetching knowledge base articles:", error);
+      res.status(500).json({ message: "Failed to fetch articles" });
+    }
+  });
+
+  app.get("/api/knowledge-base/articles/:id", requireAuth, async (req, res) => {
+    try {
+      const article = await storage.getKbArticle(req.params.id);
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      // Check visibility permissions
+      const userRole = req.user.role;
+      const roleHierarchy = { 'admin': 3, 'compliance': 2, 'agent': 1 };
+      const userLevel = roleHierarchy[userRole as keyof typeof roleHierarchy] || 0;
+      const requiredLevel = roleHierarchy[article.visibility as keyof typeof roleHierarchy] || 0;
+      
+      if (userLevel < requiredLevel) {
+        return res.status(403).json({ message: "Insufficient permissions to view article" });
+      }
+      
+      // Increment view count
+      await storage.incrementKbArticleViews(req.params.id);
+      
+      res.json({ data: article });
+    } catch (error) {
+      console.error("Error fetching knowledge base article:", error);
+      res.status(500).json({ message: "Failed to fetch article" });
+    }
+  });
+
+  app.get("/api/knowledge-base/articles/slug/:slug", requireAuth, async (req, res) => {
+    try {
+      const article = await storage.getKbArticleBySlug(req.params.slug);
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      // Check visibility permissions
+      const userRole = req.user.role;
+      const roleHierarchy = { 'admin': 3, 'compliance': 2, 'agent': 1 };
+      const userLevel = roleHierarchy[userRole as keyof typeof roleHierarchy] || 0;
+      const requiredLevel = roleHierarchy[article.visibility as keyof typeof roleHierarchy] || 0;
+      
+      if (userLevel < requiredLevel) {
+        return res.status(403).json({ message: "Insufficient permissions to view article" });
+      }
+      
+      // Increment view count
+      await storage.incrementKbArticleViews(article.id);
+      
+      res.json({ data: article });
+    } catch (error) {
+      console.error("Error fetching knowledge base article by slug:", error);
+      res.status(500).json({ message: "Failed to fetch article" });
+    }
+  });
+
+  app.post("/api/knowledge-base/articles", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const validatedData = insertKbArticleSchema.parse(req.body);
+      const articleData = {
+        ...validatedData,
+        authorId: req.user.id,
+        lastModifiedBy: req.user.id,
+      };
+      const article = await storage.createKbArticle(articleData);
+      
+      // Create initial version
+      await storage.createKbArticleVersion({
+        articleId: article.id,
+        versionNumber: 1,
+        title: article.title,
+        content: article.content,
+        summary: article.summary,
+        changeDescription: "Initial version",
+        authorId: req.user.id,
+        isPublished: article.status === "published",
+      });
+      
+      res.status(201).json({ data: article });
+    } catch (error) {
+      console.error("Error creating knowledge base article:", error);
+      res.status(500).json({ message: "Failed to create article" });
+    }
+  });
+
+  app.put("/api/knowledge-base/articles/:id", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const validatedUpdates = insertKbArticleSchema.partial().parse(req.body);
+      const updates = {
+        ...validatedUpdates,
+        lastModifiedBy: req.user.id,
+      };
+      
+      // Get current article for version tracking
+      const currentArticle = await storage.getKbArticle(req.params.id);
+      if (!currentArticle) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      const article = await storage.updateKbArticle(req.params.id, updates);
+      
+      // Create new version if content changed
+      if (updates.content && updates.content !== currentArticle.content) {
+        const latestVersion = await storage.getLatestKbArticleVersion(req.params.id);
+        const newVersionNumber = (latestVersion?.versionNumber || 0) + 1;
+        
+        await storage.createKbArticleVersion({
+          articleId: req.params.id,
+          versionNumber: newVersionNumber,
+          title: updates.title || currentArticle.title,
+          content: updates.content,
+          summary: updates.summary || currentArticle.summary,
+          changeDescription: updates.changeDescription || "Content updated",
+          authorId: req.user.id,
+          isPublished: false,
+        });
+      }
+      
+      res.json({ data: article });
+    } catch (error) {
+      console.error("Error updating knowledge base article:", error);
+      res.status(500).json({ message: "Failed to update article" });
+    }
+  });
+
+  app.post("/api/knowledge-base/articles/:id/publish", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const article = await storage.publishKbArticle(req.params.id, req.user.id);
+      res.json({ data: article });
+    } catch (error) {
+      console.error("Error publishing knowledge base article:", error);
+      res.status(500).json({ message: "Failed to publish article" });
+    }
+  });
+
+  app.delete("/api/knowledge-base/articles/:id", requireRole(["admin"]), async (req, res) => {
+    try {
+      await storage.deleteKbArticle(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting knowledge base article:", error);
+      res.status(500).json({ message: "Failed to delete article" });
+    }
+  });
+
+  // Knowledge Base Search
+  app.get("/api/knowledge-base/search", requireAuth, async (req, res) => {
+    try {
+      const querySchema = z.object({
+        q: z.string().min(1),
+        visibility: z.string().optional(),
+        categoryId: z.string().optional(),
+      });
+      
+      const { q, ...filters } = querySchema.parse(req.query);
+      const articles = await storage.searchKbArticles(q, filters);
+      res.json({ data: articles });
+    } catch (error) {
+      console.error("Error searching knowledge base:", error);
+      res.status(500).json({ message: "Failed to search articles" });
+    }
+  });
+
+  // Knowledge Base Article Versions
+  app.get("/api/knowledge-base/articles/:id/versions", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const versions = await storage.getKbArticleVersions(req.params.id);
+      res.json({ data: versions });
+    } catch (error) {
+      console.error("Error fetching article versions:", error);
+      res.status(500).json({ message: "Failed to fetch versions" });
+    }
+  });
+
+  // Knowledge Base Change Events
+  app.get("/api/knowledge-base/change-events", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const querySchema = z.object({
+        eventType: z.string().optional(),
+        entityType: z.string().optional(),
+        isProcessed: z.coerce.boolean().optional(),
+        limit: z.coerce.number().optional(),
+        offset: z.coerce.number().optional(),
+      });
+      
+      const filters = querySchema.parse(req.query);
+      const events = await storage.getKbChangeEvents(filters);
+      res.json({ data: events });
+    } catch (error) {
+      console.error("Error fetching change events:", error);
+      res.status(500).json({ message: "Failed to fetch change events" });
+    }
+  });
+
+  app.post("/api/knowledge-base/change-events", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const validatedData = insertKbChangeEventSchema.parse(req.body);
+      const eventData = {
+        ...validatedData,
+        userId: req.user.id,
+      };
+      const event = await storage.createKbChangeEvent(eventData);
+      res.status(201).json({ data: event });
+    } catch (error) {
+      console.error("Error creating change event:", error);
+      res.status(500).json({ message: "Failed to create change event" });
+    }
+  });
+
+  app.put("/api/knowledge-base/change-events/:id/processed", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const { relatedArticleId } = req.body;
+      const event = await storage.markKbChangeEventProcessed(req.params.id, relatedArticleId);
+      res.json({ data: event });
+    } catch (error) {
+      console.error("Error marking change event as processed:", error);
+      res.status(500).json({ message: "Failed to mark event as processed" });
+    }
+  });
+
+  // Knowledge Base Article Links
+  app.get("/api/knowledge-base/articles/:id/links", requireAuth, async (req, res) => {
+    try {
+      const links = await storage.getKbArticleLinks(req.params.id);
+      res.json({ data: links });
+    } catch (error) {
+      console.error("Error fetching article links:", error);
+      res.status(500).json({ message: "Failed to fetch article links" });
+    }
+  });
+
+  app.get("/api/knowledge-base/linked-articles/:entityType/:entityId", requireAuth, async (req, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const links = await storage.getKbLinkedArticles(entityType, entityId);
+      res.json({ data: links });
+    } catch (error) {
+      console.error("Error fetching linked articles:", error);
+      res.status(500).json({ message: "Failed to fetch linked articles" });
+    }
+  });
+
+  app.post("/api/knowledge-base/article-links", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      const linkData = insertKbArticleLinkSchema.parse(req.body);
+      const link = await storage.createKbArticleLink(linkData);
+      res.status(201).json({ data: link });
+    } catch (error) {
+      console.error("Error creating article link:", error);
+      res.status(500).json({ message: "Failed to create article link" });
+    }
+  });
+
+  app.delete("/api/knowledge-base/article-links/:id", requireRole(["admin", "compliance"]), async (req, res) => {
+    try {
+      await storage.deleteKbArticleLink(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting article link:", error);
+      res.status(500).json({ message: "Failed to delete article link" });
     }
   });
 

@@ -21,6 +21,11 @@ import {
   featureFlags,
   webhooks,
   integrations,
+  kbCategories,
+  kbArticles,
+  kbArticleVersions,
+  kbChangeEvents,
+  kbArticleLinks,
   type User, 
   type InsertUser,
   type UpsertUser,
@@ -65,7 +70,17 @@ import {
   type Webhook,
   type InsertWebhook,
   type Integration,
-  type InsertIntegration
+  type InsertIntegration,
+  type KbCategory,
+  type InsertKbCategory,
+  type KbArticle,
+  type InsertKbArticle,
+  type KbArticleVersion,
+  type InsertKbArticleVersion,
+  type KbChangeEvent,
+  type InsertKbChangeEvent,
+  type KbArticleLink,
+  type InsertKbArticleLink
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
@@ -214,6 +229,58 @@ export interface IStorage {
   
   // Dashboard methods
   getDashboardStats(): Promise<DashboardStats>;
+
+  // Knowledge Base methods
+  // Categories
+  getKbCategories(parentId?: string): Promise<KbCategory[]>;
+  getKbCategory(id: string): Promise<KbCategory | undefined>;
+  getKbCategoryBySlug(slug: string): Promise<KbCategory | undefined>;
+  createKbCategory(category: InsertKbCategory): Promise<KbCategory>;
+  updateKbCategory(id: string, updates: Partial<InsertKbCategory>): Promise<KbCategory>;
+  deleteKbCategory(id: string): Promise<void>;
+  
+  // Articles
+  getKbArticles(filters?: { 
+    categoryId?: string; 
+    status?: string; 
+    visibility?: string; 
+    tags?: string[];
+    search?: string;
+    limit?: number; 
+    offset?: number; 
+  }): Promise<Array<KbArticle & { categoryName?: string; authorName?: string }>>;
+  getKbArticle(id: string): Promise<KbArticle | undefined>;
+  getKbArticleBySlug(slug: string): Promise<KbArticle | undefined>;
+  createKbArticle(article: InsertKbArticle): Promise<KbArticle>;
+  updateKbArticle(id: string, updates: Partial<InsertKbArticle>): Promise<KbArticle>;
+  deleteKbArticle(id: string): Promise<void>;
+  publishKbArticle(id: string, publishedBy: string): Promise<KbArticle>;
+  incrementKbArticleViews(id: string): Promise<void>;
+  searchKbArticles(query: string, filters?: { visibility?: string; categoryId?: string }): Promise<Array<KbArticle & { categoryName?: string }>>;
+  
+  // Article Versions
+  getKbArticleVersions(articleId: string): Promise<KbArticleVersion[]>;
+  getKbArticleVersion(id: string): Promise<KbArticleVersion | undefined>;
+  createKbArticleVersion(version: InsertKbArticleVersion): Promise<KbArticleVersion>;
+  getLatestKbArticleVersion(articleId: string): Promise<KbArticleVersion | undefined>;
+  
+  // Change Events  
+  getKbChangeEvents(filters?: { 
+    eventType?: string; 
+    entityType?: string; 
+    isProcessed?: boolean;
+    limit?: number; 
+    offset?: number; 
+  }): Promise<KbChangeEvent[]>;
+  createKbChangeEvent(event: InsertKbChangeEvent): Promise<KbChangeEvent>;
+  markKbChangeEventProcessed(id: string, relatedArticleId?: string): Promise<KbChangeEvent>;
+  getUnprocessedKbChangeEvents(): Promise<KbChangeEvent[]>;
+  
+  // Article Links
+  getKbArticleLinks(articleId: string): Promise<KbArticleLink[]>;
+  getKbLinkedArticles(entityType: string, entityId: string): Promise<Array<KbArticleLink & { articleTitle: string; articleSlug: string }>>;
+  createKbArticleLink(link: InsertKbArticleLink): Promise<KbArticleLink>;
+  deleteKbArticleLink(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1130,6 +1197,351 @@ export class DatabaseStorage implements IStorage {
       recentCases,
       slaAlerts
     };
+  }
+
+  // Knowledge Base Methods
+
+  // Knowledge Base Categories
+  async getKbCategories(parentId?: string): Promise<KbCategory[]> {
+    const conditions = [];
+    if (parentId !== undefined) {
+      if (parentId === null) {
+        conditions.push(sql`${kbCategories.parentId} IS NULL`);
+      } else {
+        conditions.push(eq(kbCategories.parentId, parentId));
+      }
+    }
+    
+    return await db
+      .select()
+      .from(kbCategories)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(kbCategories.displayOrder), asc(kbCategories.name));
+  }
+
+  async getKbCategory(id: string): Promise<KbCategory | undefined> {
+    const [category] = await db.select().from(kbCategories).where(eq(kbCategories.id, id));
+    return category || undefined;
+  }
+
+  async getKbCategoryBySlug(slug: string): Promise<KbCategory | undefined> {
+    const [category] = await db.select().from(kbCategories).where(eq(kbCategories.slug, slug));
+    return category || undefined;
+  }
+
+  async createKbCategory(category: InsertKbCategory): Promise<KbCategory> {
+    const [newCategory] = await db
+      .insert(kbCategories)
+      .values({
+        ...category,
+        updatedAt: new Date()
+      })
+      .returning();
+    return newCategory;
+  }
+
+  async updateKbCategory(id: string, updates: Partial<InsertKbCategory>): Promise<KbCategory> {
+    const [category] = await db
+      .update(kbCategories)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(kbCategories.id, id))
+      .returning();
+    return category;
+  }
+
+  async deleteKbCategory(id: string): Promise<void> {
+    await db.delete(kbCategories).where(eq(kbCategories.id, id));
+  }
+
+  // Knowledge Base Articles
+  async getKbArticles(filters?: { 
+    categoryId?: string; 
+    status?: string; 
+    visibility?: string; 
+    tags?: string[];
+    search?: string;
+    limit?: number; 
+    offset?: number; 
+  }): Promise<Array<KbArticle & { categoryName?: string; authorName?: string }>> {
+    const conditions = [];
+    
+    if (filters?.categoryId) conditions.push(eq(kbArticles.categoryId, filters.categoryId));
+    if (filters?.status) conditions.push(eq(kbArticles.status, filters.status as any));
+    if (filters?.visibility) conditions.push(eq(kbArticles.visibility, filters.visibility as any));
+    if (filters?.tags && filters.tags.length > 0) {
+      conditions.push(sql`${kbArticles.tags} && ${filters.tags}`);
+    }
+    if (filters?.search) {
+      conditions.push(or(
+        ilike(kbArticles.title, `%${filters.search}%`),
+        ilike(kbArticles.content, `%${filters.search}%`),
+        ilike(kbArticles.summary, `%${filters.search}%`)
+      ));
+    }
+
+    const query = db
+      .select({
+        id: kbArticles.id,
+        title: kbArticles.title,
+        slug: kbArticles.slug,
+        summary: kbArticles.summary,
+        content: kbArticles.content,
+        categoryId: kbArticles.categoryId,
+        authorId: kbArticles.authorId,
+        lastModifiedBy: kbArticles.lastModifiedBy,
+        status: kbArticles.status,
+        visibility: kbArticles.visibility,
+        tags: kbArticles.tags,
+        searchVector: kbArticles.searchVector,
+        viewCount: kbArticles.viewCount,
+        publishedAt: kbArticles.publishedAt,
+        createdAt: kbArticles.createdAt,
+        updatedAt: kbArticles.updatedAt,
+        categoryName: kbCategories.name,
+        authorName: users.name,
+      })
+      .from(kbArticles)
+      .leftJoin(kbCategories, eq(kbArticles.categoryId, kbCategories.id))
+      .leftJoin(users, eq(kbArticles.authorId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(kbArticles.updatedAt));
+
+    if (filters?.limit) query.limit(filters.limit);
+    if (filters?.offset) query.offset(filters.offset);
+
+    return query;
+  }
+
+  async getKbArticle(id: string): Promise<KbArticle | undefined> {
+    const [article] = await db.select().from(kbArticles).where(eq(kbArticles.id, id));
+    return article || undefined;
+  }
+
+  async getKbArticleBySlug(slug: string): Promise<KbArticle | undefined> {
+    const [article] = await db.select().from(kbArticles).where(eq(kbArticles.slug, slug));
+    return article || undefined;
+  }
+
+  async createKbArticle(article: InsertKbArticle): Promise<KbArticle> {
+    const [newArticle] = await db
+      .insert(kbArticles)
+      .values({
+        ...article,
+        updatedAt: new Date()
+      })
+      .returning();
+    return newArticle;
+  }
+
+  async updateKbArticle(id: string, updates: Partial<InsertKbArticle>): Promise<KbArticle> {
+    const [article] = await db
+      .update(kbArticles)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(kbArticles.id, id))
+      .returning();
+    return article;
+  }
+
+  async deleteKbArticle(id: string): Promise<void> {
+    await db.delete(kbArticles).where(eq(kbArticles.id, id));
+  }
+
+  async publishKbArticle(id: string, publishedBy: string): Promise<KbArticle> {
+    const [article] = await db
+      .update(kbArticles)
+      .set({
+        status: "published",
+        lastModifiedBy: publishedBy,
+        publishedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(kbArticles.id, id))
+      .returning();
+    return article;
+  }
+
+  async incrementKbArticleViews(id: string): Promise<void> {
+    await db
+      .update(kbArticles)
+      .set({
+        viewCount: sql`${kbArticles.viewCount} + 1`
+      })
+      .where(eq(kbArticles.id, id));
+  }
+
+  async searchKbArticles(query: string, filters?: { visibility?: string; categoryId?: string }): Promise<Array<KbArticle & { categoryName?: string }>> {
+    const conditions = [
+      eq(kbArticles.status, "published"),
+      or(
+        ilike(kbArticles.title, `%${query}%`),
+        ilike(kbArticles.content, `%${query}%`),
+        ilike(kbArticles.summary, `%${query}%`)
+      )
+    ];
+    
+    if (filters?.visibility) conditions.push(eq(kbArticles.visibility, filters.visibility as any));
+    if (filters?.categoryId) conditions.push(eq(kbArticles.categoryId, filters.categoryId));
+
+    return await db
+      .select({
+        id: kbArticles.id,
+        title: kbArticles.title,
+        slug: kbArticles.slug,
+        summary: kbArticles.summary,
+        content: kbArticles.content,
+        categoryId: kbArticles.categoryId,
+        authorId: kbArticles.authorId,
+        lastModifiedBy: kbArticles.lastModifiedBy,
+        status: kbArticles.status,
+        visibility: kbArticles.visibility,
+        tags: kbArticles.tags,
+        searchVector: kbArticles.searchVector,
+        viewCount: kbArticles.viewCount,
+        publishedAt: kbArticles.publishedAt,
+        createdAt: kbArticles.createdAt,
+        updatedAt: kbArticles.updatedAt,
+        categoryName: kbCategories.name,
+      })
+      .from(kbArticles)
+      .leftJoin(kbCategories, eq(kbArticles.categoryId, kbCategories.id))
+      .where(and(...conditions))
+      .orderBy(desc(kbArticles.updatedAt));
+  }
+
+  // Knowledge Base Article Versions
+  async getKbArticleVersions(articleId: string): Promise<KbArticleVersion[]> {
+    return await db
+      .select()
+      .from(kbArticleVersions)
+      .where(eq(kbArticleVersions.articleId, articleId))
+      .orderBy(desc(kbArticleVersions.versionNumber));
+  }
+
+  async getKbArticleVersion(id: string): Promise<KbArticleVersion | undefined> {
+    const [version] = await db.select().from(kbArticleVersions).where(eq(kbArticleVersions.id, id));
+    return version || undefined;
+  }
+
+  async createKbArticleVersion(version: InsertKbArticleVersion): Promise<KbArticleVersion> {
+    const [newVersion] = await db
+      .insert(kbArticleVersions)
+      .values(version)
+      .returning();
+    return newVersion;
+  }
+
+  async getLatestKbArticleVersion(articleId: string): Promise<KbArticleVersion | undefined> {
+    const [version] = await db
+      .select()
+      .from(kbArticleVersions)
+      .where(eq(kbArticleVersions.articleId, articleId))
+      .orderBy(desc(kbArticleVersions.versionNumber))
+      .limit(1);
+    return version || undefined;
+  }
+
+  // Knowledge Base Change Events
+  async getKbChangeEvents(filters?: { 
+    eventType?: string; 
+    entityType?: string; 
+    isProcessed?: boolean;
+    limit?: number; 
+    offset?: number; 
+  }): Promise<KbChangeEvent[]> {
+    const conditions = [];
+    
+    if (filters?.eventType) conditions.push(eq(kbChangeEvents.eventType, filters.eventType));
+    if (filters?.entityType) conditions.push(eq(kbChangeEvents.entityType, filters.entityType));
+    if (filters?.isProcessed !== undefined) conditions.push(eq(kbChangeEvents.isProcessed, filters.isProcessed));
+
+    const query = db
+      .select()
+      .from(kbChangeEvents)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(kbChangeEvents.createdAt));
+
+    if (filters?.limit) query.limit(filters.limit);
+    if (filters?.offset) query.offset(filters.offset);
+
+    return query;
+  }
+
+  async createKbChangeEvent(event: InsertKbChangeEvent): Promise<KbChangeEvent> {
+    const [newEvent] = await db
+      .insert(kbChangeEvents)
+      .values(event)
+      .returning();
+    return newEvent;
+  }
+
+  async markKbChangeEventProcessed(id: string, relatedArticleId?: string): Promise<KbChangeEvent> {
+    const [event] = await db
+      .update(kbChangeEvents)
+      .set({
+        isProcessed: true,
+        relatedArticleId
+      })
+      .where(eq(kbChangeEvents.id, id))
+      .returning();
+    return event;
+  }
+
+  async getUnprocessedKbChangeEvents(): Promise<KbChangeEvent[]> {
+    return await db
+      .select()
+      .from(kbChangeEvents)
+      .where(eq(kbChangeEvents.isProcessed, false))
+      .orderBy(desc(kbChangeEvents.createdAt));
+  }
+
+  // Knowledge Base Article Links
+  async getKbArticleLinks(articleId: string): Promise<KbArticleLink[]> {
+    return await db
+      .select()
+      .from(kbArticleLinks)
+      .where(eq(kbArticleLinks.articleId, articleId))
+      .orderBy(asc(kbArticleLinks.linkType));
+  }
+
+  async getKbLinkedArticles(entityType: string, entityId: string): Promise<Array<KbArticleLink & { articleTitle: string; articleSlug: string }>> {
+    return await db
+      .select({
+        id: kbArticleLinks.id,
+        articleId: kbArticleLinks.articleId,
+        linkedEntityType: kbArticleLinks.linkedEntityType,
+        linkedEntityId: kbArticleLinks.linkedEntityId,
+        linkType: kbArticleLinks.linkType,
+        contextDescription: kbArticleLinks.contextDescription,
+        createdAt: kbArticleLinks.createdAt,
+        articleTitle: kbArticles.title,
+        articleSlug: kbArticles.slug,
+      })
+      .from(kbArticleLinks)
+      .innerJoin(kbArticles, eq(kbArticleLinks.articleId, kbArticles.id))
+      .where(and(
+        eq(kbArticleLinks.linkedEntityType, entityType),
+        eq(kbArticleLinks.linkedEntityId, entityId),
+        eq(kbArticles.status, "published")
+      ))
+      .orderBy(asc(kbArticleLinks.linkType));
+  }
+
+  async createKbArticleLink(link: InsertKbArticleLink): Promise<KbArticleLink> {
+    const [newLink] = await db
+      .insert(kbArticleLinks)
+      .values(link)
+      .returning();
+    return newLink;
+  }
+
+  async deleteKbArticleLink(id: string): Promise<void> {
+    await db.delete(kbArticleLinks).where(eq(kbArticleLinks.id, id));
   }
 }
 
