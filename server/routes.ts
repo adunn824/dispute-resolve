@@ -6,6 +6,7 @@ import {
   insertCaseSchema, 
   insertCustomerSchema,
   insertCaseNoteSchema,
+  insertCaseOriginationSchema,
   insertKbCategorySchema,
   insertKbArticleSchema,
   insertKbChangeEventSchema,
