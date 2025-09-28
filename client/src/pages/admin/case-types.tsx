@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,6 +60,7 @@ export default function CaseTypesManagement() {
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [showCaseTypeDialog, setShowCaseTypeDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{type: 'case-type' | 'category', id: string, name: string} | null>(null);
   const { toast } = useToast();
 
   // Fetch case types
@@ -130,10 +132,17 @@ export default function CaseTypesManagement() {
       apiRequest("DELETE", `/api/case-types/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/case-types"] });
+      setDeleteConfirm(null);
       toast({ title: "Success", description: "Case type deleted successfully" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete case type", variant: "destructive" });
+    onError: (error: any) => {
+      setDeleteConfirm(null);
+      const errorMessage = error.message || "Failed to delete case type";
+      toast({ 
+        title: "Error", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -172,10 +181,17 @@ export default function CaseTypesManagement() {
       apiRequest("DELETE", `/api/categories/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      setDeleteConfirm(null);
       toast({ title: "Success", description: "Category deleted successfully" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete category", variant: "destructive" });
+    onError: (error: any) => {
+      setDeleteConfirm(null);
+      const errorMessage = error.message || "Failed to delete category";
+      toast({ 
+        title: "Error", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -398,7 +414,7 @@ export default function CaseTypesManagement() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => deleteCaseTypeMutation.mutate(caseType.id)}
+                              onClick={() => setDeleteConfirm({type: 'case-type', id: caseType.id, name: caseType.name})}
                               disabled={deleteCaseTypeMutation.isPending}
                               data-testid={`button-delete-case-type-${caseType.id}`}
                             >
@@ -576,7 +592,7 @@ export default function CaseTypesManagement() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => deleteCategoryMutation.mutate(category.id)}
+                              onClick={() => setDeleteConfirm({type: 'category', id: category.id, name: category.name})}
                               disabled={deleteCategoryMutation.isPending}
                               data-testid={`button-delete-category-${category.id}`}
                             >
@@ -593,6 +609,37 @@ export default function CaseTypesManagement() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the {deleteConfirm?.type.replace('-', ' ')} "{deleteConfirm?.name}"?
+              {deleteConfirm?.type === 'case-type' && " This will also affect any associated categories and cannot be undone."}
+              {deleteConfirm?.type === 'category' && " This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteConfirm) {
+                  if (deleteConfirm.type === 'case-type') {
+                    deleteCaseTypeMutation.mutate(deleteConfirm.id);
+                  } else {
+                    deleteCategoryMutation.mutate(deleteConfirm.id);
+                  }
+                }
+              }}
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

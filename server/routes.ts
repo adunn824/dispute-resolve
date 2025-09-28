@@ -624,10 +624,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/case-types/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
+      
+      // Check if there are existing dependencies (cases and categories) using this case type
+      const { casesCount, categoriesCount } = await storage.getCaseTypeDependencies(id);
+      
+      if (casesCount > 0 || categoriesCount > 0) {
+        const dependencies = [];
+        if (casesCount > 0) dependencies.push(`${casesCount} existing cases`);
+        if (categoriesCount > 0) dependencies.push(`${categoriesCount} categories`);
+        
+        const dependenciesText = dependencies.join(' and ');
+        const actionText = casesCount > 0 ? 'resolve or reassign these cases' : 'remove these categories';
+        
+        return res.status(400).json({ 
+          message: `Cannot delete case type. There are ${dependenciesText} using this case type. Please ${actionText} before deleting.`,
+          code: 'FOREIGN_KEY_CONSTRAINT'
+        });
+      }
+      
       await storage.deleteCaseType(id);
       res.json({ message: "Case type deleted successfully" });
     } catch (error) {
       console.error("Error deleting case type:", error);
+      
+      // Check if it's a foreign key constraint error
+      if ((error as any).code === '23503' || (error as any).message?.includes('foreign key')) {
+        return res.status(400).json({ 
+          message: "Cannot delete case type because it is being referenced by existing data. Please remove all references first.",
+          code: 'FOREIGN_KEY_CONSTRAINT'
+        });
+      }
+      
       res.status(500).json({ message: "Failed to delete case type" });
     }
   });

@@ -882,6 +882,34 @@ export class DatabaseStorage implements IStorage {
     return caseType;
   }
 
+  async getCasesCountByCaseType(caseTypeId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .from(cases)
+      .where(eq(cases.caseTypeId, caseTypeId));
+    return result[0]?.count || 0;
+  }
+
+  async getCategoriesCountByCaseType(caseTypeId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .from(categories)
+      .where(eq(categories.caseTypeId, caseTypeId));
+    return result[0]?.count || 0;
+  }
+
+  async getCaseTypeDependencies(caseTypeId: string): Promise<{casesCount: number, categoriesCount: number}> {
+    const [casesResult, categoriesResult] = await Promise.all([
+      db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(cases).where(eq(cases.caseTypeId, caseTypeId)),
+      db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(categories).where(eq(categories.caseTypeId, caseTypeId))
+    ]);
+    
+    return {
+      casesCount: casesResult[0]?.count || 0,
+      categoriesCount: categoriesResult[0]?.count || 0
+    };
+  }
+
   async deleteCaseType(id: string): Promise<void> {
     await db.delete(caseTypes).where(eq(caseTypes.id, id));
   }
