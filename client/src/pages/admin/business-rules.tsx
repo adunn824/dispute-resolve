@@ -12,13 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Zap, Clock, Tag } from "lucide-react";
+import { Plus, Edit, Trash2, Zap, Clock, Tag, TestTube } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RuleBuilder, type RuleCondition } from "@/components/RuleBuilder";
+import { RuleTester } from "@/components/RuleTester";
 
 // Form schemas
 const priorityRuleSchema = z.object({
@@ -421,6 +422,10 @@ export default function BusinessRulesManagement() {
           <TabsTrigger value="sla" data-testid="tab-sla-policies">
             <Clock className="w-4 h-4 mr-2" />
             SLA Policies
+          </TabsTrigger>
+          <TabsTrigger value="test" data-testid="tab-rule-testing">
+            <TestTube className="w-4 h-4 mr-2" />
+            Rule Testing
           </TabsTrigger>
         </TabsList>
 
@@ -1013,6 +1018,33 @@ export default function BusinessRulesManagement() {
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="test" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Rule Testing</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Test your rules against existing cases or mock data to validate behavior
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="priority" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="priority">Priority Rules</TabsTrigger>
+                  <TabsTrigger value="tag">Tag Rules</TabsTrigger>
+                </TabsList>
+                <TabsContent value="priority">
+                  <RuleTester ruleType="priority" />
+                </TabsContent>
+                <TabsContent value="tag">
+                  <RuleTester ruleType="tag" />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>

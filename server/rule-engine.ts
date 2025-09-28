@@ -57,10 +57,35 @@ export class RuleEvaluator {
   }
 
   /**
+   * Public method for testing - evaluates a single condition against case data
+   */
+  static testCondition(condition: RuleCondition, caseData: CaseData): {
+    result: boolean;
+    fieldValue: any;
+    conditionValue: any;
+  } {
+    const fieldValue = this.getFieldValueInternal(condition.field, caseData);
+    const result = this.evaluateCondition(condition, caseData);
+    
+    return {
+      result,
+      fieldValue,
+      conditionValue: condition.value
+    };
+  }
+
+  /**
+   * Public method for testing - gets field value from case data
+   */
+  static getFieldValue(field: string, caseData: CaseData): any {
+    return this.getFieldValueInternal(field, caseData);
+  }
+
+  /**
    * Evaluates a single condition against case data
    */
   private static evaluateCondition(condition: RuleCondition, caseData: CaseData): boolean {
-    const fieldValue = this.getFieldValue(condition.field, caseData);
+    const fieldValue = this.getFieldValueInternal(condition.field, caseData);
     const conditionValue = condition.value;
 
     switch (condition.operator) {
@@ -106,7 +131,7 @@ export class RuleEvaluator {
   /**
    * Gets the value of a field from case data
    */
-  private static getFieldValue(field: string, caseData: CaseData): any {
+  private static getFieldValueInternal(field: string, caseData: CaseData): any {
     // Handle calculated fields
     if (field === 'ageInDays') {
       const now = new Date();

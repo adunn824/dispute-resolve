@@ -953,6 +953,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rule Testing API
+  app.post("/api/rules/test", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { caseData, ruleType, categoryId } = req.body;
+      
+      if (!caseData || !ruleType) {
+        return res.status(400).json({ error: "Missing required fields: caseData, ruleType" });
+      }
+
+      // Import rule evaluation functions
+      const { findMatchingPriorityRule, findMatchingTagRules, RuleEvaluator } = await import('./rule-engine.js');
+      
+      let results = [];
+
+      if (ruleType === 'priority') {
+        // Test priority rules
+        const priorityRulesForCategory = await storage.getAllPriorityRules();
+        const filteredRules = categoryId 
+          ? priorityRulesForCategory.filter(rule => rule.categoryId === categoryId)
+          : priorityRulesForCategory;
+
+        for (const rule of filteredRules) {
+          try {
+            let conditions;
+            try {
+              conditions = typeof rule.conditions === 'string' 
+                ? JSON.parse(rule.conditions) 
+                : rule.conditions;
+            } catch (parseError) {
+              conditions = [];
+            }
+
+            const conditionResults = [];
+            let matchedConditions = 0;
+
+            // Test each condition
+            for (const condition of conditions) {
+              const testResult = RuleEvaluator.testCondition(condition, caseData);
+              const matched = testResult.result;
+              const actualValue = testResult.fieldValue;
+              
+              conditionResults.push({
+                field: condition.field,
+                operator: condition.operator,
+                value: condition.value,
+                actualValue,
+                matched,
+                reason: matched ? undefined : `Expected ${condition.operator} ${condition.value}, got ${actualValue}`
+              });
+
+              if (matched) matchedConditions++;
+            }
+
+            const ruleMatched = matchedConditions === conditions.length && conditions.length > 0;
+
+            results.push({
+              ruleId: rule.id,
+              ruleName: rule.name,
+              ruleType: 'priority',
+              matched: ruleMatched,
+              matchedConditions,
+              totalConditions: conditions.length,
+              conditionResults,
+              resultValue: ruleMatched ? rule.priority : undefined
+            });
+          } catch (ruleError) {
+            console.error(`Error testing priority rule ${rule.id}:`, ruleError);
+            results.push({
+              ruleId: rule.id,
+              ruleName: rule.name,
+              ruleType: 'priority',
+              matched: false,
+              matchedConditions: 0,
+              totalConditions: 0,
+              conditionResults: [{
+                field: 'error',
+                operator: 'test',
+                value: 'N/A',
+                actualValue: 'Error evaluating rule',
+                matched: false,
+                reason: ruleError.message
+              }],
+              resultValue: undefined
+            });
+          }
+        }
+      } else if (ruleType === 'tag') {
+        // Test tag rules
+        const tagRulesForCategory = await storage.getAllTagRules();
+        const filteredRules = categoryId 
+          ? tagRulesForCategory.filter(rule => rule.categoryId === categoryId)
+          : tagRulesForCategory;
+
+        for (const rule of filteredRules) {
+          try {
+            let conditions;
+            try {
+              conditions = typeof rule.conditions === 'string' 
+                ? JSON.parse(rule.conditions) 
+                : rule.conditions;
+            } catch (parseError) {
+              conditions = [];
+            }
+
+            const conditionResults = [];
+            let matchedConditions = 0;
+
+            // Test each condition
+            for (const condition of conditions) {
+              const testResult = RuleEvaluator.testCondition(condition, caseData);
+              const matched = testResult.result;
+              const actualValue = testResult.fieldValue;
+              
+              conditionResults.push({
+                field: condition.field,
+                operator: condition.operator,
+                value: condition.value,
+                actualValue,
+                matched,
+                reason: matched ? undefined : `Expected ${condition.operator} ${condition.value}, got ${actualValue}`
+              });
+
+              if (matched) matchedConditions++;
+            }
+
+            const ruleMatched = matchedConditions === conditions.length && conditions.length > 0;
+
+            results.push({
+              ruleId: rule.id,
+              ruleName: rule.name,
+              ruleType: 'tag',
+              matched: ruleMatched,
+              matchedConditions,
+              totalConditions: conditions.length,
+              conditionResults,
+              resultValue: ruleMatched ? rule.tag : undefined
+            });
+          } catch (ruleError) {
+            console.error(`Error testing tag rule ${rule.id}:`, ruleError);
+            results.push({
+              ruleId: rule.id,
+              ruleName: rule.name,
+              ruleType: 'tag',
+              matched: false,
+              matchedConditions: 0,
+              totalConditions: 0,
+              conditionResults: [{
+                field: 'error',
+                operator: 'test',
+                value: 'N/A',
+                actualValue: 'Error evaluating rule',
+                matched: false,
+                reason: ruleError.message
+              }],
+              resultValue: undefined
+            });
+          }
+        }
+      } else {
+        return res.status(400).json({ error: "Invalid ruleType. Must be 'priority' or 'tag'" });
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error("Rule testing error:", error);
+      res.status(500).json({ error: "Failed to test rules" });
+    }
+  });
+
   // Checklist Templates Management
   app.get("/api/categories/:categoryId/checklist-templates", requireAuth, async (req, res) => {
     try {
