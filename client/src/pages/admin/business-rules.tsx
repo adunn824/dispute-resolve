@@ -18,13 +18,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { RuleBuilder, type RuleCondition } from "@/components/RuleBuilder";
 
 // Form schemas
 const priorityRuleSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   description: z.string().min(1, "Description is required").max(255, "Description must be 255 characters or less"),
   priority: z.enum(["critical", "high", "medium", "low"]),
-  conditions: z.string().min(1, "Conditions are required"),
+  conditions: z.array(z.object({
+    field: z.string(),
+    operator: z.string(),
+    value: z.any().optional()
+  })).min(1, "At least one condition is required"),
   active: z.boolean().default(true),
 });
 
@@ -32,7 +37,11 @@ const tagRuleSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   description: z.string().min(1, "Description is required").max(255, "Description must be 255 characters or less"),
   tag: z.string().min(1, "Tag is required").max(50, "Tag must be 50 characters or less"),
-  conditions: z.string().min(1, "Conditions are required"),
+  conditions: z.array(z.object({
+    field: z.string(),
+    operator: z.string(),
+    value: z.any().optional()
+  })).min(1, "At least one condition is required"),
   active: z.boolean().default(true),
 });
 
@@ -110,7 +119,7 @@ export default function BusinessRulesManagement() {
       name: "",
       description: "",
       priority: "medium",
-      conditions: "",
+      conditions: [{ field: "details", operator: "contains", value: "" }],
       active: true,
     },
   });
@@ -121,7 +130,7 @@ export default function BusinessRulesManagement() {
       name: "",
       description: "",
       tag: "",
-      conditions: "",
+      conditions: [{ field: "details", operator: "contains", value: "" }],
       active: true,
     },
   });
@@ -143,7 +152,10 @@ export default function BusinessRulesManagement() {
     mutationFn: (data: PriorityRuleForm) => 
       apiRequest("/api/priority-rules", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          conditions: JSON.stringify(data.conditions)
+        }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/priority-rules"] });
@@ -160,7 +172,10 @@ export default function BusinessRulesManagement() {
     mutationFn: ({ id, data }: { id: string; data: PriorityRuleForm }) => 
       apiRequest(`/api/priority-rules/${id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          conditions: JSON.stringify(data.conditions)
+        }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/priority-rules"] });
@@ -191,7 +206,10 @@ export default function BusinessRulesManagement() {
     mutationFn: (data: TagRuleForm) => 
       apiRequest("/api/tag-rules", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          conditions: JSON.stringify(data.conditions)
+        }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tag-rules"] });
@@ -208,7 +226,10 @@ export default function BusinessRulesManagement() {
     mutationFn: ({ id, data }: { id: string; data: TagRuleForm }) => 
       apiRequest(`/api/tag-rules/${id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          conditions: JSON.stringify(data.conditions)
+        }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tag-rules"] });
@@ -285,11 +306,23 @@ export default function BusinessRulesManagement() {
   // Handlers
   const handleEditPriorityRule = (rule: any) => {
     setEditingPriorityRule(rule);
+    
+    // Parse conditions from JSON string to array
+    let parsedConditions;
+    try {
+      parsedConditions = typeof rule.conditions === 'string' 
+        ? JSON.parse(rule.conditions) 
+        : rule.conditions || [{ field: "details", operator: "contains", value: "" }];
+    } catch (error) {
+      console.error("Error parsing rule conditions:", error);
+      parsedConditions = [{ field: "details", operator: "contains", value: "" }];
+    }
+
     priorityRuleForm.reset({
       name: rule.name,
       description: rule.description,
       priority: rule.priority,
-      conditions: rule.conditions,
+      conditions: parsedConditions,
       active: rule.active,
     });
     setShowPriorityDialog(true);
@@ -297,11 +330,23 @@ export default function BusinessRulesManagement() {
 
   const handleEditTagRule = (rule: any) => {
     setEditingTagRule(rule);
+    
+    // Parse conditions from JSON string to array
+    let parsedConditions;
+    try {
+      parsedConditions = typeof rule.conditions === 'string' 
+        ? JSON.parse(rule.conditions) 
+        : rule.conditions || [{ field: "details", operator: "contains", value: "" }];
+    } catch (error) {
+      console.error("Error parsing rule conditions:", error);
+      parsedConditions = [{ field: "details", operator: "contains", value: "" }];
+    }
+
     tagRuleForm.reset({
       name: rule.name,
       description: rule.description,
       tag: rule.tag,
-      conditions: rule.conditions,
+      conditions: parsedConditions,
       active: rule.active,
     });
     setShowTagDialog(true);
@@ -461,13 +506,11 @@ export default function BusinessRulesManagement() {
                         name="conditions"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Conditions (JSON)</FormLabel>
                             <FormControl>
-                              <Textarea 
-                                placeholder='{"keywords": ["AG", "CFPB", "Military"], "source": "external"}'
-                                {...field}
-                                data-testid="input-priority-rule-conditions"
-                                className="font-mono text-sm"
+                              <RuleBuilder
+                                conditions={field.value || []}
+                                onChange={field.onChange}
+                                data-testid="rule-builder-priority-conditions"
                               />
                             </FormControl>
                             <FormMessage />
@@ -646,13 +689,11 @@ export default function BusinessRulesManagement() {
                         name="conditions"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Conditions (JSON)</FormLabel>
                             <FormControl>
-                              <Textarea 
-                                placeholder='{"text_contains": ["cease and desist", "do not contact"], "field": "description"}'
-                                {...field}
-                                data-testid="input-tag-rule-conditions"
-                                className="font-mono text-sm"
+                              <RuleBuilder
+                                conditions={field.value || []}
+                                onChange={field.onChange}
+                                data-testid="rule-builder-tag-conditions"
                               />
                             </FormControl>
                             <FormMessage />
