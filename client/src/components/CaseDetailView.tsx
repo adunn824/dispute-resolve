@@ -89,6 +89,9 @@ interface CaseDetailData {
   customerState: string;
   caseTypeName: string;
   caseTypeColor?: string;
+  caseOriginationId?: string;
+  caseOriginationName?: string;
+  caseOriginationDescription?: string;
   categoryName: string;
   categoryCode: string;
   priorityValue: string;
@@ -285,7 +288,10 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Case #{caseDetails.id}</h1>
-          <p className="text-muted-foreground">{caseDetails.caseTypeName} • {caseDetails.categoryName}</p>
+          <p className="text-muted-foreground">
+            {caseDetails.caseOriginationName && `${caseDetails.caseOriginationName} • `}
+            {caseDetails.caseTypeName} • {caseDetails.categoryName}
+          </p>
         </div>
         <div className="flex gap-2 items-center">
           <PriorityBadge priority={caseDetails.priorityValue as "Low" | "Medium" | "High"} />

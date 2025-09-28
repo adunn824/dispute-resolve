@@ -17,6 +17,7 @@ import SearchPage from "./pages/SearchPage";
 import KnowledgeBasePage from "./pages/KnowledgeBasePage";
 import KnowledgeBaseArticlePage from "./pages/KnowledgeBaseArticlePage";
 import CaseTypesManagement from "./pages/admin/case-types";
+import CaseOriginationsManagement from "./pages/admin/case-originations";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
 import CategoriesManagement from "./pages/admin/categories";
@@ -93,6 +94,11 @@ function Router() {
       <Route path="/admin/case-types">
         <ProtectedRoute requiredRole="admin">
           <CaseTypesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/case-originations">
+        <ProtectedRoute requiredRole="admin">
+          <CaseOriginationsManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/business-rules">

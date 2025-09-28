@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const caseSchema = z.object({
+  caseOriginationId: z.string().min(1, "Case origination is required"),
   caseTypeId: z.string().min(1, "Case type is required"),
   categoryId: z.string().min(1, "Category is required"),
   customerName: z.string().min(1, "Customer name is required"),
@@ -52,12 +53,21 @@ const caseSchema = z.object({
 type CaseFormValues = z.infer<typeof caseSchema>;
 
 // Interface for API data
+interface CaseOrigination {
+  id: string;
+  name: string;
+  description?: string;
+  externalKey?: string;
+  isActive: boolean;
+}
+
 interface CaseType {
   id: string;
   name: string;
   description?: string;
   color?: string;
   isActive: boolean;
+  caseOriginationId?: string;
 }
 
 interface Category {
@@ -82,14 +92,22 @@ interface CaseIntakeFormProps {
 }
 
 export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
+  const [selectedOriginationId, setSelectedOriginationId] = useState<string | null>(null);
   const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
   const [hasRepresentative, setHasRepresentative] = useState(false);
   const { toast } = useToast();
 
-  // Fetch case types from API
+  // Fetch case originations from API
+  const { data: caseOriginations, isLoading: loadingOriginations, error: originationsError } = useQuery<{data: CaseOrigination[]}>({ 
+    queryKey: ["/api/case-originations"],
+    queryFn: () => apiRequest("GET", "/api/case-originations")
+  });
+
+  // Fetch case types filtered by selected origination
   const { data: caseTypes, isLoading: loadingCaseTypes, error: caseTypesError } = useQuery<{data: CaseType[]}>({ 
-    queryKey: ["/api/case-types"],
-    queryFn: () => apiRequest("GET", "/api/case-types")
+    queryKey: ["/api/case-types", selectedOriginationId],
+    queryFn: () => apiRequest("GET", selectedOriginationId ? `/api/case-types?caseOriginationId=${selectedOriginationId}` : "/api/case-types"),
+    enabled: !!selectedOriginationId,
   });
 
   // Fetch categories filtered by selected case type
@@ -104,6 +122,7 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema),
     defaultValues: {
+      caseOriginationId: "",
       caseTypeId: "",
       categoryId: "",
       customerName: "",
@@ -158,6 +177,49 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="caseOriginationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Case Origination</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedOriginationId(value);
+                        setSelectedCaseTypeId(null);
+                        form.setValue("caseTypeId", "");
+                        form.setValue("categoryId", "");
+                      }}
+                      disabled={loadingOriginations}
+                      data-testid="select-case-origination"
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingOriginations ? "Loading..." : "Select case origination"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {originationsError ? (
+                          <div className="p-2 text-sm text-destructive">Failed to load case originations</div>
+                        ) : caseOriginations?.data?.length ? (
+                          caseOriginations.data.map((origination) => (
+                            <SelectItem key={origination.id} value={origination.id}>
+                              {origination.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground">No case originations available</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -171,12 +233,15 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
                         setSelectedCaseTypeId(value);
                         form.setValue("categoryId", "");
                       }}
-                      disabled={loadingCaseTypes}
+                      disabled={!selectedOriginationId || loadingCaseTypes}
                       data-testid="select-case-type"
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={loadingCaseTypes ? "Loading..." : "Select case type"} />
+                          <SelectValue placeholder={
+                            !selectedOriginationId ? "Select case origination first" :
+                            loadingCaseTypes ? "Loading..." : "Select case type"
+                          } />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

@@ -55,6 +55,7 @@ export const customers = pgTable("customers", {
 
 export const cases = pgTable("cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseOriginationId: varchar("case_origination_id").references(() => caseOriginations.id),
   caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id),
   categoryId: varchar("category_id").notNull().references(() => categories.id),
   priorityRuleId: varchar("priority_rule_id").notNull().references(() => priorityRules.id),
@@ -140,8 +141,19 @@ export const caseNotes = pgTable("case_notes", {
 
 // Admin Config Tables
 
+export const caseOriginations = pgTable("case_originations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  externalKey: text("external_key"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const caseTypes = pgTable("case_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseOriginationId: varchar("case_origination_id").references(() => caseOriginations.id),
   name: text("name").notNull().unique(),
   description: text("description"),
   color: text("color").default("#2563eb"),
@@ -291,6 +303,10 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
     fields: [cases.customerId],
     references: [customers.id],
   }),
+  caseOrigination: one(caseOriginations, {
+    fields: [cases.caseOriginationId],
+    references: [caseOriginations.id],
+  }),
   caseType: one(caseTypes, {
     fields: [cases.caseTypeId],
     references: [caseTypes.id],
@@ -373,7 +389,16 @@ export const caseNotesRelations = relations(caseNotes, ({ one }) => ({
   }),
 }));
 
-export const caseTypesRelations = relations(caseTypes, ({ many }) => ({
+export const caseOriginationsRelations = relations(caseOriginations, ({ many }) => ({
+  caseTypes: many(caseTypes),
+  cases: many(cases),
+}));
+
+export const caseTypesRelations = relations(caseTypes, ({ one, many }) => ({
+  caseOrigination: one(caseOriginations, {
+    fields: [caseTypes.caseOriginationId],
+    references: [caseOriginations.id],
+  }),
   categories: many(categories),
   cases: many(cases),
 }));
@@ -486,6 +511,12 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 });
 
 export const insertCaseNoteSchema = createInsertSchema(caseNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCaseOriginationSchema = createInsertSchema(caseOriginations).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

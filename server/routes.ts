@@ -543,12 +543,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/case-types - List case types  
+  // GET /api/case-originations - List case originations
+  app.get("/api/case-originations", requireAuth, async (req, res) => {
+    try {
+      const caseOriginations = await storage.getCaseOriginations();
+      res.json({ data: caseOriginations });
+    } catch (error) {
+      console.error("Failed to fetch case originations:", error);
+      res.status(500).json({ error: "Failed to fetch case originations" });
+    }
+  });
+
+  // GET /api/case-types - List case types (optionally filtered by case origination)
   app.get("/api/case-types", requireAuth, async (req, res) => {
     try {
-      const caseTypes = await storage.getCaseTypes();
+      const querySchema = z.object({
+        caseOriginationId: z.string().optional()
+      });
+      
+      const { caseOriginationId } = querySchema.parse(req.query);
+      const caseTypes = await storage.getCaseTypes(caseOriginationId);
       res.json({ data: caseTypes });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
       console.error("Failed to fetch case types:", error);
       res.status(500).json({ error: "Failed to fetch case types" });
     }
@@ -587,15 +606,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin Configuration APIs (Create, Update, Delete)
   
+  // Case Originations Admin Management  
+  app.post("/api/case-originations", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const validatedData = insertCaseOriginationSchema.parse(req.body);
+      const caseOrigination = await storage.createCaseOrigination(validatedData);
+      res.status(201).json(caseOrigination);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating case origination:", error);
+      res.status(500).json({ message: "Failed to create case origination" });
+    }
+  });
+
+  app.put("/api/case-originations/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertCaseOriginationSchema.parse(req.body);
+      const caseOrigination = await storage.updateCaseOrigination(id, validatedData);
+      res.json(caseOrigination);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating case origination:", error);
+      res.status(500).json({ message: "Failed to update case origination" });
+    }
+  });
+
+  app.delete("/api/case-originations/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // TODO: Add dependency checking methods to storage
+      // For now, just attempt deletion and catch foreign key errors
+      await storage.deleteCaseOrigination(id);
+      res.json({ message: "Case origination deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting case origination:", error);
+      
+      // Check if it's a foreign key constraint error
+      if ((error as any).code === '23503' || (error as any).message?.includes('foreign key')) {
+        return res.status(400).json({ 
+          message: "Cannot delete case origination because it is being referenced by existing data. Please remove all references first.",
+          code: 'FOREIGN_KEY_CONSTRAINT'
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to delete case origination" });
+    }
+  });
+
   // Case Types Admin Management  
   app.post("/api/case-types", requireAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { name, description, color, active } = req.body;
+      const { name, description, color, active, caseOriginationId } = req.body;
       const caseType = await storage.createCaseType({
         name,
         description,
         color,
         isActive: active,
+        caseOriginationId,
       });
       res.status(201).json(caseType);
     } catch (error) {
@@ -607,12 +680,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/case-types/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, color, active } = req.body;
+      const { name, description, color, active, caseOriginationId } = req.body;
       const caseType = await storage.updateCaseType(id, {
         name,
         description,
         color,
         isActive: active,
+        caseOriginationId,
       });
       res.json(caseType);
     } catch (error) {

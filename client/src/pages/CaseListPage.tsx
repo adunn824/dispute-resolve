@@ -44,6 +44,9 @@ interface CaseListItem {
   customerState: string;
   caseTypeName: string;
   caseTypeColor?: string;
+  caseOriginationId?: string;
+  caseOriginationName?: string;
+  caseOriginationDescription?: string;
   categoryName: string;
   categoryCode: string;
   priorityValue: string;
@@ -439,6 +442,11 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                       </TableCell>
                       <TableCell>
                         <div>
+                          {caseItem.caseOriginationName && (
+                            <div className="text-xs text-muted-foreground mb-1 font-medium">
+                              {caseItem.caseOriginationName}
+                            </div>
+                          )}
                           <Badge 
                             variant="outline" 
                             style={{ borderColor: caseItem.caseTypeColor }}

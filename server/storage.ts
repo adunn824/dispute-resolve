@@ -8,6 +8,7 @@ import {
   flags, 
   auditLogs,
   caseNotes,
+  caseOriginations,
   caseTypes,
   categories,
   checklistTemplates,
@@ -45,6 +46,8 @@ import {
   type InsertAuditLog,
   type CaseNote,
   type InsertCaseNote,
+  type CaseOrigination,
+  type InsertCaseOrigination,
   type CaseType,
   type InsertCaseType,
   type Category,
@@ -163,8 +166,15 @@ export interface IStorage {
   getAuditLogs(caseId?: string, limit?: number): Promise<AuditLog[]>;
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
   
+  // Config methods - Case Originations
+  getCaseOriginations(): Promise<CaseOrigination[]>;
+  getCaseOrigination(id: string): Promise<CaseOrigination | undefined>;
+  createCaseOrigination(caseOrigination: InsertCaseOrigination): Promise<CaseOrigination>;
+  updateCaseOrigination(id: string, updates: Partial<InsertCaseOrigination>): Promise<CaseOrigination>;
+  deleteCaseOrigination(id: string): Promise<void>;
+
   // Config methods - Case Types
-  getCaseTypes(): Promise<CaseType[]>;
+  getCaseTypes(caseOriginationId?: string): Promise<CaseType[]>;
   getCaseType(id: string): Promise<CaseType | undefined>;
   createCaseType(caseType: InsertCaseType): Promise<CaseType>;
   updateCaseType(id: string, updates: Partial<InsertCaseType>): Promise<CaseType>;
@@ -423,6 +433,11 @@ export class DatabaseStorage implements IStorage {
         caseTypeName: caseTypes.name,
         caseTypeColor: caseTypes.color,
         
+        // Case origination fields
+        caseOriginationId: caseTypes.caseOriginationId,
+        caseOriginationName: caseOriginations.name,
+        caseOriginationDescription: caseOriginations.description,
+        
         // Category fields
         categoryName: categories.name,
         categoryCode: categories.code,
@@ -439,6 +454,7 @@ export class DatabaseStorage implements IStorage {
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
       .leftJoin(users, eq(cases.assignedToUserId, users.id))
@@ -594,6 +610,11 @@ export class DatabaseStorage implements IStorage {
         caseTypeName: caseTypes.name,
         caseTypeColor: caseTypes.color,
         
+        // Case origination fields
+        caseOriginationId: caseTypes.caseOriginationId,
+        caseOriginationName: caseOriginations.name,
+        caseOriginationDescription: caseOriginations.description,
+        
         // Category fields
         categoryName: categories.name,
         categoryCode: categories.code,
@@ -610,6 +631,7 @@ export class DatabaseStorage implements IStorage {
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
       .leftJoin(users, eq(cases.assignedToUserId, users.id));
@@ -855,9 +877,46 @@ export class DatabaseStorage implements IStorage {
     return auditLog;
   }
 
+  // Config methods - Case Originations
+  async getCaseOriginations(): Promise<CaseOrigination[]> {
+    return await db.select().from(caseOriginations).orderBy(caseOriginations.name);
+  }
+
+  async getCaseOrigination(id: string): Promise<CaseOrigination | undefined> {
+    const [caseOrigination] = await db.select().from(caseOriginations).where(eq(caseOriginations.id, id));
+    return caseOrigination || undefined;
+  }
+
+  async createCaseOrigination(insertCaseOrigination: InsertCaseOrigination): Promise<CaseOrigination> {
+    const [caseOrigination] = await db
+      .insert(caseOriginations)
+      .values(insertCaseOrigination)
+      .returning();
+    return caseOrigination;
+  }
+
+  async updateCaseOrigination(id: string, updates: Partial<InsertCaseOrigination>): Promise<CaseOrigination> {
+    const [caseOrigination] = await db
+      .update(caseOriginations)
+      .set(updates)
+      .where(eq(caseOriginations.id, id))
+      .returning();
+    return caseOrigination;
+  }
+
+  async deleteCaseOrigination(id: string): Promise<void> {
+    await db.delete(caseOriginations).where(eq(caseOriginations.id, id));
+  }
+
   // Config methods - Case Types
-  async getCaseTypes(): Promise<CaseType[]> {
-    return await db.select().from(caseTypes).where(eq(caseTypes.isActive, true));
+  async getCaseTypes(caseOriginationId?: string): Promise<CaseType[]> {
+    const whereConditions = [eq(caseTypes.isActive, true)];
+    
+    if (caseOriginationId) {
+      whereConditions.push(eq(caseTypes.caseOriginationId, caseOriginationId));
+    }
+    
+    return await db.select().from(caseTypes).where(and(...whereConditions));
   }
 
   async getCaseType(id: string): Promise<CaseType | undefined> {
