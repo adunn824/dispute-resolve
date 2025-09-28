@@ -1,9 +1,11 @@
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { hashPassword } from "./auth";
 import { 
   users, 
   customers, 
   cases, 
+  caseNotes,
   checklistItems, 
   documents, 
   resolutions, 
@@ -18,7 +20,12 @@ import {
   resolutionConfigs,
   slaPolicies,
   valueSets,
-  featureFlags
+  featureFlags,
+  kbCategories,
+  kbArticles,
+  kbArticleVersions,
+  kbChangeEvents,
+  kbArticleLinks
 } from "@shared/schema";
 
 async function seed() {
@@ -30,8 +37,14 @@ async function seed() {
   await db.delete(documents);
   await db.delete(checklistItems);
   await db.delete(flags);
+  await db.delete(caseNotes);
   await db.delete(cases);
   await db.delete(customers);
+  await db.delete(kbChangeEvents);
+  await db.delete(kbArticleLinks);
+  await db.delete(kbArticleVersions);
+  await db.delete(kbArticles);
+  await db.delete(kbCategories);
   await db.delete(users);
   await db.delete(checklistTemplates);
   await db.delete(documentRequirements);
@@ -77,11 +90,11 @@ async function seed() {
   // 3. Create Users
   console.log("Creating users...");
   const userRecords = await db.insert(users).values([
-    { username: "admin", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "admin@company.com", name: "Admin User", role: "admin", status: "active" },
-    { username: "jane.smith", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "jane.smith@company.com", name: "Jane Smith", role: "compliance", status: "active" },
-    { username: "mike.johnson", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "mike.johnson@company.com", name: "Mike Johnson", role: "agent", status: "active" },
-    { username: "sarah.wilson", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "sarah.wilson@company.com", name: "Sarah Wilson", role: "agent", status: "active" },
-    { username: "david.brown", password: "$2b$10$rMgEEI8wcI6EQ0M4TKXZcemCZS9QzJX4MmCo/ASDF2345abcdefgh", email: "david.brown@company.com", name: "David Brown", role: "compliance", status: "active" },
+    { username: "admin", password: await hashPassword("admin123"), email: "admin@company.com", name: "Admin User", role: "admin", status: "active" },
+    { username: "jane.smith", password: await hashPassword("password123"), email: "jane.smith@company.com", name: "Jane Smith", role: "compliance", status: "active" },
+    { username: "mike.johnson", password: await hashPassword("password123"), email: "mike.johnson@company.com", name: "Mike Johnson", role: "agent", status: "active" },
+    { username: "sarah.wilson", password: await hashPassword("password123"), email: "sarah.wilson@company.com", name: "Sarah Wilson", role: "agent", status: "active" },
+    { username: "david.brown", password: await hashPassword("password123"), email: "david.brown@company.com", name: "David Brown", role: "compliance", status: "active" },
   ]).returning();
 
   const adminUser = userRecords.find(u => u.role === "admin")!;
