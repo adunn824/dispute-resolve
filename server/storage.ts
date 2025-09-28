@@ -12,6 +12,8 @@ import {
   caseTypes,
   categories,
   checklistTemplates,
+  reusableChecklistTemplates,
+  reusableChecklistItems,
   documentRequirements,
   priorityRules,
   tagRules,
@@ -54,6 +56,10 @@ import {
   type InsertCategory,
   type ChecklistTemplate,
   type InsertChecklistTemplate,
+  type ReusableChecklistTemplate,
+  type InsertReusableChecklistTemplate,
+  type ReusableChecklistItem,
+  type InsertReusableChecklistItem,
   type DocumentRequirement,
   type InsertDocumentRequirement,
   type PriorityRule,
@@ -1243,6 +1249,81 @@ export class DatabaseStorage implements IStorage {
 
   async deleteChecklistTemplate(id: string): Promise<void> {
     await db.delete(checklistTemplates).where(eq(checklistTemplates.id, id));
+  }
+
+  // Config methods - Reusable Checklist Templates
+  async getReusableChecklistTemplates(): Promise<ReusableChecklistTemplate[]> {
+    return await db.select().from(reusableChecklistTemplates)
+      .orderBy(asc(reusableChecklistTemplates.name));
+  }
+
+  async getReusableChecklistTemplateWithItems(templateId: string): Promise<ReusableChecklistTemplate & { items: ReusableChecklistItem[] }> {
+    const template = await db.select().from(reusableChecklistTemplates)
+      .where(eq(reusableChecklistTemplates.id, templateId))
+      .limit(1);
+    
+    if (!template[0]) {
+      throw new Error("Template not found");
+    }
+
+    const items = await db.select().from(reusableChecklistItems)
+      .where(eq(reusableChecklistItems.templateId, templateId))
+      .orderBy(asc(reusableChecklistItems.sortOrder));
+
+    return {
+      ...template[0],
+      items
+    };
+  }
+
+  async createReusableChecklistTemplate(insertTemplate: InsertReusableChecklistTemplate): Promise<ReusableChecklistTemplate> {
+    const [template] = await db
+      .insert(reusableChecklistTemplates)
+      .values(insertTemplate)
+      .returning();
+    return template;
+  }
+
+  async updateReusableChecklistTemplate(id: string, updates: Partial<InsertReusableChecklistTemplate>): Promise<ReusableChecklistTemplate> {
+    const [template] = await db
+      .update(reusableChecklistTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(reusableChecklistTemplates.id, id))
+      .returning();
+    return template;
+  }
+
+  async deleteReusableChecklistTemplate(id: string): Promise<void> {
+    // Items will be cascade deleted due to foreign key constraint
+    await db.delete(reusableChecklistTemplates).where(eq(reusableChecklistTemplates.id, id));
+  }
+
+  // Config methods - Reusable Checklist Items
+  async getReusableChecklistItems(templateId: string): Promise<ReusableChecklistItem[]> {
+    return await db.select().from(reusableChecklistItems)
+      .where(eq(reusableChecklistItems.templateId, templateId))
+      .orderBy(asc(reusableChecklistItems.sortOrder));
+  }
+
+  async createReusableChecklistItem(insertItem: InsertReusableChecklistItem): Promise<ReusableChecklistItem> {
+    const [item] = await db
+      .insert(reusableChecklistItems)
+      .values(insertItem)
+      .returning();
+    return item;
+  }
+
+  async updateReusableChecklistItem(id: string, updates: Partial<InsertReusableChecklistItem>): Promise<ReusableChecklistItem> {
+    const [item] = await db
+      .update(reusableChecklistItems)
+      .set(updates)
+      .where(eq(reusableChecklistItems.id, id))
+      .returning();
+    return item;
+  }
+
+  async deleteReusableChecklistItem(id: string): Promise<void> {
+    await db.delete(reusableChecklistItems).where(eq(reusableChecklistItems.id, id));
   }
 
   // Config methods - Document Requirements

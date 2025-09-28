@@ -1,4 +1,4 @@
-import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen, Building } from "lucide-react";
+import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen, Building, ListChecks } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -54,6 +54,8 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "Case Originations", url: "/admin/case-originations", icon: Building },
     { title: "Case Types", url: "/admin/case-types", icon: FileText },
     { title: "Categories", url: "/admin/categories", icon: FileText },
+    { title: "Templates", url: "/admin/templates", icon: FileText },
+    { title: "Reusable Templates", url: "/admin/reusable-templates", icon: ListChecks },
     { title: "Rules", url: "/admin/rules", icon: Settings },
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "System", url: "/admin/system", icon: Cog },

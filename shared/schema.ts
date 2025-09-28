@@ -11,7 +11,8 @@ import {
   serial,
   unique,
   jsonb,
-  index
+  index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -215,6 +216,7 @@ export const categories = pgTable("categories", {
   effectiveTo: timestamp("effective_to"),
 });
 
+// Legacy category-specific checklist templates (keep for backward compatibility)
 export const checklistTemplates = pgTable("checklist_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   categoryId: varchar("category_id").notNull().references(() => categories.id),
@@ -225,6 +227,37 @@ export const checklistTemplates = pgTable("checklist_templates", {
   conditionJson: json("condition_json"),
   helpText: text("help_text"),
 });
+
+// New reusable checklist templates (for rule-based assignment)
+export const reusableChecklistTemplates = pgTable("reusable_checklist_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Individual items within reusable checklist templates
+export const reusableChecklistItems = pgTable("reusable_checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => reusableChecklistTemplates.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  label: text("label").notNull(),
+  description: text("description"),
+  isRequired: boolean("is_required").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  helpText: text("help_text"),
+  estimatedDuration: integer("estimated_duration"), // in minutes
+});
+
+export const insertReusableChecklistTemplateSchema = createInsertSchema(reusableChecklistTemplates);
+export const insertReusableChecklistItemSchema = createInsertSchema(reusableChecklistItems);
+
+export type ReusableChecklistTemplate = typeof reusableChecklistTemplates.$inferSelect;
+export type InsertReusableChecklistTemplate = z.infer<typeof insertReusableChecklistTemplateSchema>;
+export type ReusableChecklistItem = typeof reusableChecklistItems.$inferSelect;
+export type InsertReusableChecklistItem = z.infer<typeof insertReusableChecklistItemSchema>;
 
 export const documentRequirements = pgTable("document_requirements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -267,7 +300,9 @@ export const checklistAssignmentRules = pgTable("checklist_assignment_rules", {
   categoryId: varchar("category_id").references(() => categories.id),
   name: text("name").notNull(),
   description: text("description"),
-  checklistTemplateId: varchar("checklist_template_id").notNull().references(() => checklistTemplates.id),
+  // Support both legacy and new template systems
+  checklistTemplateId: varchar("checklist_template_id").references(() => checklistTemplates.id),
+  reusableTemplateId: varchar("reusable_template_id").references(() => reusableChecklistTemplates.id),
   conditions: json("conditions").notNull(), // JSON for structured conditions
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -511,6 +546,22 @@ export const checklistAssignmentRulesRelations = relations(checklistAssignmentRu
     fields: [checklistAssignmentRules.checklistTemplateId],
     references: [checklistTemplates.id],
   }),
+  reusableTemplate: one(reusableChecklistTemplates, {
+    fields: [checklistAssignmentRules.reusableTemplateId],
+    references: [reusableChecklistTemplates.id],
+  }),
+}));
+
+export const reusableChecklistTemplatesRelations = relations(reusableChecklistTemplates, ({ many }) => ({
+  items: many(reusableChecklistItems),
+  assignmentRules: many(checklistAssignmentRules),
+}));
+
+export const reusableChecklistItemsRelations = relations(reusableChecklistItems, ({ one }) => ({
+  template: one(reusableChecklistTemplates, {
+    fields: [reusableChecklistItems.templateId],
+    references: [reusableChecklistTemplates.id],
+  }),
 }));
 
 export const resolutionConfigsRelations = relations(resolutionConfigs, ({ one }) => ({
@@ -731,7 +782,7 @@ export const kbCategories = pgTable("kb_categories", {
   name: text("name").notNull(),
   description: text("description"),
   slug: text("slug").unique().notNull(),
-  parentId: varchar("parent_id"), // TODO: Add self-reference when KB features are needed
+  parentId: varchar("parent_id").references((): AnyPgColumn => kbCategories.id),
   displayOrder: integer("display_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),

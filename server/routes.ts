@@ -1184,6 +1184,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reusable Checklist Templates Management
+  app.get("/api/reusable-checklist-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getReusableChecklistTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching reusable checklist templates:", error);
+      res.status(500).json({ message: "Failed to fetch reusable checklist templates" });
+    }
+  });
+
+  app.get("/api/reusable-checklist-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getReusableChecklistTemplateWithItems(id);
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching reusable checklist template:", error);
+      if (error.message === "Template not found") {
+        res.status(404).json({ message: "Reusable checklist template not found" });
+      } else {
+        res.status(500).json({ message: "Failed to fetch reusable checklist template" });
+      }
+    }
+  });
+
+  app.post("/api/reusable-checklist-templates", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, isActive } = req.body;
+      const template = await storage.createReusableChecklistTemplate({
+        name,
+        description,
+        isActive: isActive !== undefined ? isActive : true,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating reusable checklist template:", error);
+      res.status(500).json({ message: "Failed to create reusable checklist template" });
+    }
+  });
+
+  app.put("/api/reusable-checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, isActive } = req.body;
+      const template = await storage.updateReusableChecklistTemplate(id, {
+        name,
+        description,
+        isActive,
+      });
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating reusable checklist template:", error);
+      res.status(500).json({ message: "Failed to update reusable checklist template" });
+    }
+  });
+
+  app.delete("/api/reusable-checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteReusableChecklistTemplate(id);
+      res.json({ message: "Reusable checklist template deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting reusable checklist template:", error);
+      res.status(500).json({ message: "Failed to delete reusable checklist template" });
+    }
+  });
+
+  // Reusable Checklist Items Management
+  app.get("/api/reusable-checklist-templates/:templateId/items", requireAuth, async (req, res) => {
+    try {
+      const { templateId } = req.params;
+      const items = await storage.getReusableChecklistItems(templateId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching reusable checklist items:", error);
+      res.status(500).json({ message: "Failed to fetch reusable checklist items" });
+    }
+  });
+
+  app.post("/api/reusable-checklist-templates/:templateId/items", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { templateId } = req.params;
+      const { key, label, description, isRequired, sortOrder, helpText, estimatedDuration } = req.body;
+      const item = await storage.createReusableChecklistItem({
+        templateId,
+        key,
+        label,
+        description,
+        isRequired: isRequired || false,
+        sortOrder: sortOrder || 0,
+        helpText,
+        estimatedDuration,
+      });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating reusable checklist item:", error);
+      res.status(500).json({ message: "Failed to create reusable checklist item" });
+    }
+  });
+
+  app.put("/api/reusable-checklist-items/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { key, label, description, isRequired, sortOrder, helpText, estimatedDuration } = req.body;
+      const item = await storage.updateReusableChecklistItem(id, {
+        key,
+        label,
+        description,
+        isRequired,
+        sortOrder,
+        helpText,
+        estimatedDuration,
+      });
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating reusable checklist item:", error);
+      res.status(500).json({ message: "Failed to update reusable checklist item" });
+    }
+  });
+
+  app.delete("/api/reusable-checklist-items/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteReusableChecklistItem(id);
+      res.json({ message: "Reusable checklist item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting reusable checklist item:", error);
+      res.status(500).json({ message: "Failed to delete reusable checklist item" });
+    }
+  });
+
   // Document Requirements Management  
   app.get("/api/categories/:categoryId/document-requirements", requireAuth, async (req, res) => {
     try {

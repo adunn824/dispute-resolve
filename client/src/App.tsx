@@ -20,6 +20,7 @@ import CaseTypesManagement from "./pages/admin/case-types";
 import CaseOriginationsManagement from "./pages/admin/case-originations";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import TemplatesManagement from "./pages/admin/templates";
+import ReusableTemplatesManagement from "./pages/admin/reusable-templates";
 import CategoriesManagement from "./pages/admin/categories";
 import UsersManagement from "./pages/admin/users";
 import SystemManagement from "./pages/admin/system";
@@ -109,6 +110,11 @@ function Router() {
       <Route path="/admin/templates">
         <ProtectedRoute requiredRole="admin">
           <TemplatesManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/reusable-templates">
+        <ProtectedRoute requiredRole="admin">
+          <ReusableTemplatesManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/categories">

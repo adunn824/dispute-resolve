@@ -123,8 +123,8 @@ export default function TemplatesManagement() {
 
   // Checklist Template mutations
   const createTemplateMutation = useMutation({
-    mutationFn: (data: ChecklistTemplateForm & { categoryId: string }) => 
-      apiRequest(`/api/categories/${data.categoryId}/checklist-templates`, {
+    mutationFn: async (data: ChecklistTemplateForm & { categoryId: string }) => 
+      await apiRequest(`/api/categories/${data.categoryId}/checklist-templates`, {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -140,8 +140,8 @@ export default function TemplatesManagement() {
   });
 
   const updateTemplateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ChecklistTemplateForm }) => 
-      apiRequest(`/api/checklist-templates/${id}`, {
+    mutationFn: async ({ id, data }: { id: string; data: ChecklistTemplateForm }) => 
+      await apiRequest(`/api/checklist-templates/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
@@ -158,8 +158,8 @@ export default function TemplatesManagement() {
   });
 
   const deleteTemplateMutation = useMutation({
-    mutationFn: (id: string) => 
-      apiRequest(`/api/checklist-templates/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: string) => 
+      await apiRequest(`/api/checklist-templates/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories", selectedCategoryId, "checklist-templates"] });
       toast({ title: "Success", description: "Checklist template deleted successfully" });
@@ -171,8 +171,8 @@ export default function TemplatesManagement() {
 
   // Document Requirement mutations
   const createRequirementMutation = useMutation({
-    mutationFn: (data: DocumentRequirementForm & { categoryId: string }) => 
-      apiRequest(`/api/categories/${data.categoryId}/document-requirements`, {
+    mutationFn: async (data: DocumentRequirementForm & { categoryId: string }) => 
+      await apiRequest(`/api/categories/${data.categoryId}/document-requirements`, {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -188,8 +188,8 @@ export default function TemplatesManagement() {
   });
 
   const updateRequirementMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: DocumentRequirementForm }) => 
-      apiRequest(`/api/document-requirements/${id}`, {
+    mutationFn: async ({ id, data }: { id: string; data: DocumentRequirementForm }) => 
+      await apiRequest(`/api/document-requirements/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
@@ -206,8 +206,8 @@ export default function TemplatesManagement() {
   });
 
   const deleteRequirementMutation = useMutation({
-    mutationFn: (id: string) => 
-      apiRequest(`/api/document-requirements/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: string) => 
+      await apiRequest(`/api/document-requirements/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories", selectedCategoryId, "document-requirements"] });
       toast({ title: "Success", description: "Document requirement deleted successfully" });
