@@ -16,6 +16,47 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Rule condition types for rule evaluation engine
+export type RuleCondition = {
+  field: string;           // The field to evaluate (e.g., 'details', 'lenderName', 'customerState')
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan' | 'in' | 'notIn' | 'exists' | 'notExists' | 'regex' | 'ageInDays';
+  value: string | number | boolean | string[]; // The value to compare against
+  caseSensitive?: boolean; // For text comparisons, defaults to false
+};
+
+export type RuleConditions = {
+  logic: 'AND' | 'OR';     // How to combine conditions
+  conditions: RuleCondition[];
+};
+
+// Available case fields for rule evaluation
+export const RULE_FIELDS = {
+  // Case basic fields
+  'details': { type: 'text', label: 'Complaint Details', description: 'The complaint description text' },
+  'loanId': { type: 'text', label: 'Loan ID', description: 'Loan identifier' },
+  'lenderName': { type: 'text', label: 'Lender Name', description: 'Financial institution name' },
+  'state': { type: 'text', label: 'Customer State', description: 'Customer state abbreviation' },
+  'status': { type: 'enum', label: 'Case Status', description: 'Current case status', options: ['open', 'in_progress', 'resolved'] },
+  'hasRepresentative': { type: 'boolean', label: 'Has Representative', description: 'Whether customer has POA/Attorney' },
+  'representativeCompanyName': { type: 'text', label: 'Representative Company', description: 'POA/Attorney company name' },
+  
+  // Customer fields (via join)
+  'customerName': { type: 'text', label: 'Customer Name', description: 'Customer full name' },
+  'customerState': { type: 'text', label: 'Customer State', description: 'Customer state (alternative field)' },
+  
+  // Category/Type fields (via join)
+  'categoryCode': { type: 'text', label: 'Category Code', description: 'Case category code' },
+  'categoryName': { type: 'text', label: 'Category Name', description: 'Case category name' },
+  'caseTypeName': { type: 'text', label: 'Case Type', description: 'Case type name' },
+  
+  // Calculated fields
+  'ageInDays': { type: 'number', label: 'Case Age (Days)', description: 'Days since case creation' },
+  
+  // Resolution fields (if resolved)
+  'settlementAmount': { type: 'number', label: 'Settlement Amount', description: 'Settlement dollar amount' },
+  'forgivenAmount': { type: 'number', label: 'Forgiven Amount', description: 'Forgiven dollar amount' }
+} as const;
+
 // Session storage table for authentication
 export const sessions = pgTable(
   "sessions",
@@ -200,10 +241,11 @@ export const priorityRules = pgTable("priority_rules", {
   name: text("name").notNull(),
   description: text("description"),
   priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).notNull(),
-  conditions: text("conditions").notNull(),
-  ruleJson: json("rule_json"),
+  conditions: json("conditions").notNull(), // Changed to JSON for structured conditions
   priorityValue: text("priority_value"),
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const tagRules = pgTable("tag_rules", {
@@ -212,10 +254,11 @@ export const tagRules = pgTable("tag_rules", {
   name: text("name").notNull(),
   description: text("description"),
   tag: text("tag").notNull(),
-  conditions: text("conditions").notNull(),
-  ruleJson: json("rule_json"),
+  conditions: json("conditions").notNull(), // Changed to JSON for structured conditions
   tags: json("tags").$type<string[]>(),
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const resolutionConfigs = pgTable("resolution_configs", {
