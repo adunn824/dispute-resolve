@@ -113,7 +113,7 @@ export const cases = pgTable("cases", {
   representativeAddress: text("representative_address"),
   representativeEmail: text("representative_email"),
   representativePhone: text("representative_phone"),
-  tags: text("tags").array().default('{}'), // Array of strings for rule-applied tags
+  tags: text("tags").array().default(sql`'{}'`), // Array of strings for rule-applied tags
   configVersion: integer("config_version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -257,6 +257,18 @@ export const tagRules = pgTable("tag_rules", {
   tag: text("tag").notNull(),
   conditions: json("conditions").notNull(), // Changed to JSON for structured conditions
   tags: json("tags").$type<string[]>(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const checklistAssignmentRules = pgTable("checklist_assignment_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").references(() => categories.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  checklistTemplateId: varchar("checklist_template_id").notNull().references(() => checklistTemplates.id),
+  conditions: json("conditions").notNull(), // JSON for structured conditions
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -457,6 +469,7 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
   documentRequirements: many(documentRequirements),
   priorityRules: many(priorityRules),
   tagRules: many(tagRules),
+  checklistAssignmentRules: many(checklistAssignmentRules),
   resolutionConfigs: many(resolutionConfigs),
   slaPolicies: many(slaPolicies),
 }));
@@ -486,6 +499,17 @@ export const tagRulesRelations = relations(tagRules, ({ one }) => ({
   category: one(categories, {
     fields: [tagRules.categoryId],
     references: [categories.id],
+  }),
+}));
+
+export const checklistAssignmentRulesRelations = relations(checklistAssignmentRules, ({ one }) => ({
+  category: one(categories, {
+    fields: [checklistAssignmentRules.categoryId],
+    references: [categories.id],
+  }),
+  checklistTemplate: one(checklistTemplates, {
+    fields: [checklistAssignmentRules.checklistTemplateId],
+    references: [checklistTemplates.id],
   }),
 }));
 
@@ -591,6 +615,10 @@ export const insertTagRuleSchema = createInsertSchema(tagRules).omit({
   id: true,
 });
 
+export const insertChecklistAssignmentRuleSchema = createInsertSchema(checklistAssignmentRules).omit({
+  id: true,
+});
+
 export const insertResolutionConfigSchema = createInsertSchema(resolutionConfigs).omit({
   id: true,
 });
@@ -672,6 +700,9 @@ export type InsertPriorityRule = z.infer<typeof insertPriorityRuleSchema>;
 export type TagRule = typeof tagRules.$inferSelect;
 export type InsertTagRule = z.infer<typeof insertTagRuleSchema>;
 
+export type ChecklistAssignmentRule = typeof checklistAssignmentRules.$inferSelect;
+export type InsertChecklistAssignmentRule = z.infer<typeof insertChecklistAssignmentRuleSchema>;
+
 export type ResolutionConfig = typeof resolutionConfigs.$inferSelect;
 export type InsertResolutionConfig = z.infer<typeof insertResolutionConfigSchema>;
 
@@ -700,7 +731,7 @@ export const kbCategories = pgTable("kb_categories", {
   name: text("name").notNull(),
   description: text("description"),
   slug: text("slug").unique().notNull(),
-  parentId: varchar("parent_id").references(() => kbCategories.id),
+  parentId: varchar("parent_id"), // TODO: Add self-reference when KB features are needed
   displayOrder: integer("display_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
