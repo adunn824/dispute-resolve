@@ -87,6 +87,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
+import { RuleEvaluator, findMatchingPriorityRule, findMatchingTagRules, type CaseData } from "./rule-engine";
 import session from "express-session";
 import ConnectPgSession from "connect-pg-simple";
 
@@ -678,25 +679,229 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCase(insertCase: InsertCase): Promise<Case> {
+    // First, get customer and category info for rule evaluation
+    const customer = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.id, insertCase.customerId))
+      .limit(1);
+    
+    const category = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, insertCase.categoryId))
+      .limit(1);
+    
+    const caseType = await db
+      .select()
+      .from(caseTypes)
+      .where(eq(caseTypes.id, insertCase.caseTypeId))
+      .limit(1);
+
+    if (customer.length === 0 || category.length === 0 || caseType.length === 0) {
+      throw new Error("Customer, category, or case type not found");
+    }
+
+    // Prepare case data for rule evaluation
+    const now = new Date();
+    const caseData: CaseData = {
+      details: insertCase.details,
+      loanId: insertCase.loanId || null,
+      lenderName: insertCase.lenderName || null,
+      state: insertCase.state,
+      status: insertCase.status || 'open',
+      hasRepresentative: insertCase.hasRepresentative || false,
+      representativeCompanyName: insertCase.representativeCompanyName || null,
+      representativePersonName: insertCase.representativePersonName || null,
+      representativeAddress: insertCase.representativeAddress || null,
+      representativeEmail: insertCase.representativeEmail || null,
+      representativePhone: insertCase.representativePhone || null,
+      createdAt: now,
+      updatedAt: now,
+      
+      // Customer fields
+      customerName: customer[0].name,
+      customerState: customer[0].state,
+      
+      // Category/Type fields  
+      categoryCode: category[0].code,
+      categoryName: category[0].name,
+      caseTypeName: caseType[0].name,
+      
+      // Resolution fields (null for new cases)
+      settlementAmount: null,
+      forgivenAmount: null
+    };
+
+    // Load and evaluate priority rules for this category
+    const priorityRulesForCategory = await db
+      .select()
+      .from(priorityRules)
+      .where(and(
+        eq(priorityRules.categoryId, insertCase.categoryId),
+        eq(priorityRules.isActive, true)
+      ));
+
+    let finalPriorityRuleId = insertCase.priorityRuleId;
+    if (priorityRulesForCategory.length > 0) {
+      const matchingPriorityRuleId = findMatchingPriorityRule(priorityRulesForCategory, caseData);
+      if (matchingPriorityRuleId) {
+        finalPriorityRuleId = matchingPriorityRuleId;
+      }
+    }
+
+    // Load and evaluate tag rules for this category
+    const tagRulesForCategory = await db
+      .select()
+      .from(tagRules)
+      .where(and(
+        eq(tagRules.categoryId, insertCase.categoryId),
+        eq(tagRules.isActive, true)
+      ));
+
+    // Start with any user-provided tags
+    let finalTags: string[] = insertCase.tags ? [...insertCase.tags] : [];
+    
+    // Add rule-derived tags
+    if (tagRulesForCategory.length > 0) {
+      const ruleDerivedTags = findMatchingTagRules(tagRulesForCategory, caseData);
+      finalTags.push(...ruleDerivedTags);
+    }
+    
+    // Remove duplicates
+    finalTags = Array.from(new Set(finalTags));
+
+    // Create the case with evaluated priority and tags
     const [caseRecord] = await db
       .insert(cases)
       .values({
         ...insertCase,
-        updatedAt: new Date()
+        priorityRuleId: finalPriorityRuleId,
+        tags: finalTags,
+        updatedAt: now
       })
       .returning();
+    
     return caseRecord;
   }
 
   async updateCase(id: string, updates: Partial<InsertCase>): Promise<Case> {
+    // First get the current case to check if we need rule re-evaluation
+    const currentCase = await db
+      .select()
+      .from(cases)
+      .where(eq(cases.id, id))
+      .limit(1);
+
+    if (currentCase.length === 0) {
+      throw new Error("Case not found");
+    }
+
+    // Check if significant fields changed that might affect rule evaluation
+    const significantFieldsChanged = [
+      'details', 'state', 'status', 'hasRepresentative', 'representativeCompanyName',
+      'lenderName', 'loanId', 'categoryId', 'customerId'
+    ].some(field => updates[field as keyof InsertCase] !== undefined);
+
+    let finalUpdates = { ...updates, updatedAt: new Date() };
+
+    // Re-evaluate rules if significant fields changed
+    if (significantFieldsChanged) {
+      // Get updated case data for rule evaluation
+      const mergedCaseData = { ...currentCase[0], ...updates };
+
+      // Get customer, category, and case type info for rule evaluation
+      const customer = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.id, mergedCaseData.customerId))
+        .limit(1);
+      
+      const category = await db
+        .select()
+        .from(categories)
+        .where(eq(categories.id, mergedCaseData.categoryId))
+        .limit(1);
+      
+      const caseType = await db
+        .select()
+        .from(caseTypes)
+        .where(eq(caseTypes.id, mergedCaseData.caseTypeId))
+        .limit(1);
+
+      if (customer.length > 0 && category.length > 0 && caseType.length > 0) {
+        // Prepare case data for rule evaluation
+        const caseData: CaseData = {
+          details: mergedCaseData.details,
+          loanId: mergedCaseData.loanId || null,
+          lenderName: mergedCaseData.lenderName || null,
+          state: mergedCaseData.state,
+          status: mergedCaseData.status,
+          hasRepresentative: mergedCaseData.hasRepresentative || false,
+          representativeCompanyName: mergedCaseData.representativeCompanyName || null,
+          representativePersonName: mergedCaseData.representativePersonName || null,
+          representativeAddress: mergedCaseData.representativeAddress || null,
+          representativeEmail: mergedCaseData.representativeEmail || null,
+          representativePhone: mergedCaseData.representativePhone || null,
+          createdAt: currentCase[0].createdAt,
+          updatedAt: new Date(),
+          
+          // Customer fields
+          customerName: customer[0].name,
+          customerState: customer[0].state,
+          
+          // Category/Type fields  
+          categoryCode: category[0].code,
+          categoryName: category[0].name,
+          caseTypeName: caseType[0].name,
+          
+          // Resolution fields (could be updated)
+          settlementAmount: null, // TODO: Add settlement data if needed
+          forgivenAmount: null
+        };
+
+        // Load and evaluate priority rules for this category
+        const priorityRulesForCategory = await db
+          .select()
+          .from(priorityRules)
+          .where(and(
+            eq(priorityRules.categoryId, mergedCaseData.categoryId),
+            eq(priorityRules.isActive, true)
+          ));
+
+        if (priorityRulesForCategory.length > 0) {
+          const matchingPriorityRuleId = findMatchingPriorityRule(priorityRulesForCategory, caseData);
+          if (matchingPriorityRuleId) {
+            finalUpdates.priorityRuleId = matchingPriorityRuleId;
+          }
+        }
+
+        // Load and evaluate tag rules for this category
+        const tagRulesForCategory = await db
+          .select()
+          .from(tagRules)
+          .where(and(
+            eq(tagRules.categoryId, mergedCaseData.categoryId),
+            eq(tagRules.isActive, true)
+          ));
+
+        if (tagRulesForCategory.length > 0) {
+          const ruleDerivedTags = findMatchingTagRules(tagRulesForCategory, caseData);
+          // Merge rule-derived tags with existing tags (don't overwrite)
+          const existingTags = currentCase[0].tags || [];
+          const userProvidedTags = updates.tags || [];
+          const allTags = [...existingTags, ...userProvidedTags, ...ruleDerivedTags];
+          finalUpdates.tags = Array.from(new Set(allTags)); // Remove duplicates
+        }
+      }
+    }
+
     const [caseRecord] = await db
       .update(cases)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
+      .set(finalUpdates)
       .where(eq(cases.id, id))
       .returning();
+    
     return caseRecord;
   }
 

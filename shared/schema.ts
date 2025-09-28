@@ -19,7 +19,7 @@ import { z } from "zod";
 // Rule condition types for rule evaluation engine
 export type RuleCondition = {
   field: string;           // The field to evaluate (e.g., 'details', 'lenderName', 'customerState')
-  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan' | 'in' | 'notIn' | 'exists' | 'notExists' | 'regex' | 'ageInDays';
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan' | 'in' | 'notIn' | 'exists' | 'notExists' | 'regex';
   value: string | number | boolean | string[]; // The value to compare against
   caseSensitive?: boolean; // For text comparisons, defaults to false
 };
@@ -113,6 +113,7 @@ export const cases = pgTable("cases", {
   representativeAddress: text("representative_address"),
   representativeEmail: text("representative_email"),
   representativePhone: text("representative_phone"),
+  tags: text("tags").array().default('{}'), // Array of strings for rule-applied tags
   configVersion: integer("config_version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

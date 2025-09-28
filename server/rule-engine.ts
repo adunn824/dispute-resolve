@@ -97,9 +97,6 @@ export class RuleEvaluator {
       case 'regex':
         return this.compareRegex(fieldValue, conditionValue, condition.caseSensitive);
 
-      case 'ageInDays':
-        return this.compareAgeInDays(condition.field, caseData, conditionValue);
-
       default:
         console.warn(`Unknown rule operator: ${condition.operator}`);
         return false;
@@ -190,10 +187,6 @@ export class RuleEvaluator {
     }
   }
 
-  private static compareAgeInDays(field: string, caseData: CaseData, conditionValue: any): boolean {
-    // This is handled by getFieldValue and then processed by comparison operators
-    return false; // This should not be called directly
-  }
 
   /**
    * Validates rule conditions for syntax and field availability
@@ -225,7 +218,7 @@ export class RuleEvaluator {
       }
 
       // Validate operator
-      const validOperators = ['equals', 'contains', 'startsWith', 'endsWith', 'greaterThan', 'lessThan', 'in', 'notIn', 'exists', 'notExists', 'regex', 'ageInDays'];
+      const validOperators = ['equals', 'contains', 'startsWith', 'endsWith', 'greaterThan', 'lessThan', 'in', 'notIn', 'exists', 'notExists', 'regex'];
       if (!validOperators.includes(condition.operator)) {
         errors.push(`Condition ${i + 1}: Invalid operator '${condition.operator}'`);
       }
