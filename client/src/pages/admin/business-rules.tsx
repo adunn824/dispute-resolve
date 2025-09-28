@@ -151,12 +151,9 @@ export default function BusinessRulesManagement() {
   // Priority Rule mutations
   const createPriorityRuleMutation = useMutation({
     mutationFn: (data: PriorityRuleForm) => 
-      apiRequest("/api/priority-rules", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          conditions: JSON.stringify(data.conditions)
-        }),
+      apiRequest("POST", "/api/priority-rules", {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/priority-rules"] });
@@ -171,12 +168,9 @@ export default function BusinessRulesManagement() {
 
   const updatePriorityRuleMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PriorityRuleForm }) => 
-      apiRequest(`/api/priority-rules/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          ...data,
-          conditions: JSON.stringify(data.conditions)
-        }),
+      apiRequest("PUT", `/api/priority-rules/${id}`, {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/priority-rules"] });
@@ -192,7 +186,7 @@ export default function BusinessRulesManagement() {
 
   const deletePriorityRuleMutation = useMutation({
     mutationFn: (id: string) => 
-      apiRequest(`/api/priority-rules/${id}`, { method: "DELETE" }),
+      apiRequest("DELETE", `/api/priority-rules/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/priority-rules"] });
       toast({ title: "Success", description: "Priority rule deleted successfully" });
@@ -205,12 +199,9 @@ export default function BusinessRulesManagement() {
   // Tag Rule mutations
   const createTagRuleMutation = useMutation({
     mutationFn: (data: TagRuleForm) => 
-      apiRequest("/api/tag-rules", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          conditions: JSON.stringify(data.conditions)
-        }),
+      apiRequest("POST", "/api/tag-rules", {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tag-rules"] });
@@ -225,12 +216,9 @@ export default function BusinessRulesManagement() {
 
   const updateTagRuleMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: TagRuleForm }) => 
-      apiRequest(`/api/tag-rules/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          ...data,
-          conditions: JSON.stringify(data.conditions)
-        }),
+      apiRequest("PUT", `/api/tag-rules/${id}`, {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tag-rules"] });
@@ -246,7 +234,7 @@ export default function BusinessRulesManagement() {
 
   const deleteTagRuleMutation = useMutation({
     mutationFn: (id: string) => 
-      apiRequest(`/api/tag-rules/${id}`, { method: "DELETE" }),
+      apiRequest("DELETE", `/api/tag-rules/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tag-rules"] });
       toast({ title: "Success", description: "Tag rule deleted successfully" });
@@ -259,10 +247,7 @@ export default function BusinessRulesManagement() {
   // SLA Policy mutations
   const createSLAPolicyMutation = useMutation({
     mutationFn: (data: SLAPolicyForm) => 
-      apiRequest("/api/sla-policies", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("POST", "/api/sla-policies", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sla-policies"] });
       setShowSLADialog(false);
@@ -276,10 +261,7 @@ export default function BusinessRulesManagement() {
 
   const updateSLAPolicyMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: SLAPolicyForm }) => 
-      apiRequest(`/api/sla-policies/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("PUT", `/api/sla-policies/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sla-policies"] });
       setShowSLADialog(false);
@@ -294,7 +276,7 @@ export default function BusinessRulesManagement() {
 
   const deleteSLAPolicyMutation = useMutation({
     mutationFn: (id: string) => 
-      apiRequest(`/api/sla-policies/${id}`, { method: "DELETE" }),
+      apiRequest("DELETE", `/api/sla-policies/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sla-policies"] });
       toast({ title: "Success", description: "SLA policy deleted successfully" });
