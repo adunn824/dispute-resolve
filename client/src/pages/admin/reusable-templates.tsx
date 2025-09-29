@@ -70,14 +70,14 @@ export default function ReusableTemplatesManagement() {
   // Fetch all reusable templates
   const { data: templates = [], isLoading: loadingTemplates, refetch: refetchTemplates } = useQuery<ReusableTemplate[]>({
     queryKey: ["/api/reusable-checklist-templates"],
-    select: (response: any) => response || [],
+    select: (response: any) => response.data || response || [],
   });
 
   // Fetch items for selected template
   const { data: templateItems = [], isLoading: loadingItems, refetch: refetchItems } = useQuery<ReusableItem[]>({
     queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"],
     enabled: !!selectedTemplateId,
-    select: (response: any) => response || [],
+    select: (response: any) => response.data || response || [],
   });
 
   // Forms
