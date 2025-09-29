@@ -894,6 +894,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Checklist Assignment Rules Management
+  app.get("/api/checklist-assignment-rules", requireAuth, requireRole("compliance"), async (req, res) => {
+    try {
+      const rules = await storage.getAllChecklistAssignmentRules();
+      res.json({ data: rules });
+    } catch (error) {
+      console.error("Error fetching checklist assignment rules:", error);
+      res.status(500).json({ error: "Failed to fetch checklist assignment rules" });
+    }
+  });
+
+  app.post("/api/checklist-assignment-rules", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, description, templateId, conditions, active } = req.body;
+      const rule = await storage.createChecklistAssignmentRule({
+        name,
+        description,
+        templateId,
+        conditions,
+        active: active !== undefined ? active : true,
+      });
+      res.status(201).json({ data: rule });
+    } catch (error) {
+      console.error("Error creating checklist assignment rule:", error);
+      res.status(500).json({ error: "Failed to create checklist assignment rule" });
+    }
+  });
+
+  app.put("/api/checklist-assignment-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, templateId, conditions, active } = req.body;
+      const rule = await storage.updateChecklistAssignmentRule(id, {
+        name,
+        description,
+        templateId,
+        conditions,
+        active,
+      });
+      res.json({ data: rule });
+    } catch (error) {
+      console.error("Error updating checklist assignment rule:", error);
+      res.status(500).json({ error: "Failed to update checklist assignment rule" });
+    }
+  });
+
+  app.delete("/api/checklist-assignment-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteChecklistAssignmentRule(id);
+      res.json({ data: { message: "Checklist assignment rule deleted successfully" } });
+    } catch (error) {
+      console.error("Error deleting checklist assignment rule:", error);
+      res.status(500).json({ error: "Failed to delete checklist assignment rule" });
+    }
+  });
+
   // SLA Policies Management
   app.get("/api/sla-policies", requireAuth, requireRole("compliance"), async (req, res) => {
     try {

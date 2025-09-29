@@ -1533,6 +1533,31 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tagRules).orderBy(asc(tagRules.name));
   }
 
+  async getAllChecklistAssignmentRules(): Promise<ChecklistAssignmentRule[]> {
+    return await db.select().from(checklistAssignmentRules).orderBy(asc(checklistAssignmentRules.name));
+  }
+
+  async createChecklistAssignmentRule(insertRule: InsertChecklistAssignmentRule): Promise<ChecklistAssignmentRule> {
+    const [rule] = await db
+      .insert(checklistAssignmentRules)
+      .values(insertRule)
+      .returning();
+    return rule;
+  }
+
+  async updateChecklistAssignmentRule(id: string, updates: Partial<InsertChecklistAssignmentRule>): Promise<ChecklistAssignmentRule> {
+    const [rule] = await db
+      .update(checklistAssignmentRules)
+      .set(updates)
+      .where(eq(checklistAssignmentRules.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteChecklistAssignmentRule(id: string): Promise<void> {
+    await db.delete(checklistAssignmentRules).where(eq(checklistAssignmentRules.id, id));
+  }
+
   async getAllSlaPolicies(): Promise<SlaPolicy[]> {
     return await db.select().from(slaPolicies).orderBy(asc(slaPolicies.name));
   }
