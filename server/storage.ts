@@ -471,6 +471,67 @@ export class DatabaseStorage implements IStorage {
     return result[0] || undefined;
   }
 
+  async getCaseForRuleEvaluation(id: string): Promise<import("./rule-engine").CaseData | undefined> {
+    const result = await db
+      .select({
+        details: cases.details,
+        loanId: cases.loanId,
+        lenderName: cases.lenderName,
+        state: cases.state,
+        status: cases.status,
+        hasRepresentative: cases.hasRepresentative,
+        representativeCompanyName: cases.representativeCompanyName,
+        representativePersonName: cases.representativePersonName,
+        representativeAddress: cases.representativeAddress,
+        representativeEmail: cases.representativeEmail,
+        representativePhone: cases.representativePhone,
+        createdAt: cases.createdAt,
+        updatedAt: cases.updatedAt,
+        customerName: customers.name,
+        customerState: customers.state,
+        categoryCode: categories.code,
+        categoryName: categories.name,
+        caseTypeName: caseTypes.name,
+        settlementAmount: sql<number | null>`NULL`,
+        forgivenAmount: sql<number | null>`NULL`,
+      })
+      .from(cases)
+      .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(categories, eq(cases.categoryId, categories.id))
+      .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .where(eq(cases.id, id))
+      .limit(1);
+
+    const row = result[0];
+    if (!row) {
+      return undefined;
+    }
+
+    // Map nullable fields to non-null values required by CaseData interface
+    return {
+      details: row.details,
+      loanId: row.loanId ?? null,
+      lenderName: row.lenderName ?? null,
+      state: row.state,
+      status: row.status,
+      hasRepresentative: row.hasRepresentative,
+      representativeCompanyName: row.representativeCompanyName ?? null,
+      representativePersonName: row.representativePersonName ?? null,
+      representativeAddress: row.representativeAddress ?? null,
+      representativeEmail: row.representativeEmail ?? null,
+      representativePhone: row.representativePhone ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      customerName: row.customerName || '',
+      customerState: row.customerState || '',
+      categoryCode: row.categoryCode || '',
+      categoryName: row.categoryName || '',
+      caseTypeName: row.caseTypeName || '',
+      settlementAmount: row.settlementAmount ?? null,
+      forgivenAmount: row.forgivenAmount ?? null,
+    };
+  }
+
   // Update case status
   async updateCaseStatus(caseId: string, status: "open" | "in_progress" | "resolved", actorUserId: string) {
     // First, update the case status
