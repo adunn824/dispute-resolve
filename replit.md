@@ -52,7 +52,34 @@ The system is built as a single-repository full-stack application optimized for 
 - **UI/UX Design**: Consistent form styling with existing design patterns, proper visual grouping, and clear field labels
 - **API Integration**: Updated case creation endpoint with comprehensive validation matching frontend requirements
 
-**Status**: The platform now provides complete case management workflows from intake through resolution. All major case management features are operational with role-based access control, comprehensive search and filtering capabilities, and full audit trails. The enhanced intake form now captures lender information and supports POA/Attorney representation with proper validation and conditional field handling. The system supports enterprise-grade case processing with real-time updates and proper data management.
+### Phase 5 Complete: Automated Checklist Assignment System (September 2024)
+- **Reusable Checklist Templates**: Complete template management system with:
+  - Admin interface for creating/editing reusable checklist templates
+  - Template items with configurable keys, labels, descriptions, required flags, sort order
+  - Help text and estimated duration fields for each item
+  - Active/inactive template toggles for workflow control
+  - Template listing showing item counts and usage
+- **Checklist Assignment Rules**: Integrated rule-based automation with:
+  - New "Checklist Rules" tab in business rules admin panel
+  - Full integration with existing RuleBuilder component
+  - Template selector dropdown for assigning templates to rules
+  - Support for complex AND/OR conditions (category, case type, state, priority, etc.)
+  - Rule activation/deactivation with immediate effect
+- **Automated Rule Evaluation**: Production-ready automation engine with:
+  - Automatic checklist assignment during case creation
+  - Real-time evaluation of all active checklist assignment rules
+  - Global key-level duplicate prevention across all templates
+  - Template-level tracking to prevent reprocessing
+  - Type-safe integration with existing RuleEvaluator class
+  - Non-blocking error handling with comprehensive logging
+  - Idempotent behavior (safe for concurrent operations)
+- **Frontend Bug Fixes**: Resolved critical query selector issues:
+  - Fixed response.data extraction in template queries
+  - Fixed template items fetch for proper dropdown rendering
+  - Ensured consistent API response handling across admin pages
+- **End-to-End Integration**: Complete workflow automation from rule configuration through case creation with automatic checklist population
+
+**Status**: The platform now provides complete case management workflows from intake through resolution with full automation capabilities. All major case management features are operational with role-based access control, comprehensive search and filtering capabilities, full audit trails, and automated checklist assignment based on configurable business rules. The enhanced intake form captures lender information and supports POA/Attorney representation with proper validation. The system supports enterprise-grade case processing with real-time updates, proper data management, and intelligent workflow automation through reusable templates and rule-based checklist assignment.
 
 ## User Preferences
 
@@ -82,20 +109,23 @@ Preferred communication style: Simple, everyday language.
 - **Schema**: Comprehensive relational model supporting:
   - User management with role-based access (agent, compliance, admin)
   - Customer and case entities with flexible categorization
-  - Dynamic checklist system with templates
+  - Dynamic checklist system with case-specific and reusable templates
+  - Reusable checklist templates with configurable items (JSON array storage)
   - Document management with metadata tracking
   - Resolution tracking with disposition and settlement data
   - Audit logging for all operations
-  - Configurable business rules (priority rules, tag rules, SLA policies)
+  - Configurable business rules (priority rules, tag rules, checklist assignment rules, SLA policies)
 
 ### Configuration Management
 - **Admin Panel**: Dynamic configuration system allowing runtime updates to:
   - Case types and categories
-  - Checklist templates and document requirements
+  - Reusable checklist templates with configurable items
+  - Checklist assignment rules for automated workflow automation
   - Priority assignment rules and tag automation
   - Resolution configurations and SLA policies
   - Value sets and feature flags
 - **Audit Trail**: Complete tracking of configuration changes with rollback capability
+- **Rule-Based Automation**: Intelligent workflow automation using configurable business rules that automatically assign checklists, priorities, and tags based on case attributes during intake
 
 ### File Management
 - **Strategy**: Prepared for S3 integration with presigned URL patterns
