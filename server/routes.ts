@@ -1727,6 +1727,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/cases/:id/dynamic-checklist - Get dynamically evaluated checklist for a case
+  app.get("/api/cases/:id/dynamic-checklist", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const dynamicChecklist = await storage.evaluateDynamicChecklist(id);
+      res.json({ data: dynamicChecklist });
+    } catch (error) {
+      console.error("Failed to evaluate dynamic checklist:", error);
+      res.status(500).json({ error: "Failed to evaluate dynamic checklist" });
+    }
+  });
+
   // Get users for assignment
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
