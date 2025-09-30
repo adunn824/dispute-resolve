@@ -40,7 +40,7 @@ interface DateRange {
 
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
 
@@ -168,14 +168,14 @@ export default function ReportsPage() {
               <Button
                 onClick={() => {
                   setDateRange({
-                    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                     endDate: new Date().toISOString().split('T')[0]
                   });
                 }}
                 variant="outline"
                 data-testid="button-reset-dates"
               >
-                Reset to Last 30 Days
+                Reset to Last 60 Days
               </Button>
             </div>
           </div>
