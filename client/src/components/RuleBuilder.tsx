@@ -48,16 +48,29 @@ interface RuleBuilderProps {
   conditions: RuleCondition[];
   onChange: (conditions: RuleCondition[]) => void;
   className?: string;
+  allowedFields?: string[]; // Optional filter for which fields to show
 }
 
-export function RuleBuilder({ conditions, onChange, className }: RuleBuilderProps) {
+export function RuleBuilder({ conditions, onChange, className, allowedFields }: RuleBuilderProps) {
   const [showJsonPreview, setShowJsonPreview] = useState(false);
+  
+  // Filter RULE_FIELDS based on allowedFields prop
+  const availableFields = allowedFields 
+    ? Object.fromEntries(
+        Object.entries(RULE_FIELDS).filter(([key]) => allowedFields.includes(key))
+      )
+    : RULE_FIELDS;
 
   // Add a new condition
   const addCondition = () => {
+    // Use first available field as default
+    const firstFieldKey = Object.keys(availableFields)[0] || 'details';
+    const firstFieldType = availableFields[firstFieldKey as keyof typeof availableFields]?.type;
+    const defaultOperators = OPERATORS_BY_TYPE[firstFieldType as keyof typeof OPERATORS_BY_TYPE] || [];
+    
     const newCondition: RuleCondition = {
-      field: 'details',
-      operator: 'contains',
+      field: firstFieldKey,
+      operator: defaultOperators[0]?.value || 'contains',
       value: ''
     };
     onChange([...conditions, newCondition]);
@@ -76,7 +89,7 @@ export function RuleBuilder({ conditions, onChange, className }: RuleBuilderProp
     
     // If field changed, reset operator and value to appropriate defaults
     if (updates.field) {
-      const fieldType = RULE_FIELDS[updates.field as keyof typeof RULE_FIELDS]?.type;
+      const fieldType = availableFields[updates.field as keyof typeof availableFields]?.type;
       const availableOperators = OPERATORS_BY_TYPE[fieldType as keyof typeof OPERATORS_BY_TYPE] || [];
       newConditions[index].operator = availableOperators[0]?.value || 'equals';
       newConditions[index].value = fieldType === 'boolean' ? false : '';
@@ -92,7 +105,7 @@ export function RuleBuilder({ conditions, onChange, className }: RuleBuilderProp
 
   // Get available operators for a field
   const getAvailableOperators = (fieldName: string) => {
-    const fieldType = RULE_FIELDS[fieldName as keyof typeof RULE_FIELDS]?.type;
+    const fieldType = availableFields[fieldName as keyof typeof availableFields]?.type;
     return OPERATORS_BY_TYPE[fieldType as keyof typeof OPERATORS_BY_TYPE] || [];
   };
 
@@ -103,7 +116,7 @@ export function RuleBuilder({ conditions, onChange, className }: RuleBuilderProp
 
   // Render value input based on field type and operator
   const renderValueInput = (condition: RuleCondition, index: number) => {
-    const fieldDef = RULE_FIELDS[condition.field as keyof typeof RULE_FIELDS];
+    const fieldDef = availableFields[condition.field as keyof typeof availableFields];
     const requiresValue = operatorRequiresValue(condition.operator);
     
     if (!requiresValue) {
@@ -284,7 +297,7 @@ export function RuleBuilder({ conditions, onChange, className }: RuleBuilderProp
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(RULE_FIELDS).map(([key, field]) => (
+                    {Object.entries(availableFields).map(([key, field]) => (
                       <SelectItem key={key} value={key}>
                         <div className="flex flex-col">
                           <span>{field.label}</span>

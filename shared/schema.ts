@@ -45,7 +45,8 @@ export const RULE_FIELDS = {
   'customerName': { type: 'text', label: 'Customer Name', description: 'Customer full name' },
   'customerState': { type: 'text', label: 'Customer State', description: 'Customer state (alternative field)' },
   
-  // Category/Type fields (via join)
+  // Category/Type/Origination fields (via join)
+  'caseOriginationName': { type: 'text', label: 'Case Origination', description: 'Case origination name' },
   'categoryCode': { type: 'text', label: 'Category Code', description: 'Case category code' },
   'categoryName': { type: 'text', label: 'Category Name', description: 'Case category name' },
   'caseTypeName': { type: 'text', label: 'Case Type', description: 'Case type name' },

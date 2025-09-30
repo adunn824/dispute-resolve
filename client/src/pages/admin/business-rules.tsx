@@ -1009,6 +1009,7 @@ export default function BusinessRulesManagement() {
                               <RuleBuilder
                                 conditions={field.value}
                                 onChange={field.onChange}
+                                allowedFields={['caseOriginationName', 'caseTypeName', 'categoryName', 'state', 'lenderName']}
                               />
                             </FormControl>
                             <FormMessage />
