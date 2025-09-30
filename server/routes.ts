@@ -59,91 +59,6 @@ const requireRole = (roles: string | string[]) => (req: any, res: any, next: any
   next();
 };
 
-// Helper function to apply checklist assignment rules when a case is created
-async function applyChecklistAssignmentRules(caseId: string, storageInstance: DatabaseStorage) {
-  try {
-    // Get the case with full details needed for rule evaluation
-    const caseData = await storageInstance.getCaseForRuleEvaluation(caseId);
-    if (!caseData) {
-      console.warn(`Case ${caseId} not found for checklist assignment`);
-      return;
-    }
-
-    // Get all active checklist assignment rules
-    const allRules = await storageInstance.getAllChecklistAssignmentRules();
-    const activeRules = allRules.filter(rule => rule.active);
-
-    if (activeRules.length === 0) {
-      return;
-    }
-
-    // Import the RuleEvaluator
-    const { RuleEvaluator } = await import("./rule-engine");
-
-    // Get existing checklist items once at the start for global key-level deduplication
-    const existingItems = await storageInstance.getChecklistItems(caseId);
-    const assignedKeys = new Set(existingItems.map(item => item.key));
-
-    // Track which templates have been assigned to avoid duplicates
-    const assignedTemplateIds = new Set<string>();
-
-    // Evaluate each rule
-    for (const rule of activeRules) {
-      if (!rule.conditions || assignedTemplateIds.has(rule.templateId)) {
-        continue;
-      }
-
-      try {
-        // Evaluate the rule conditions
-        const matches = RuleEvaluator.evaluate(rule.conditions, caseData);
-
-        if (matches) {
-          // Get the template
-          const template = await storageInstance.getReusableTemplate(rule.templateId);
-          
-          if (template && template.active && template.items && template.items.length > 0) {
-            // Create checklist items from template items (skip duplicates globally)
-            let itemsCreated = 0;
-            for (const templateItem of template.items) {
-              // Skip if this key already exists (global check across all templates)
-              if (assignedKeys.has(templateItem.key)) {
-                continue;
-              }
-
-              await storageInstance.createChecklistItem({
-                caseId,
-                key: templateItem.key,
-                label: templateItem.label,
-                description: templateItem.description,
-                required: templateItem.required,
-                completed: false,
-                sortOrder: templateItem.sortOrder,
-                helpText: templateItem.helpText,
-                estimatedDuration: templateItem.estimatedDuration,
-              });
-
-              // Add the key to assigned set to prevent future duplicates
-              assignedKeys.add(templateItem.key);
-              itemsCreated++;
-            }
-
-            // Only mark template as assigned if we actually created items
-            if (itemsCreated > 0) {
-              assignedTemplateIds.add(rule.templateId);
-              console.log(`Applied checklist template "${template.name}" to case ${caseId} via rule "${rule.name}" (${itemsCreated} items created)`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error evaluating checklist rule "${rule.name}":`, error);
-      }
-    }
-  } catch (error) {
-    console.error(`Error applying checklist assignment rules to case ${caseId}:`, error);
-    throw error;
-  }
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup multer for file uploads
@@ -464,13 +379,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const newCase = await storage.createCase(caseData);
-      
-      // Evaluate checklist assignment rules and create checklist items
-      try {
-        await applyChecklistAssignmentRules(newCase.id, storage);
-      } catch (error) {
-        console.error("Failed to apply checklist assignment rules:", error);
-      }
       
       // Create audit log for case creation
       await storage.createAuditLog({
