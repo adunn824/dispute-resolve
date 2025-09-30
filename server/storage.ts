@@ -942,7 +942,7 @@ export class DatabaseStorage implements IStorage {
     // Check if significant fields changed that might affect rule evaluation
     const significantFieldsChanged = [
       'details', 'state', 'status', 'hasRepresentative', 'representativeCompanyName',
-      'lenderName', 'loanId', 'categoryId', 'customerId'
+      'lenderId', 'loanId', 'categoryId', 'customerId'
     ].some(field => updates[field as keyof InsertCase] !== undefined);
 
     let finalUpdates = { ...updates, updatedAt: new Date() };
@@ -972,11 +972,24 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
 
       if (customer.length > 0 && category.length > 0 && caseType.length > 0) {
+        // Fetch lender name if lenderId is provided
+        let lenderName = null;
+        if (mergedCaseData.lenderId) {
+          const lender = await db
+            .select()
+            .from(lenders)
+            .where(eq(lenders.id, mergedCaseData.lenderId))
+            .limit(1);
+          if (lender.length > 0) {
+            lenderName = lender[0].name;
+          }
+        }
+        
         // Prepare case data for rule evaluation
         const caseData: CaseData = {
           details: mergedCaseData.details,
           loanId: mergedCaseData.loanId || null,
-          lenderName: mergedCaseData.lenderName || null,
+          lenderName: lenderName,
           state: mergedCaseData.state,
           status: mergedCaseData.status,
           hasRepresentative: mergedCaseData.hasRepresentative || false,

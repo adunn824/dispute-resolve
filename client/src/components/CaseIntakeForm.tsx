@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
   const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
   const [hasRepresentative, setHasRepresentative] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Fetch case originations from API
   const { data: caseOriginations, isLoading: loadingOriginations, error: originationsError } = useQuery<{data: CaseOrigination[]}>({ 
@@ -161,6 +163,9 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
       // Invalidate relevant queries to refresh dashboards
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      
+      // Navigate to the newly created case
+      setLocation(`/cases/${response.data.id}`);
       
       onSubmit(response.data);
     },
