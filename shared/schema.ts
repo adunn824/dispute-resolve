@@ -205,7 +205,7 @@ export const caseTypes = pgTable("case_types", {
 
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id),
+  caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   code: text("code").notNull(),
   description: text("description"),
