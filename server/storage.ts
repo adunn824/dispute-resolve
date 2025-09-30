@@ -121,6 +121,24 @@ export interface DashboardStats {
   slaAlerts: { caseId: string; customerName: string; hoursRemaining: number; }[];
 }
 
+// Dynamic checklist item combining template item with completion state
+export interface DynamicChecklistItem {
+  key: string;
+  label: string;
+  description?: string | null;
+  isRequired: boolean;
+  sortOrder: number;
+  helpText?: string | null;
+  estimatedDuration?: number | null;
+  templateId: string;
+  templateName: string;
+  // Completion state fields
+  completed: boolean;
+  completedAt?: Date | null;
+  assignedToUserId?: string | null;
+  checklistItemId?: string | null; // ID from checklistItems table if exists
+}
+
 export interface IStorage {
   // Authentication
   sessionStore: session.SessionStore;
@@ -173,6 +191,7 @@ export interface IStorage {
   getChecklistItems(caseId: string): Promise<ChecklistItem[]>;
   createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
   updateChecklistItem(id: string, updates: Partial<InsertChecklistItem>): Promise<ChecklistItem>;
+  evaluateDynamicChecklist(caseId: string): Promise<DynamicChecklistItem[]>;
   
   // Document methods
   getDocuments(caseId: string): Promise<Document[]>;
@@ -1164,6 +1183,106 @@ export class DatabaseStorage implements IStorage {
       .where(eq(checklistItems.id, id))
       .returning();
     return item;
+  }
+
+  async evaluateDynamicChecklist(caseId: string): Promise<DynamicChecklistItem[]> {
+    try {
+      // Get the case with full details needed for rule evaluation
+      const caseData = await this.getCaseForRuleEvaluation(caseId);
+      if (!caseData) {
+        console.warn(`Case ${caseId} not found for dynamic checklist evaluation`);
+        return [];
+      }
+
+      // Get all active checklist assignment rules
+      const allRules = await this.getAllChecklistAssignmentRules();
+      const activeRules = allRules.filter(rule => rule.isActive);
+
+      if (activeRules.length === 0) {
+        return [];
+      }
+
+      // Get existing completion state from checklistItems table
+      const completionState = await db.select().from(checklistItems)
+        .where(eq(checklistItems.caseId, caseId));
+
+      // Create a map of completion state by key
+      const completionMap = new Map(
+        completionState.map(item => [
+          item.key,
+          {
+            completed: item.status === 'complete',
+            completedAt: item.completedAt,
+            assignedToUserId: item.assignedToUserId,
+            checklistItemId: item.id
+          }
+        ])
+      );
+
+      // Track which templates have been assigned to avoid duplicates
+      const assignedTemplateIds = new Set<string>();
+      const dynamicItems: DynamicChecklistItem[] = [];
+      const seenKeys = new Set<string>();
+
+      // Evaluate each rule
+      for (const rule of activeRules) {
+        if (!rule.conditions || !rule.reusableTemplateId || assignedTemplateIds.has(rule.reusableTemplateId)) {
+          continue;
+        }
+
+        try {
+          // Evaluate the rule conditions
+          const matches = RuleEvaluator.evaluate(rule.conditions, caseData);
+
+          if (matches) {
+            // Get the template with items
+            const template = await this.getReusableChecklistTemplateWithItems(rule.reusableTemplateId);
+            
+            if (template && template.isActive && template.items && template.items.length > 0) {
+              // Add items from this template (skip duplicates based on key)
+              for (const templateItem of template.items) {
+                // Skip if this key already exists
+                if (seenKeys.has(templateItem.key)) {
+                  continue;
+                }
+
+                const completion = completionMap.get(templateItem.key);
+                
+                dynamicItems.push({
+                  key: templateItem.key,
+                  label: templateItem.label,
+                  description: templateItem.description,
+                  isRequired: templateItem.isRequired,
+                  sortOrder: templateItem.sortOrder,
+                  helpText: templateItem.helpText,
+                  estimatedDuration: templateItem.estimatedDuration,
+                  templateId: template.id,
+                  templateName: template.name,
+                  completed: completion?.completed ?? false,
+                  completedAt: completion?.completedAt ?? null,
+                  assignedToUserId: completion?.assignedToUserId ?? null,
+                  checklistItemId: completion?.checklistItemId ?? null
+                });
+
+                seenKeys.add(templateItem.key);
+              }
+
+              assignedTemplateIds.add(rule.reusableTemplateId);
+            }
+          }
+        } catch (error) {
+          console.error(`Error evaluating checklist rule "${rule.name}":`, error);
+        }
+      }
+
+      // Sort by sortOrder
+      dynamicItems.sort((a, b) => a.sortOrder - b.sortOrder);
+
+      return dynamicItems;
+    } catch (error) {
+      console.error(`Error evaluating dynamic checklist for case ${caseId}:`, error);
+      throw error;
+    }
   }
 
   // Document methods
