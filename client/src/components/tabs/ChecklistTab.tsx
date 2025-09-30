@@ -11,14 +11,20 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChecklistItem {
-  id: string;
-  caseId: string;
   key: string;
   label: string;
+  description?: string | null;
   isRequired: boolean;
-  status: "open" | "complete";
-  assignedToUserId?: string;
-  completedAt?: string;
+  sortOrder: number;
+  helpText?: string | null;
+  estimatedDuration?: number | null;
+  templateId: string;
+  templateName: string;
+  // Completion state fields
+  completed: boolean;
+  completedAt?: Date | null;
+  assignedToUserId?: string | null;
+  checklistItemId?: string | null;
 }
 
 interface ChecklistTabProps {
@@ -28,35 +34,26 @@ interface ChecklistTabProps {
 export function ChecklistTab({ caseId }: ChecklistTabProps) {
   const { toast } = useToast();
 
-  // Fetch checklist items for this case
-  const { data: checklistItems = [], isLoading, refetch } = useQuery<ChecklistItem[]>({
-    queryKey: [`/api/cases/${caseId}/checklist-items`],
+  // Fetch dynamic checklist items for this case
+  const { data: checklistResponse, isLoading, refetch } = useQuery<{data: ChecklistItem[]}>({
+    queryKey: [`/api/cases/${caseId}/dynamic-checklist`],
+    queryFn: () => apiRequest("GET", `/api/cases/${caseId}/dynamic-checklist`),
     enabled: !!caseId,
   });
+
+  const checklistItems = checklistResponse?.data || [];
 
   // Fetch users for assignment
   const { data: users = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
     queryKey: ["/api/users"],
   });
 
-  // Generate checklist items from templates
-  const generateMutation = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/cases/${caseId}/checklist-items/generate`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/cases/${caseId}/checklist-items`] });
-      toast({ title: "Success", description: "Checklist items generated from templates" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to generate checklist items", variant: "destructive" });
-    },
-  });
-
-  // Complete/reopen checklist item
+  // Complete/reopen dynamic checklist item
   const toggleMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "complete" | "reopen" }) =>
-      apiRequest("POST", `/api/checklist-items/${id}/${action}`),
+    mutationFn: ({ key, action }: { key: string; action: "complete" | "reopen" }) =>
+      apiRequest("POST", `/api/cases/${caseId}/checklist/${key}/${action}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/cases/${caseId}/checklist-items`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/cases/${caseId}/dynamic-checklist`] });
       toast({ title: "Success", description: "Checklist item updated" });
     },
     onError: () => {
@@ -64,38 +61,13 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
     },
   });
 
-  // Assign checklist item
-  const assignMutation = useMutation({
-    mutationFn: ({ id, assignedToUserId }: { id: string; assignedToUserId: string }) =>
-      apiRequest("PUT", `/api/checklist-items/${id}`, { assignedToUserId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/cases/${caseId}/checklist-items`] });
-      toast({ title: "Success", description: "Checklist item assigned" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to assign checklist item", variant: "destructive" });
-    },
-  });
-
   const handleToggleItem = (item: ChecklistItem) => {
-    const action = item.status === "complete" ? "reopen" : "complete";
-    toggleMutation.mutate({ id: item.id, action });
+    const action = item.completed ? "reopen" : "complete";
+    toggleMutation.mutate({ key: item.key, action });
   };
 
-  const handleAssignItem = (itemId: string, assignedToUserId: string | null) => {
-    if (assignedToUserId === null) {
-      assignMutation.mutate({ id: itemId, assignedToUserId: "" });
-    } else {
-      assignMutation.mutate({ id: itemId, assignedToUserId });
-    }
-  };
-
-  const handleGenerateItems = () => {
-    generateMutation.mutate();
-  };
-
-  const getStatusIcon = (status: string, isRequired: boolean) => {
-    if (status === "complete") {
+  const getStatusIcon = (completed: boolean, isRequired: boolean) => {
+    if (completed) {
       return <CheckCircle className="h-5 w-5 text-green-600" />;
     }
     return isRequired ? 
@@ -103,8 +75,8 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
       <Circle className="h-5 w-5 text-muted-foreground" />;
   };
 
-  const getStatusBadge = (status: string, isRequired: boolean) => {
-    if (status === "complete") {
+  const getStatusBadge = (completed: boolean, isRequired: boolean) => {
+    if (completed) {
       return <Badge className="bg-green-100 text-green-800 border-green-200">Complete</Badge>;
     }
     return isRequired ? 
@@ -112,15 +84,15 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
       <Badge variant="secondary">Optional</Badge>;
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return null;
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (date?: Date | string | null) => {
+    if (!date) return null;
+    return new Date(date).toLocaleDateString();
   };
 
-  const completedItems = checklistItems.filter(item => item.status === "complete").length;
+  const completedItems = checklistItems.filter(item => item.completed).length;
   const totalItems = checklistItems.length;
   const requiredItems = checklistItems.filter(item => item.isRequired);
-  const completedRequiredItems = requiredItems.filter(item => item.status === "complete").length;
+  const completedRequiredItems = requiredItems.filter(item => item.completed).length;
 
   return (
     <div className="space-y-6" data-testid="tab-content-checklist">
@@ -178,14 +150,6 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
-              <Button 
-                onClick={handleGenerateItems}
-                disabled={generateMutation.isPending || checklistItems.length > 0}
-                data-testid="button-generate-checklist"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Generate Checklist
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -194,7 +158,7 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No checklist items found for this case. Click "Generate Checklist" to create items from templates.
+                No checklist items found. Checklist items are dynamically assigned based on business rules.
               </AlertDescription>
             </Alert>
           )}
@@ -227,52 +191,39 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                     .sort((a, b) => {
                       // Sort by: required first, then by completion status, then by label
                       if (a.isRequired !== b.isRequired) return a.isRequired ? -1 : 1;
-                      if (a.status !== b.status) return a.status === "open" ? -1 : 1;
+                      if (a.completed !== b.completed) return a.completed ? 1 : -1;
                       return a.label.localeCompare(b.label);
                     })
                     .map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.key}>
                       <TableCell>
                         <button
                           onClick={() => handleToggleItem(item)}
                           disabled={toggleMutation.isPending}
                           className="hover:scale-110 transition-transform"
-                          data-testid={`button-toggle-${item.id}`}
+                          data-testid={`button-toggle-${item.key}`}
                         >
-                          {getStatusIcon(item.status, item.isRequired)}
+                          {getStatusIcon(item.completed, item.isRequired)}
                         </button>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className={`font-medium ${item.status === "complete" ? "line-through text-muted-foreground" : ""}`}>
+                          <p className={`font-medium ${item.completed ? "line-through text-muted-foreground" : ""}`}>
                             {item.label}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             Key: <code className="text-xs bg-muted px-1 py-0.5 rounded">{item.key}</code>
                           </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            From: {item.templateName}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(item.status, item.isRequired)}
+                        {getStatusBadge(item.completed, item.isRequired)}
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={item.assignedToUserId || "unassigned"}
-                          onValueChange={(value) => handleAssignItem(item.id, value === "unassigned" ? null : value)}
-                          disabled={assignMutation.isPending}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue placeholder="Assign" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {users.map(user => (
-                              <SelectItem key={user.id} value={user.id}>
-                                {user.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <span className="text-muted-foreground">—</span>
                       </TableCell>
                       <TableCell>
                         {item.completedAt ? (
@@ -289,9 +240,9 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                           size="sm"
                           onClick={() => handleToggleItem(item)}
                           disabled={toggleMutation.isPending}
-                          data-testid={`button-action-${item.id}`}
+                          data-testid={`button-action-${item.key}`}
                         >
-                          {item.status === "complete" ? "Reopen" : "Complete"}
+                          {item.completed ? "Reopen" : "Complete"}
                         </Button>
                       </TableCell>
                     </TableRow>
