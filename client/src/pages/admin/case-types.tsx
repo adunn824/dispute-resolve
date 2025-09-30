@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -22,7 +22,7 @@ const caseTypeSchema = z.object({
   name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
   description: z.string().min(1, "Description is required").max(255, "Description must be 255 characters or less"),
   color: z.string().min(1, "Color is required"),
-  caseOriginationId: z.string().optional(),
+  originationIds: z.array(z.string()).default([]),
 });
 
 type CaseTypeForm = z.infer<typeof caseTypeSchema>;
@@ -32,8 +32,7 @@ type CaseType = {
   name: string;
   description: string;
   color: string;
-  caseOriginationId?: string;
-  caseOriginationName?: string | null;
+  originations?: Array<{ id: string; name: string }>;
 };
 
 type CaseOrigination = {
@@ -66,7 +65,7 @@ export default function CaseTypesManagement() {
       name: "",
       description: "",
       color: "#2563eb",
-      caseOriginationId: undefined,
+      originationIds: [],
     },
   });
 
@@ -120,15 +119,21 @@ export default function CaseTypesManagement() {
   });
 
   // Handlers
-  const handleEditCaseType = (caseType: any) => {
-    setEditingCaseType(caseType);
-    caseTypeForm.reset({
-      name: caseType.name,
-      description: caseType.description,
-      color: caseType.color,
-      caseOriginationId: caseType.caseOriginationId || undefined,
-    });
-    setShowCaseTypeDialog(true);
+  const handleEditCaseType = async (caseType: any) => {
+    // Fetch the case type with originations
+    try {
+      const fullCaseType = await apiRequest("GET", `/api/case-types/${caseType.id}`);
+      setEditingCaseType(fullCaseType);
+      caseTypeForm.reset({
+        name: fullCaseType.name,
+        description: fullCaseType.description,
+        color: fullCaseType.color,
+        originationIds: fullCaseType.originations?.map((o: any) => o.id) || [],
+      });
+      setShowCaseTypeDialog(true);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to load case type details", variant: "destructive" });
+    }
   };
 
   const onCaseTypeSubmit = (data: CaseTypeForm) => {
@@ -186,24 +191,39 @@ export default function CaseTypesManagement() {
                   />
                   <FormField
                     control={caseTypeForm.control}
-                    name="caseOriginationId"
+                    name="originationIds"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Case Origination (Optional)</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(value || undefined)} value={field.value || undefined}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-case-origination">
-                              <SelectValue placeholder="None - Select if needed..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {caseOriginations.map((origination) => (
-                              <SelectItem key={origination.id} value={origination.id}>
+                        <FormLabel>Case Originations</FormLabel>
+                        <div className="space-y-2">
+                          {caseOriginations.map((origination) => (
+                            <div key={origination.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                data-testid={`checkbox-origination-${origination.id}`}
+                                checked={field.value?.includes(origination.id)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  if (checked) {
+                                    field.onChange([...currentValue, origination.id]);
+                                  } else {
+                                    field.onChange(currentValue.filter((id: string) => id !== origination.id));
+                                  }
+                                }}
+                              />
+                              <label className="text-sm cursor-pointer" onClick={() => {
+                                const currentValue = field.value || [];
+                                const isChecked = currentValue.includes(origination.id);
+                                if (isChecked) {
+                                  field.onChange(currentValue.filter((id: string) => id !== origination.id));
+                                } else {
+                                  field.onChange([...currentValue, origination.id]);
+                                }
+                              }}>
                                 {origination.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}

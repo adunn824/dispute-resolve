@@ -58,7 +58,6 @@ interface CaseOrigination {
   name: string;
   description?: string;
   externalKey?: string;
-  isActive: boolean;
 }
 
 interface CaseType {
@@ -66,17 +65,13 @@ interface CaseType {
   name: string;
   description?: string;
   color?: string;
-  isActive: boolean;
-  caseOriginationId?: string;
 }
 
 interface Category {
   id: string;
-  caseTypeId: string;
   name: string;
   code: string;
   description?: string;
-  isActive: boolean;
 }
 
 const usStates = [

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,7 +20,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 const categorySchema = z.object({
   name: z.string().min(1, "Category name is required"),
   description: z.string().min(1, "Description is required"),
-  caseTypeId: z.string().min(1, "Case type is required"),
+  caseTypeIds: z.array(z.string()).min(1, "At least one case type is required"),
 });
 
 type CategoryForm = z.infer<typeof categorySchema>;
@@ -29,7 +29,7 @@ type Category = {
   id: string;
   name: string;
   description: string;
-  caseTypeId: string;
+  caseTypes?: Array<{ id: string; name: string }>;
 };
 
 type CaseType = {
@@ -61,7 +61,7 @@ export default function CategoriesManagement() {
     defaultValues: {
       name: "",
       description: "",
-      caseTypeId: "",
+      caseTypeIds: [],
     },
   });
 
@@ -115,14 +115,19 @@ export default function CategoriesManagement() {
     }
   };
 
-  const handleEdit = (category: Category) => {
-    setEditingCategory(category);
-    form.reset({
-      name: category.name,
-      description: category.description,
-      caseTypeId: category.caseTypeId,
-    });
-    setShowDialog(true);
+  const handleEdit = async (category: Category) => {
+    try {
+      const fullCategory = await apiRequest("GET", `/api/categories/${category.id}`);
+      setEditingCategory(fullCategory);
+      form.reset({
+        name: fullCategory.name,
+        description: fullCategory.description,
+        caseTypeIds: fullCategory.caseTypes?.map((ct: any) => ct.id) || [],
+      });
+      setShowDialog(true);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to load category details", variant: "destructive" });
+    }
   };
 
   const handleCreate = () => {
@@ -131,9 +136,11 @@ export default function CategoriesManagement() {
     setShowDialog(true);
   };
 
-  const getCaseTypeName = (caseTypeId: string) => {
-    const caseType = caseTypes.find(ct => ct.id === caseTypeId);
-    return caseType?.name || "Unknown";
+  const getCaseTypeNames = (category: Category) => {
+    if (!category.caseTypes || category.caseTypes.length === 0) {
+      return "None";
+    }
+    return category.caseTypes.map(ct => ct.name).join(", ");
   };
 
   return (
@@ -188,24 +195,39 @@ export default function CategoriesManagement() {
                 />
                 <FormField
                   control={form.control}
-                  name="caseTypeId"
+                  name="caseTypeIds"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Case Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-case-type">
-                            <SelectValue placeholder="Select case type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {caseTypes.map((caseType) => (
-                            <SelectItem key={caseType.id} value={caseType.id}>
+                      <FormLabel>Case Types</FormLabel>
+                      <div className="space-y-2">
+                        {caseTypes.map((caseType) => (
+                          <div key={caseType.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              data-testid={`checkbox-case-type-${caseType.id}`}
+                              checked={field.value?.includes(caseType.id)}
+                              onCheckedChange={(checked) => {
+                                const currentValue = field.value || [];
+                                if (checked) {
+                                  field.onChange([...currentValue, caseType.id]);
+                                } else {
+                                  field.onChange(currentValue.filter((id: string) => id !== caseType.id));
+                                }
+                              }}
+                            />
+                            <label className="text-sm cursor-pointer" onClick={() => {
+                              const currentValue = field.value || [];
+                              const isChecked = currentValue.includes(caseType.id);
+                              if (isChecked) {
+                                field.onChange(currentValue.filter((id: string) => id !== caseType.id));
+                              } else {
+                                field.onChange([...currentValue, caseType.id]);
+                              }
+                            }}>
                               {caseType.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -262,9 +284,13 @@ export default function CategoriesManagement() {
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>{category.description}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {getCaseTypeName(category.caseTypeId)}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {category.caseTypes?.map((ct) => (
+                          <Badge key={ct.id} variant="outline">
+                            {ct.name}
+                          </Badge>
+                        )) || <span className="text-muted-foreground text-sm">None</span>}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

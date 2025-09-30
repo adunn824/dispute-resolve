@@ -10,7 +10,9 @@ import {
   caseNotes,
   caseOriginations,
   caseTypes,
+  caseTypeOriginations,
   categories,
+  categoryCaseTypes,
   checklistTemplates,
   reusableChecklistTemplates,
   reusableChecklistItems,
@@ -52,8 +54,12 @@ import {
   type InsertCaseOrigination,
   type CaseType,
   type InsertCaseType,
+  type CaseTypeOrigination,
+  type InsertCaseTypeOrigination,
   type Category,
   type InsertCategory,
+  type CategoryCaseType,
+  type InsertCategoryCaseType,
   type ChecklistTemplate,
   type InsertChecklistTemplate,
   type ReusableChecklistTemplate,
@@ -183,16 +189,18 @@ export interface IStorage {
   // Config methods - Case Types
   getCaseTypes(caseOriginationId?: string): Promise<CaseType[]>;
   getCaseType(id: string): Promise<CaseType | undefined>;
-  createCaseType(caseType: InsertCaseType): Promise<CaseType>;
-  updateCaseType(id: string, updates: Partial<InsertCaseType>): Promise<CaseType>;
+  createCaseType(caseType: InsertCaseType, originationIds?: string[]): Promise<CaseType>;
+  updateCaseType(id: string, updates: Partial<InsertCaseType>, originationIds?: string[]): Promise<CaseType>;
   deleteCaseType(id: string): Promise<void>;
+  getCaseTypeWithOriginations(id: string): Promise<CaseType & { originations: CaseOrigination[] }>;
   
   // Config methods - Categories  
   getCategories(caseTypeId?: string): Promise<Category[]>;
   getCategory(id: string): Promise<Category | undefined>;
-  createCategory(category: InsertCategory): Promise<Category>;
-  updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category>;
+  createCategory(category: InsertCategory, caseTypeIds?: string[]): Promise<Category>;
+  updateCategory(id: string, updates: Partial<InsertCategory>, caseTypeIds?: string[]): Promise<Category>;
   deleteCategory(id: string): Promise<void>;
+  getCategoryWithCaseTypes(id: string): Promise<Category & { caseTypes: CaseType[] }>;
   
   // Config methods - Templates & Requirements
   getChecklistTemplates(categoryId: string): Promise<ChecklistTemplate[]>;
@@ -1183,35 +1191,23 @@ export class DatabaseStorage implements IStorage {
   // Config methods - Case Types
   async getCaseTypes(caseOriginationId?: string): Promise<any[]> {
     if (caseOriginationId) {
+      // Get case types filtered by origination
       const results = await db
         .select({
           id: caseTypes.id,
           name: caseTypes.name,
           description: caseTypes.description,
           color: caseTypes.color,
-          caseOriginationId: caseTypes.caseOriginationId,
-          caseOriginationName: caseOriginations.name,
         })
         .from(caseTypes)
-        .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
-        .where(eq(caseTypes.caseOriginationId, caseOriginationId));
+        .innerJoin(caseTypeOriginations, eq(caseTypes.id, caseTypeOriginations.caseTypeId))
+        .where(eq(caseTypeOriginations.caseOriginationId, caseOriginationId));
       
       return results;
     }
     
-    const results = await db
-      .select({
-        id: caseTypes.id,
-        name: caseTypes.name,
-        description: caseTypes.description,
-        color: caseTypes.color,
-        caseOriginationId: caseTypes.caseOriginationId,
-        caseOriginationName: caseOriginations.name,
-      })
-      .from(caseTypes)
-      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id));
-    
-    return results;
+    // Get all case types
+    return await db.select().from(caseTypes);
   }
 
   async getCaseType(id: string): Promise<CaseType | undefined> {
@@ -1219,20 +1215,70 @@ export class DatabaseStorage implements IStorage {
     return caseType || undefined;
   }
 
-  async createCaseType(insertCaseType: InsertCaseType): Promise<CaseType> {
+  async getCaseTypeWithOriginations(id: string): Promise<CaseType & { originations: CaseOrigination[] }> {
+    const caseType = await this.getCaseType(id);
+    if (!caseType) {
+      throw new Error("Case Type not found");
+    }
+
+    const originations = await db
+      .select({
+        id: caseOriginations.id,
+        name: caseOriginations.name,
+        description: caseOriginations.description,
+        externalKey: caseOriginations.externalKey,
+        createdAt: caseOriginations.createdAt,
+        updatedAt: caseOriginations.updatedAt,
+      })
+      .from(caseOriginations)
+      .innerJoin(caseTypeOriginations, eq(caseOriginations.id, caseTypeOriginations.caseOriginationId))
+      .where(eq(caseTypeOriginations.caseTypeId, id));
+
+    return { ...caseType, originations };
+  }
+
+  async createCaseType(insertCaseType: InsertCaseType, originationIds?: string[]): Promise<CaseType> {
     const [caseType] = await db
       .insert(caseTypes)
       .values(insertCaseType)
       .returning();
+    
+    // Create junction table entries if originationIds are provided
+    if (originationIds && originationIds.length > 0) {
+      await db.insert(caseTypeOriginations).values(
+        originationIds.map(originationId => ({
+          caseTypeId: caseType.id,
+          caseOriginationId: originationId,
+        }))
+      );
+    }
+    
     return caseType;
   }
 
-  async updateCaseType(id: string, updates: Partial<InsertCaseType>): Promise<CaseType> {
+  async updateCaseType(id: string, updates: Partial<InsertCaseType>, originationIds?: string[]): Promise<CaseType> {
     const [caseType] = await db
       .update(caseTypes)
       .set(updates)
       .where(eq(caseTypes.id, id))
       .returning();
+    
+    // Update junction table entries if originationIds are provided
+    if (originationIds !== undefined) {
+      // Delete existing associations
+      await db.delete(caseTypeOriginations).where(eq(caseTypeOriginations.caseTypeId, id));
+      
+      // Create new associations
+      if (originationIds.length > 0) {
+        await db.insert(caseTypeOriginations).values(
+          originationIds.map(originationId => ({
+            caseTypeId: id,
+            caseOriginationId: originationId,
+          }))
+        );
+      }
+    }
+    
     return caseType;
   }
 
@@ -1247,15 +1293,15 @@ export class DatabaseStorage implements IStorage {
   async getCategoriesCountByCaseType(caseTypeId: string): Promise<number> {
     const result = await db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
-      .from(categories)
-      .where(eq(categories.caseTypeId, caseTypeId));
+      .from(categoryCaseTypes)
+      .where(eq(categoryCaseTypes.caseTypeId, caseTypeId));
     return result[0]?.count || 0;
   }
 
   async getCaseTypeDependencies(caseTypeId: string): Promise<{casesCount: number, categoriesCount: number}> {
     const [casesResult, categoriesResult] = await Promise.all([
       db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(cases).where(eq(cases.caseTypeId, caseTypeId)),
-      db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(categories).where(eq(categories.caseTypeId, caseTypeId))
+      db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(categoryCaseTypes).where(eq(categoryCaseTypes.caseTypeId, caseTypeId))
     ]);
     
     return {
@@ -1271,11 +1317,27 @@ export class DatabaseStorage implements IStorage {
   // Config methods - Categories
   async getCategories(caseTypeId?: string): Promise<Category[]> {
     if (caseTypeId) {
-      return await db.select().from(categories)
-        .where(eq(categories.caseTypeId, caseTypeId))
+      // Get categories filtered by case type
+      const results = await db
+        .select({
+          id: categories.id,
+          name: categories.name,
+          code: categories.code,
+          description: categories.description,
+          sortOrder: categories.sortOrder,
+          version: categories.version,
+          effectiveFrom: categories.effectiveFrom,
+          effectiveTo: categories.effectiveTo,
+        })
+        .from(categories)
+        .innerJoin(categoryCaseTypes, eq(categories.id, categoryCaseTypes.categoryId))
+        .where(eq(categoryCaseTypes.caseTypeId, caseTypeId))
         .orderBy(asc(categories.sortOrder));
+      
+      return results;
     }
     
+    // Get all categories
     return await db.select().from(categories)
       .orderBy(asc(categories.sortOrder));
   }
@@ -1285,20 +1347,68 @@ export class DatabaseStorage implements IStorage {
     return category || undefined;
   }
 
-  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+  async getCategoryWithCaseTypes(id: string): Promise<Category & { caseTypes: CaseType[] }> {
+    const category = await this.getCategory(id);
+    if (!category) {
+      throw new Error("Category not found");
+    }
+
+    const caseTypesData = await db
+      .select({
+        id: caseTypes.id,
+        name: caseTypes.name,
+        description: caseTypes.description,
+        color: caseTypes.color,
+      })
+      .from(caseTypes)
+      .innerJoin(categoryCaseTypes, eq(caseTypes.id, categoryCaseTypes.caseTypeId))
+      .where(eq(categoryCaseTypes.categoryId, id));
+
+    return { ...category, caseTypes: caseTypesData };
+  }
+
+  async createCategory(insertCategory: InsertCategory, caseTypeIds?: string[]): Promise<Category> {
     const [category] = await db
       .insert(categories)
       .values(insertCategory)
       .returning();
+    
+    // Create junction table entries if caseTypeIds are provided
+    if (caseTypeIds && caseTypeIds.length > 0) {
+      await db.insert(categoryCaseTypes).values(
+        caseTypeIds.map(caseTypeId => ({
+          categoryId: category.id,
+          caseTypeId: caseTypeId,
+        }))
+      );
+    }
+    
     return category;
   }
 
-  async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category> {
+  async updateCategory(id: string, updates: Partial<InsertCategory>, caseTypeIds?: string[]): Promise<Category> {
     const [category] = await db
       .update(categories)
       .set(updates)
       .where(eq(categories.id, id))
       .returning();
+    
+    // Update junction table entries if caseTypeIds are provided
+    if (caseTypeIds !== undefined) {
+      // Delete existing associations
+      await db.delete(categoryCaseTypes).where(eq(categoryCaseTypes.categoryId, id));
+      
+      // Create new associations
+      if (caseTypeIds.length > 0) {
+        await db.insert(categoryCaseTypes).values(
+          caseTypeIds.map(caseTypeId => ({
+            categoryId: id,
+            caseTypeId: caseTypeId,
+          }))
+        );
+      }
+    }
+    
     return category;
   }
 

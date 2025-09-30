@@ -755,14 +755,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Case Types Admin Management  
   app.post("/api/case-types", requireAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { name, description, color, active, caseOriginationId } = req.body;
+      const { name, description, color, originationIds } = req.body;
       const caseType = await storage.createCaseType({
         name,
         description,
         color,
-        isActive: active,
-        caseOriginationId,
-      });
+      }, originationIds);
       res.status(201).json(caseType);
     } catch (error) {
       console.error("Error creating case type:", error);
@@ -770,17 +768,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/case-types/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const caseTypeWithOriginations = await storage.getCaseTypeWithOriginations(id);
+      res.json(caseTypeWithOriginations);
+    } catch (error) {
+      console.error("Error fetching case type:", error);
+      res.status(404).json({ message: "Case type not found" });
+    }
+  });
+
   app.put("/api/case-types/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, color, active, caseOriginationId } = req.body;
+      const { name, description, color, originationIds } = req.body;
       const caseType = await storage.updateCaseType(id, {
         name,
         description,
         color,
-        isActive: active,
-        caseOriginationId,
-      });
+      }, originationIds);
       res.json(caseType);
     } catch (error) {
       console.error("Error updating case type:", error);
@@ -829,14 +836,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Categories Admin Management
   app.post("/api/categories", requireAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { name, description, caseTypeId, active } = req.body;
+      const { name, description, caseTypeIds } = req.body;
       const category = await storage.createCategory({
         name,
         description,
-        caseTypeId,
         code: name.toUpperCase().replace(/\s+/g, '_'),
-        isActive: active,
-      });
+      }, caseTypeIds);
       res.status(201).json(category);
     } catch (error) {
       console.error("Error creating category:", error);
@@ -844,16 +849,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/categories/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const categoryWithCaseTypes = await storage.getCategoryWithCaseTypes(id);
+      res.json(categoryWithCaseTypes);
+    } catch (error) {
+      console.error("Error fetching category:", error);
+      res.status(404).json({ message: "Category not found" });
+    }
+  });
+
   app.put("/api/categories/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, caseTypeId, active } = req.body;
+      const { name, description, caseTypeIds } = req.body;
       const category = await storage.updateCategory(id, {
         name,
         description,
-        caseTypeId,
-        isActive: active,
-      });
+      }, caseTypeIds);
       res.json(category);
     } catch (error) {
       console.error("Error updating category:", error);

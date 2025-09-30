@@ -195,15 +195,23 @@ export const caseOriginations = pgTable("case_originations", {
 
 export const caseTypes = pgTable("case_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  caseOriginationId: varchar("case_origination_id").references(() => caseOriginations.id),
   name: text("name").notNull().unique(),
   description: text("description"),
   color: text("color").default("#2563eb"),
 });
 
-export const categories = pgTable("categories", {
+// Junction table for Case Type to Case Origination (many-to-many)
+export const caseTypeOriginations = pgTable("case_type_originations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id, { onDelete: "cascade" }),
+  caseOriginationId: varchar("case_origination_id").notNull().references(() => caseOriginations.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.caseTypeId, table.caseOriginationId),
+]);
+
+export const categories = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   code: text("code").notNull(),
   description: text("description"),
@@ -212,6 +220,16 @@ export const categories = pgTable("categories", {
   effectiveFrom: timestamp("effective_from").defaultNow().notNull(),
   effectiveTo: timestamp("effective_to"),
 });
+
+// Junction table for Category to Case Type (many-to-many)
+export const categoryCaseTypes = pgTable("category_case_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
+  caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.categoryId, table.caseTypeId),
+]);
 
 // Legacy category-specific checklist templates (keep for backward compatibility)
 export const checklistTemplates = pgTable("checklist_templates", {
@@ -478,24 +496,40 @@ export const caseNotesRelations = relations(caseNotes, ({ one }) => ({
 }));
 
 export const caseOriginationsRelations = relations(caseOriginations, ({ many }) => ({
-  caseTypes: many(caseTypes),
+  caseTypeOriginations: many(caseTypeOriginations),
   cases: many(cases),
 }));
 
-export const caseTypesRelations = relations(caseTypes, ({ one, many }) => ({
-  caseOrigination: one(caseOriginations, {
-    fields: [caseTypes.caseOriginationId],
-    references: [caseOriginations.id],
-  }),
-  categories: many(categories),
+export const caseTypesRelations = relations(caseTypes, ({ many }) => ({
+  caseTypeOriginations: many(caseTypeOriginations),
+  categoryCaseTypes: many(categoryCaseTypes),
   cases: many(cases),
 }));
 
-export const categoriesRelations = relations(categories, ({ one, many }) => ({
+export const caseTypeOriginationsRelations = relations(caseTypeOriginations, ({ one }) => ({
   caseType: one(caseTypes, {
-    fields: [categories.caseTypeId],
+    fields: [caseTypeOriginations.caseTypeId],
     references: [caseTypes.id],
   }),
+  caseOrigination: one(caseOriginations, {
+    fields: [caseTypeOriginations.caseOriginationId],
+    references: [caseOriginations.id],
+  }),
+}));
+
+export const categoryCaseTypesRelations = relations(categoryCaseTypes, ({ one }) => ({
+  category: one(categories, {
+    fields: [categoryCaseTypes.categoryId],
+    references: [categories.id],
+  }),
+  caseType: one(caseTypes, {
+    fields: [categoryCaseTypes.caseTypeId],
+    references: [caseTypes.id],
+  }),
+}));
+
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  categoryCaseTypes: many(categoryCaseTypes),
   cases: many(cases),
   checklistTemplates: many(checklistTemplates),
   documentRequirements: many(documentRequirements),
@@ -647,6 +681,16 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
   effectiveFrom: true,
 });
 
+export const insertCaseTypeOriginationSchema = createInsertSchema(caseTypeOriginations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCategoryCaseTypeSchema = createInsertSchema(categoryCaseTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({
   id: true,
 });
@@ -735,6 +779,12 @@ export type InsertCaseType = z.infer<typeof insertCaseTypeSchema>;
 
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+export type CaseTypeOrigination = typeof caseTypeOriginations.$inferSelect;
+export type InsertCaseTypeOrigination = z.infer<typeof insertCaseTypeOriginationSchema>;
+
+export type CategoryCaseType = typeof categoryCaseTypes.$inferSelect;
+export type InsertCategoryCaseType = z.infer<typeof insertCategoryCaseTypeSchema>;
 
 export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
 export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
