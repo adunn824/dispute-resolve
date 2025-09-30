@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -22,6 +23,7 @@ const caseTypeSchema = z.object({
   name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
   description: z.string().min(1, "Description is required").max(255, "Description must be 255 characters or less"),
   color: z.string().min(1, "Color is required"),
+  caseOriginationId: z.string().optional(),
   active: z.boolean().default(true),
 });
 
@@ -32,7 +34,14 @@ type CaseType = {
   name: string;
   description: string;
   color: string;
+  caseOriginationId?: string;
   active: boolean;
+};
+
+type CaseOrigination = {
+  id: string;
+  name: string;
+  isActive: boolean;
 };
 
 export default function CaseTypesManagement() {
@@ -47,6 +56,12 @@ export default function CaseTypesManagement() {
     select: (response: any) => response.data || [],
   });
 
+  // Fetch case originations
+  const { data: caseOriginations = [] } = useQuery<CaseOrigination[]>({
+    queryKey: ["/api/case-originations"],
+    select: (response: any) => response.data || [],
+  });
+
   // Case type form
   const caseTypeForm = useForm<CaseTypeForm>({
     resolver: zodResolver(caseTypeSchema),
@@ -54,6 +69,7 @@ export default function CaseTypesManagement() {
       name: "",
       description: "",
       color: "#2563eb",
+      caseOriginationId: undefined,
       active: true,
     },
   });
@@ -114,6 +130,7 @@ export default function CaseTypesManagement() {
       name: caseType.name,
       description: caseType.description,
       color: caseType.color,
+      caseOriginationId: caseType.caseOriginationId || undefined,
       active: caseType.active,
     });
     setShowCaseTypeDialog(true);
@@ -168,6 +185,31 @@ export default function CaseTypesManagement() {
                         <FormControl>
                           <Input placeholder="Mail, Complaint, Dispute..." {...field} data-testid="input-case-type-name" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={caseTypeForm.control}
+                    name="caseOriginationId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Case Origination (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-case-origination">
+                              <SelectValue placeholder="Select case origination..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {caseOriginations.map((origination) => (
+                              <SelectItem key={origination.id} value={origination.id}>
+                                {origination.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
