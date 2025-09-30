@@ -35,6 +35,7 @@ type CaseType = {
   description: string;
   color: string;
   caseOriginationId?: string;
+  caseOriginationName?: string | null;
   active: boolean;
 };
 
@@ -292,6 +293,7 @@ export default function CaseTypesManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Case Origination</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Status</TableHead>
@@ -302,6 +304,13 @@ export default function CaseTypesManagement() {
                 {caseTypes.map((caseType: any) => (
                   <TableRow key={caseType.id}>
                     <TableCell className="font-medium">{caseType.name}</TableCell>
+                    <TableCell>
+                      {caseType.caseOriginationName ? (
+                        <span className="text-sm">{caseType.caseOriginationName}</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground italic">None</span>
+                      )}
+                    </TableCell>
                     <TableCell>{caseType.description}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

@@ -1181,14 +1181,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Config methods - Case Types
-  async getCaseTypes(caseOriginationId?: string): Promise<CaseType[]> {
+  async getCaseTypes(caseOriginationId?: string): Promise<any[]> {
     const whereConditions = [eq(caseTypes.isActive, true)];
     
     if (caseOriginationId) {
       whereConditions.push(eq(caseTypes.caseOriginationId, caseOriginationId));
     }
     
-    return await db.select().from(caseTypes).where(and(...whereConditions));
+    const results = await db
+      .select({
+        id: caseTypes.id,
+        name: caseTypes.name,
+        description: caseTypes.description,
+        color: caseTypes.color,
+        caseOriginationId: caseTypes.caseOriginationId,
+        isActive: caseTypes.isActive,
+        caseOriginationName: caseOriginations.name,
+      })
+      .from(caseTypes)
+      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
+      .where(and(...whereConditions));
+    
+    return results;
   }
 
   async getCaseType(id: string): Promise<CaseType | undefined> {
