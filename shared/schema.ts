@@ -189,7 +189,6 @@ export const caseOriginations = pgTable("case_originations", {
   name: text("name").notNull().unique(),
   description: text("description"),
   externalKey: text("external_key"),
-  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -200,7 +199,6 @@ export const caseTypes = pgTable("case_types", {
   name: text("name").notNull().unique(),
   description: text("description"),
   color: text("color").default("#2563eb"),
-  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const categories = pgTable("categories", {
@@ -210,7 +208,6 @@ export const categories = pgTable("categories", {
   code: text("code").notNull(),
   description: text("description"),
   sortOrder: integer("sort_order").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
   version: integer("version").notNull().default(1),
   effectiveFrom: timestamp("effective_from").defaultNow().notNull(),
   effectiveTo: timestamp("effective_to"),

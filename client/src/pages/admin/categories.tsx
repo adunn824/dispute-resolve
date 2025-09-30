@@ -21,7 +21,6 @@ const categorySchema = z.object({
   name: z.string().min(1, "Category name is required"),
   description: z.string().min(1, "Description is required"),
   caseTypeId: z.string().min(1, "Case type is required"),
-  active: z.boolean().default(true),
 });
 
 type CategoryForm = z.infer<typeof categorySchema>;
@@ -31,14 +30,12 @@ type Category = {
   name: string;
   description: string;
   caseTypeId: string;
-  active: boolean;
 };
 
 type CaseType = {
   id: string;
   name: string;
   description: string;
-  active: boolean;
 };
 
 export default function CategoriesManagement() {
@@ -65,7 +62,6 @@ export default function CategoriesManagement() {
       name: "",
       description: "",
       caseTypeId: "",
-      active: true,
     },
   });
 
@@ -125,7 +121,6 @@ export default function CategoriesManagement() {
       name: category.name,
       description: category.description,
       caseTypeId: category.caseTypeId,
-      active: category.active,
     });
     setShowDialog(true);
   };
@@ -258,7 +253,6 @@ export default function CategoriesManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Case Type</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -270,11 +264,6 @@ export default function CategoriesManagement() {
                     <TableCell>
                       <Badge variant="outline">
                         {getCaseTypeName(category.caseTypeId)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={category.active ? "default" : "secondary"}>
-                        {category.active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

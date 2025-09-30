@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -23,7 +22,6 @@ const caseOriginationSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   description: z.string().optional(),
   externalKey: z.string().optional(),
-  active: z.boolean().default(true),
 });
 
 type CaseOriginationForm = z.infer<typeof caseOriginationSchema>;
@@ -33,7 +31,6 @@ type CaseOrigination = {
   name: string;
   description?: string;
   externalKey?: string;
-  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -57,7 +54,6 @@ export default function CaseOriginationsManagement() {
       name: "",
       description: "",
       externalKey: "",
-      active: true,
     },
   });
 
@@ -133,7 +129,6 @@ export default function CaseOriginationsManagement() {
       name: "",
       description: "",
       externalKey: "",
-      active: true,
     });
     setShowOriginationDialog(true);
   };
@@ -144,7 +139,6 @@ export default function CaseOriginationsManagement() {
       name: origination.name,
       description: origination.description || "",
       externalKey: origination.externalKey || "",
-      active: origination.isActive,
     });
     setShowOriginationDialog(true);
   };
@@ -203,7 +197,6 @@ export default function CaseOriginationsManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>External Key</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -219,11 +212,6 @@ export default function CaseOriginationsManagement() {
                     </TableCell>
                     <TableCell data-testid={`text-external-key-${origination.id}`}>
                       {origination.externalKey || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={origination.isActive ? "default" : "secondary"} data-testid={`badge-status-${origination.id}`}>
-                        {origination.isActive ? "Active" : "Inactive"}
-                      </Badge>
                     </TableCell>
                     <TableCell data-testid={`text-created-${origination.id}`}>
                       {new Date(origination.createdAt).toLocaleDateString()}
@@ -310,28 +298,6 @@ export default function CaseOriginationsManagement() {
                       <Input placeholder="External system identifier (optional)" {...field} data-testid="input-external-key" />
                     </FormControl>
                     <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="active"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active</FormLabel>
-                      <div className="text-sm text-muted-foreground">
-                        Enable this case origination for new cases
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-active"
-                      />
-                    </FormControl>
                   </FormItem>
                 )}
               />

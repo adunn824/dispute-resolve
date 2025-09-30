@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -24,7 +23,6 @@ const caseTypeSchema = z.object({
   description: z.string().min(1, "Description is required").max(255, "Description must be 255 characters or less"),
   color: z.string().min(1, "Color is required"),
   caseOriginationId: z.string().optional(),
-  active: z.boolean().default(true),
 });
 
 type CaseTypeForm = z.infer<typeof caseTypeSchema>;
@@ -36,13 +34,11 @@ type CaseType = {
   color: string;
   caseOriginationId?: string;
   caseOriginationName?: string | null;
-  active: boolean;
 };
 
 type CaseOrigination = {
   id: string;
   name: string;
-  isActive: boolean;
 };
 
 export default function CaseTypesManagement() {
@@ -71,7 +67,6 @@ export default function CaseTypesManagement() {
       description: "",
       color: "#2563eb",
       caseOriginationId: undefined,
-      active: true,
     },
   });
 
@@ -132,7 +127,6 @@ export default function CaseTypesManagement() {
       description: caseType.description,
       color: caseType.color,
       caseOriginationId: caseType.caseOriginationId || undefined,
-      active: caseType.active,
     });
     setShowCaseTypeDialog(true);
   };
@@ -296,7 +290,6 @@ export default function CaseTypesManagement() {
                   <TableHead>Case Origination</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Color</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -320,11 +313,6 @@ export default function CaseTypesManagement() {
                         />
                         <span className="text-sm text-muted-foreground">{caseType.color}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={caseType.active ? "default" : "secondary"}>
-                        {caseType.active ? "Active" : "Inactive"}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">

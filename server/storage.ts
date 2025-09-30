@@ -1182,10 +1182,21 @@ export class DatabaseStorage implements IStorage {
 
   // Config methods - Case Types
   async getCaseTypes(caseOriginationId?: string): Promise<any[]> {
-    const whereConditions = [eq(caseTypes.isActive, true)];
-    
     if (caseOriginationId) {
-      whereConditions.push(eq(caseTypes.caseOriginationId, caseOriginationId));
+      const results = await db
+        .select({
+          id: caseTypes.id,
+          name: caseTypes.name,
+          description: caseTypes.description,
+          color: caseTypes.color,
+          caseOriginationId: caseTypes.caseOriginationId,
+          caseOriginationName: caseOriginations.name,
+        })
+        .from(caseTypes)
+        .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
+        .where(eq(caseTypes.caseOriginationId, caseOriginationId));
+      
+      return results;
     }
     
     const results = await db
@@ -1195,12 +1206,10 @@ export class DatabaseStorage implements IStorage {
         description: caseTypes.description,
         color: caseTypes.color,
         caseOriginationId: caseTypes.caseOriginationId,
-        isActive: caseTypes.isActive,
         caseOriginationName: caseOriginations.name,
       })
       .from(caseTypes)
-      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
-      .where(and(...whereConditions));
+      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id));
     
     return results;
   }
@@ -1261,14 +1270,13 @@ export class DatabaseStorage implements IStorage {
 
   // Config methods - Categories
   async getCategories(caseTypeId?: string): Promise<Category[]> {
-    const conditions = [eq(categories.isActive, true)];
-    
     if (caseTypeId) {
-      conditions.push(eq(categories.caseTypeId, caseTypeId));
+      return await db.select().from(categories)
+        .where(eq(categories.caseTypeId, caseTypeId))
+        .orderBy(asc(categories.sortOrder));
     }
     
     return await db.select().from(categories)
-      .where(and(...conditions))
       .orderBy(asc(categories.sortOrder));
   }
 
