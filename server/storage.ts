@@ -1301,6 +1301,8 @@ export class DatabaseStorage implements IStorage {
           .innerJoin(caseTypeOriginations, eq(caseOriginations.id, caseTypeOriginations.caseOriginationId))
           .where(eq(caseTypeOriginations.caseTypeId, caseType.id));
         
+        console.log(`[DEBUG] Case type ${caseType.name} has ${originations.length} originations:`, originations);
+        
         return {
           ...caseType,
           originations,
@@ -1308,6 +1310,7 @@ export class DatabaseStorage implements IStorage {
       })
     );
     
+    console.log('[DEBUG] Returning case types with originations:', JSON.stringify(caseTypesWithOriginations, null, 2));
     return caseTypesWithOriginations;
   }
 
