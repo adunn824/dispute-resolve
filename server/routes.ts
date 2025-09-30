@@ -545,6 +545,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reporting API Endpoints
+  
+  // GET /api/reports/case-volume - Case volume analytics
+  app.get("/api/reports/case-volume", requireRole(['compliance', 'admin']), async (req, res) => {
+    try {
+      const querySchema = z.object({
+        startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+      });
+
+      const filters = querySchema.parse(req.query);
+      const report = await storage.getCaseVolumeReport(filters);
+      res.json({ data: report });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to fetch case volume report:", error);
+      res.status(500).json({ error: "Failed to fetch case volume report" });
+    }
+  });
+
+  // GET /api/reports/agent-performance - Agent performance metrics
+  app.get("/api/reports/agent-performance", requireRole(['compliance', 'admin']), async (req, res) => {
+    try {
+      const querySchema = z.object({
+        startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+      });
+
+      const filters = querySchema.parse(req.query);
+      const report = await storage.getAgentPerformanceReport(filters);
+      res.json({ data: report });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to fetch agent performance report:", error);
+      res.status(500).json({ error: "Failed to fetch agent performance report" });
+    }
+  });
+
+  // GET /api/reports/sla-compliance - SLA compliance analysis
+  app.get("/api/reports/sla-compliance", requireRole(['compliance', 'admin']), async (req, res) => {
+    try {
+      const querySchema = z.object({
+        startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+      });
+
+      const filters = querySchema.parse(req.query);
+      const report = await storage.getSlaComplianceReport(filters);
+      res.json({ data: report });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to fetch SLA compliance report:", error);
+      res.status(500).json({ error: "Failed to fetch SLA compliance report" });
+    }
+  });
+
+  // GET /api/reports/resolution-patterns - Resolution pattern analysis
+  app.get("/api/reports/resolution-patterns", requireRole(['compliance', 'admin']), async (req, res) => {
+    try {
+      const querySchema = z.object({
+        startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+      });
+
+      const filters = querySchema.parse(req.query);
+      const report = await storage.getResolutionPatternsReport(filters);
+      res.json({ data: report });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to fetch resolution patterns report:", error);
+      res.status(500).json({ error: "Failed to fetch resolution patterns report" });
+    }
+  });
+
+  // GET /api/reports/lender-analytics - Lender performance analytics
+  app.get("/api/reports/lender-analytics", requireRole(['compliance', 'admin']), async (req, res) => {
+    try {
+      const querySchema = z.object({
+        startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+      });
+
+      const filters = querySchema.parse(req.query);
+      const report = await storage.getLenderAnalyticsReport(filters);
+      res.json({ data: report });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to fetch lender analytics report:", error);
+      res.status(500).json({ error: "Failed to fetch lender analytics report" });
+    }
+  });
+
   // GET /api/case-originations - List case originations
   app.get("/api/case-originations", requireAuth, async (req, res) => {
     try {

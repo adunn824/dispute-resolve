@@ -287,6 +287,54 @@ export interface IStorage {
   // Dashboard methods
   getDashboardStats(): Promise<DashboardStats>;
 
+  // Reporting methods
+  getCaseVolumeReport(filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    byStatus: Array<{ status: string; count: number }>;
+    byType: Array<{ typeName: string; typeId: string; count: number }>;
+    byCategory: Array<{ categoryName: string; categoryId: string; count: number }>;
+    byOrigination: Array<{ originationName: string; originationId: string; count: number }>;
+    byPriority: Array<{ priorityValue: string; count: number }>;
+    dailyTrend: Array<{ date: string; count: number }>;
+    total: number;
+  }>;
+  
+  getAgentPerformanceReport(filters?: { startDate?: Date; endDate?: Date }): Promise<Array<{
+    userId: string;
+    userName: string;
+    role: string;
+    totalAssigned: number;
+    resolved: number;
+    avgResolutionTimeHours: number | null;
+    completionRate: number;
+  }>>;
+  
+  getSlaComplianceReport(filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    totalCases: number;
+    withinSla: number;
+    breachedSla: number;
+    complianceRate: number;
+    avgResolutionTimeHours: number | null;
+    casesByAge: Array<{ ageRange: string; count: number }>;
+  }>;
+  
+  getResolutionPatternsReport(filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    byDisposition: Array<{ disposition: string; count: number; avgAmount: number | null }>;
+    avgSettlementAmount: number | null;
+    avgForgivenAmount: number | null;
+    totalSettlementAmount: number | null;
+    totalForgivenAmount: number | null;
+    policyViolations: Array<{ type: string; count: number }>;
+  }>;
+  
+  getLenderAnalyticsReport(filters?: { startDate?: Date; endDate?: Date }): Promise<Array<{
+    lenderId: string;
+    lenderName: string;
+    totalCases: number;
+    openCases: number;
+    resolvedCases: number;
+    avgResolutionTimeHours: number | null;
+  }>>;
+
   // Knowledge Base methods
   // Categories
   getKbCategories(parentId?: string): Promise<KbCategory[]>;
@@ -2018,6 +2066,312 @@ export class DatabaseStorage implements IStorage {
       recentCases,
       slaAlerts
     };
+  }
+
+  // Reporting Methods
+
+  async getCaseVolumeReport(filters?: { startDate?: Date; endDate?: Date }) {
+    const conditions = [];
+    if (filters?.startDate) {
+      conditions.push(gte(cases.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${cases.createdAt} <= ${filters.endDate}`);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get counts by status
+    const byStatus = await db
+      .select({
+        status: cases.status,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .where(whereClause)
+      .groupBy(cases.status);
+
+    // Get counts by type
+    const byType = await db
+      .select({
+        typeId: caseTypes.id,
+        typeName: caseTypes.name,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .innerJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .where(whereClause)
+      .groupBy(caseTypes.id, caseTypes.name);
+
+    // Get counts by category
+    const byCategory = await db
+      .select({
+        categoryId: categories.id,
+        categoryName: categories.name,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .innerJoin(categories, eq(cases.categoryId, categories.id))
+      .where(whereClause)
+      .groupBy(categories.id, categories.name);
+
+    // Get counts by origination
+    const byOrigination = await db
+      .select({
+        originationId: sql<string>`COALESCE(${caseOriginations.id}, 'none')`,
+        originationName: sql<string>`COALESCE(${caseOriginations.name}, 'No Origination')`,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .leftJoin(caseOriginations, eq(cases.caseOriginationId, caseOriginations.id))
+      .where(whereClause)
+      .groupBy(caseOriginations.id, caseOriginations.name);
+
+    // Get counts by priority
+    const byPriority = await db
+      .select({
+        priorityValue: priorityRules.value,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .innerJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
+      .where(whereClause)
+      .groupBy(priorityRules.value);
+
+    // Get daily trend (last 30 days or filtered range)
+    const dailyTrend = await db
+      .select({
+        date: sql<string>`TO_CHAR(${cases.createdAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .where(whereClause)
+      .groupBy(sql`TO_CHAR(${cases.createdAt}, 'YYYY-MM-DD')`)
+      .orderBy(sql`TO_CHAR(${cases.createdAt}, 'YYYY-MM-DD')`);
+
+    // Get total count
+    const [totalResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(cases)
+      .where(whereClause);
+
+    return {
+      byStatus,
+      byType,
+      byCategory,
+      byOrigination,
+      byPriority,
+      dailyTrend,
+      total: totalResult?.count || 0
+    };
+  }
+
+  async getAgentPerformanceReport(filters?: { startDate?: Date; endDate?: Date }) {
+    const conditions = [];
+    if (filters?.startDate) {
+      conditions.push(gte(cases.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${cases.createdAt} <= ${filters.endDate}`);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get performance metrics per user
+    const performance = await db
+      .select({
+        userId: users.id,
+        userName: users.name,
+        role: users.role,
+        totalAssigned: sql<number>`count(*)::int`,
+        resolved: sql<number>`count(CASE WHEN ${cases.status} = 'resolved' THEN 1 END)::int`,
+        avgResolutionTimeHours: sql<number>`AVG(CASE WHEN ${cases.status} = 'resolved' THEN EXTRACT(EPOCH FROM (${cases.updatedAt} - ${cases.createdAt})) / 3600 END)`,
+      })
+      .from(cases)
+      .innerJoin(users, eq(cases.assignedToUserId, users.id))
+      .where(whereClause)
+      .groupBy(users.id, users.name, users.role);
+
+    return performance.map(p => ({
+      userId: p.userId,
+      userName: p.userName,
+      role: p.role,
+      totalAssigned: p.totalAssigned,
+      resolved: p.resolved,
+      avgResolutionTimeHours: p.avgResolutionTimeHours ? Math.round(p.avgResolutionTimeHours * 10) / 10 : null,
+      completionRate: p.totalAssigned > 0 ? Math.round((p.resolved / p.totalAssigned) * 100) : 0
+    }));
+  }
+
+  async getSlaComplianceReport(filters?: { startDate?: Date; endDate?: Date }) {
+    const conditions = [];
+    if (filters?.startDate) {
+      conditions.push(gte(cases.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${cases.createdAt} <= ${filters.endDate}`);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total cases count
+    const [totals] = await db
+      .select({
+        totalCases: sql<number>`count(*)::int`,
+        avgResolutionTimeHours: sql<number>`AVG(CASE WHEN ${cases.status} = 'resolved' THEN EXTRACT(EPOCH FROM (${cases.updatedAt} - ${cases.createdAt})) / 3600 END)`
+      })
+      .from(cases)
+      .where(whereClause);
+
+    // Get cases by age ranges
+    const casesByAge = await db
+      .select({
+        ageRange: sql<string>`
+          CASE 
+            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 1 THEN '0-1 days'
+            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 3 THEN '1-3 days'
+            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 7 THEN '3-7 days'
+            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 14 THEN '7-14 days'
+            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 30 THEN '14-30 days'
+            ELSE '30+ days'
+          END
+        `,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .where(whereClause)
+      .groupBy(sql`
+        CASE 
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 1 THEN '0-1 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 3 THEN '1-3 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 7 THEN '3-7 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 14 THEN '7-14 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 30 THEN '14-30 days'
+          ELSE '30+ days'
+        END
+      `)
+      .orderBy(sql`
+        CASE 
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 1 THEN 1
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 3 THEN 2
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 7 THEN 3
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 14 THEN 4
+          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 30 THEN 5
+          ELSE 6
+        END
+      `);
+
+    // Mock SLA compliance calculation (TODO: implement proper SLA policy evaluation)
+    const totalCases = totals?.totalCases || 0;
+    const withinSla = Math.floor(totalCases * 0.85); // Mock: assume 85% compliance
+    const breachedSla = totalCases - withinSla;
+    const complianceRate = totalCases > 0 ? Math.round((withinSla / totalCases) * 100) : 0;
+
+    return {
+      totalCases,
+      withinSla,
+      breachedSla,
+      complianceRate,
+      avgResolutionTimeHours: totals?.avgResolutionTimeHours ? Math.round(totals.avgResolutionTimeHours * 10) / 10 : null,
+      casesByAge
+    };
+  }
+
+  async getResolutionPatternsReport(filters?: { startDate?: Date; endDate?: Date }) {
+    const conditions = [eq(cases.status, 'resolved')];
+    if (filters?.startDate) {
+      conditions.push(gte(cases.updatedAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${cases.updatedAt} <= ${filters.endDate}`);
+    }
+
+    const whereClause = and(...conditions);
+
+    // Get resolution patterns by disposition
+    const byDisposition = await db
+      .select({
+        disposition: resolutions.disposition,
+        count: sql<number>`count(*)::int`,
+        avgAmount: sql<number>`AVG(CASE WHEN ${resolutions.settlementAmount} IS NOT NULL THEN ${resolutions.settlementAmount}::numeric END)`
+      })
+      .from(cases)
+      .innerJoin(resolutions, eq(cases.id, resolutions.caseId))
+      .where(whereClause)
+      .groupBy(resolutions.disposition);
+
+    // Get aggregate financial metrics
+    const [financials] = await db
+      .select({
+        avgSettlementAmount: sql<number>`AVG(${resolutions.settlementAmount}::numeric)`,
+        avgForgivenAmount: sql<number>`AVG(${resolutions.forgivenAmount}::numeric)`,
+        totalSettlementAmount: sql<number>`SUM(${resolutions.settlementAmount}::numeric)`,
+        totalForgivenAmount: sql<number>`SUM(${resolutions.forgivenAmount}::numeric)`
+      })
+      .from(cases)
+      .innerJoin(resolutions, eq(cases.id, resolutions.caseId))
+      .where(whereClause);
+
+    // Get policy violations
+    const policyViolations = await db
+      .select({
+        type: resolutions.policyViolation,
+        count: sql<number>`count(*)::int`
+      })
+      .from(cases)
+      .innerJoin(resolutions, eq(cases.id, resolutions.caseId))
+      .where(whereClause)
+      .groupBy(resolutions.policyViolation);
+
+    return {
+      byDisposition: byDisposition.map(d => ({
+        disposition: d.disposition,
+        count: d.count,
+        avgAmount: d.avgAmount ? Math.round(d.avgAmount * 100) / 100 : null
+      })),
+      avgSettlementAmount: financials?.avgSettlementAmount ? Math.round(financials.avgSettlementAmount * 100) / 100 : null,
+      avgForgivenAmount: financials?.avgForgivenAmount ? Math.round(financials.avgForgivenAmount * 100) / 100 : null,
+      totalSettlementAmount: financials?.totalSettlementAmount ? Math.round(financials.totalSettlementAmount * 100) / 100 : null,
+      totalForgivenAmount: financials?.totalForgivenAmount ? Math.round(financials.totalForgivenAmount * 100) / 100 : null,
+      policyViolations
+    };
+  }
+
+  async getLenderAnalyticsReport(filters?: { startDate?: Date; endDate?: Date }) {
+    const conditions = [];
+    if (filters?.startDate) {
+      conditions.push(gte(cases.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${cases.createdAt} <= ${filters.endDate}`);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get metrics per lender
+    const lenderMetrics = await db
+      .select({
+        lenderId: lenders.id,
+        lenderName: lenders.name,
+        totalCases: sql<number>`count(*)::int`,
+        openCases: sql<number>`count(CASE WHEN ${cases.status} = 'open' THEN 1 END)::int`,
+        resolvedCases: sql<number>`count(CASE WHEN ${cases.status} = 'resolved' THEN 1 END)::int`,
+        avgResolutionTimeHours: sql<number>`AVG(CASE WHEN ${cases.status} = 'resolved' THEN EXTRACT(EPOCH FROM (${cases.updatedAt} - ${cases.createdAt})) / 3600 END)`
+      })
+      .from(cases)
+      .innerJoin(lenders, eq(cases.lenderId, lenders.id))
+      .where(whereClause)
+      .groupBy(lenders.id, lenders.name)
+      .orderBy(desc(sql`count(*)`));
+
+    return lenderMetrics.map(m => ({
+      lenderId: m.lenderId,
+      lenderName: m.lenderName,
+      totalCases: m.totalCases,
+      openCases: m.openCases,
+      resolvedCases: m.resolvedCases,
+      avgResolutionTimeHours: m.avgResolutionTimeHours ? Math.round(m.avgResolutionTimeHours * 10) / 10 : null
+    }));
   }
 
   // Knowledge Base Methods

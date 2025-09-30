@@ -26,6 +26,7 @@ import CategoriesManagement from "./pages/admin/categories";
 import UsersManagement from "./pages/admin/users";
 import SystemManagement from "./pages/admin/system";
 import KnowledgeBaseManagement from "./pages/admin/KnowledgeBaseManagement";
+import ReportsPage from "./pages/compliance/reports";
 import NotFound from "@/pages/not-found";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -201,11 +202,7 @@ function Router() {
       </Route>
       <Route path="/compliance/reports">
         <ProtectedRoute requiredRole={["compliance", "admin"]}>
-          <Dashboard
-            userRole="compliance"
-            onCreateCase={handleCreateCase}
-            onViewCase={handleViewCase}
-          />
+          <ReportsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/compliance/regulatory">
