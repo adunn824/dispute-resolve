@@ -1098,7 +1098,10 @@ export default function BusinessRulesManagement() {
                   <TableBody>
                     {checklistAssignmentRules.map((rule) => {
                       const template = reusableTemplates.find(t => t.id === rule.templateId);
-                      const conditionsCount = JSON.parse(rule.conditions || "[]").length;
+                      const conditionsArray = Array.isArray(rule.conditions) 
+                        ? rule.conditions 
+                        : (typeof rule.conditions === 'string' ? JSON.parse(rule.conditions || "[]") : []);
+                      const conditionsCount = conditionsArray.length;
                       return (
                         <TableRow key={rule.id} data-testid={`row-checklist-rule-${rule.id}`}>
                           <TableCell>
