@@ -334,10 +334,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Step 2: Find appropriate priority rule for the category
       const priorityRules = await storage.getPriorityRules(intakeData.categoryId);
-      let selectedPriorityRule = priorityRules.find(rule => 
-        rule.ruleJson && typeof rule.ruleJson === 'object' && 
-        'default' in rule.ruleJson && rule.ruleJson.default === true
-      );
+      let selectedPriorityRule = priorityRules.find(rule => {
+        const conditions = typeof rule.conditions === 'string' 
+          ? JSON.parse(rule.conditions) 
+          : rule.conditions;
+        return conditions && typeof conditions === 'object' && 
+          'default' in conditions && conditions.default === true;
+      });
       
       // If no default rule found, use the first available rule
       if (!selectedPriorityRule && priorityRules.length > 0) {
@@ -351,8 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: "Default Priority",
           description: "Auto-generated default priority rule",
           priority: "medium",
-          conditions: "default",
-          ruleJson: { conditions: [], default: true },
+          conditions: { conditions: [], default: true },
           priorityValue: "Medium",
           isActive: true,
         });
@@ -1262,6 +1264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           } catch (ruleError) {
             console.error(`Error testing priority rule ${rule.id}:`, ruleError);
+            const errorMessage = ruleError instanceof Error ? ruleError.message : 'Unknown error';
             results.push({
               ruleId: rule.id,
               ruleName: rule.name,
@@ -1275,7 +1278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 value: 'N/A',
                 actualValue: 'Error evaluating rule',
                 matched: false,
-                reason: ruleError.message
+                reason: errorMessage
               }],
               resultValue: undefined
             });
@@ -1334,6 +1337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           } catch (ruleError) {
             console.error(`Error testing tag rule ${rule.id}:`, ruleError);
+            const errorMessage = ruleError instanceof Error ? ruleError.message : 'Unknown error';
             results.push({
               ruleId: rule.id,
               ruleName: rule.name,
@@ -1347,7 +1351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 value: 'N/A',
                 actualValue: 'Error evaluating rule',
                 matched: false,
-                reason: ruleError.message
+                reason: errorMessage
               }],
               resultValue: undefined
             });
@@ -1444,7 +1448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(template);
     } catch (error) {
       console.error("Error fetching reusable checklist template:", error);
-      if (error.message === "Template not found") {
+      if (error instanceof Error && error.message === "Template not found") {
         res.status(404).json({ message: "Reusable checklist template not found" });
       } else {
         res.status(500).json({ message: "Failed to fetch reusable checklist template" });
@@ -2030,6 +2034,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check visibility permissions
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const userRole = req.user.role;
       const roleHierarchy = { 'admin': 3, 'compliance': 2, 'agent': 1 };
       const userLevel = roleHierarchy[userRole as keyof typeof roleHierarchy] || 0;
@@ -2057,6 +2064,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check visibility permissions
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const userRole = req.user.role;
       const roleHierarchy = { 'admin': 3, 'compliance': 2, 'agent': 1 };
       const userLevel = roleHierarchy[userRole as keyof typeof roleHierarchy] || 0;
@@ -2078,6 +2088,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/knowledge-base/articles", requireRole(["admin", "compliance"]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const validatedData = insertKbArticleSchema.parse(req.body);
       const articleData = {
         ...validatedData,
@@ -2107,6 +2120,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/knowledge-base/articles/:id", requireRole(["admin", "compliance"]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const validatedUpdates = insertKbArticleSchema.partial().parse(req.body);
       const updates = {
         ...validatedUpdates,
@@ -2132,7 +2148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           title: updates.title || currentArticle.title,
           content: updates.content,
           summary: updates.summary || currentArticle.summary,
-          changeDescription: updates.changeDescription || "Content updated",
+          changeDescription: "Content updated",
           authorId: req.user.id,
           isPublished: false,
         });
@@ -2147,6 +2163,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/knowledge-base/articles/:id/publish", requireRole(["admin", "compliance"]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const article = await storage.publishKbArticle(req.params.id, req.user.id);
       res.json({ data: article });
     } catch (error) {
@@ -2216,6 +2235,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/knowledge-base/change-events", requireRole(["admin", "compliance"]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const validatedData = insertKbChangeEventSchema.parse(req.body);
       const eventData = {
         ...validatedData,
