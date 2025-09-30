@@ -52,13 +52,13 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
 
   const adminItems = [
     { title: "Case Originations", url: "/admin/case-originations", icon: Building },
-    { title: "Lenders", url: "/admin/lenders", icon: Building },
     { title: "Case Types", url: "/admin/case-types", icon: FileText },
     { title: "Categories", url: "/admin/categories", icon: FileText },
     { title: "Templates", url: "/admin/templates", icon: FileText },
     { title: "Reusable Templates", url: "/admin/reusable-templates", icon: ListChecks },
     { title: "Rules", url: "/admin/rules", icon: Settings },
     { title: "Users", url: "/admin/users", icon: Users },
+    { title: "Lenders", url: "/admin/lenders", icon: Building },
     { title: "System", url: "/admin/system", icon: Cog },
     { title: "Knowledge Base", url: "/knowledge-base/admin", icon: BookOpen },
   ];
