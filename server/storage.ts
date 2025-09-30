@@ -2130,13 +2130,13 @@ export class DatabaseStorage implements IStorage {
     // Get counts by priority
     const byPriority = await db
       .select({
-        priorityValue: priorityRules.value,
+        priorityValue: priorityRules.priorityValue,
         count: sql<number>`count(*)::int`
       })
       .from(cases)
       .innerJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
       .where(whereClause)
-      .groupBy(priorityRules.value);
+      .groupBy(priorityRules.priorityValue);
 
     // Get daily trend (last 30 days or filtered range)
     const dailyTrend = await db
@@ -2223,43 +2223,31 @@ export class DatabaseStorage implements IStorage {
       .from(cases)
       .where(whereClause);
 
-    // Get cases by age ranges
-    const casesByAge = await db
-      .select({
-        ageRange: sql<string>`
-          CASE 
-            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 1 THEN '0-1 days'
-            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 3 THEN '1-3 days'
-            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 7 THEN '3-7 days'
-            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 14 THEN '7-14 days'
-            WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 30 THEN '14-30 days'
-            ELSE '30+ days'
-          END
-        `,
-        count: sql<number>`count(*)::int`
-      })
-      .from(cases)
-      .where(whereClause)
-      .groupBy(sql`
+    // Get cases by age ranges - use raw SQL to avoid GROUP BY issues with column references
+    const casesByAge = await db.execute<{ ageRange: string; count: number }>(sql`
+      SELECT 
         CASE 
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 1 THEN '0-1 days'
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 3 THEN '1-3 days'
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 7 THEN '3-7 days'
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 14 THEN '7-14 days'
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 30 THEN '14-30 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 1 THEN '0-1 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 3 THEN '1-3 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 7 THEN '3-7 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 14 THEN '7-14 days'
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 30 THEN '14-30 days'
           ELSE '30+ days'
-        END
-      `)
-      .orderBy(sql`
-        CASE 
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 1 THEN 1
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 3 THEN 2
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 7 THEN 3
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 14 THEN 4
-          WHEN EXTRACT(EPOCH FROM (NOW() - ${cases.createdAt})) / 86400 < 30 THEN 5
+        END as age_range,
+        count(*)::int as count
+      FROM cases
+      ${whereClause ? sql`WHERE ${whereClause}` : sql``}
+      GROUP BY age_range
+      ORDER BY 
+        CASE age_range
+          WHEN '0-1 days' THEN 1
+          WHEN '1-3 days' THEN 2
+          WHEN '3-7 days' THEN 3
+          WHEN '7-14 days' THEN 4
+          WHEN '14-30 days' THEN 5
           ELSE 6
         END
-      `);
+    `);
 
     // Mock SLA compliance calculation (TODO: implement proper SLA policy evaluation)
     const totalCases = totals?.totalCases || 0;
@@ -2273,7 +2261,7 @@ export class DatabaseStorage implements IStorage {
       breachedSla,
       complianceRate,
       avgResolutionTimeHours: totals?.avgResolutionTimeHours ? Math.round(totals.avgResolutionTimeHours * 10) / 10 : null,
-      casesByAge
+      casesByAge: casesByAge.rows.map(row => ({ ageRange: row.ageRange, count: row.count }))
     };
   }
 
