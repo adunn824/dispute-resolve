@@ -554,7 +554,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const querySchema = z.object({
         startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+        endDate: z.string().optional().transform(val => {
+          if (!val) return undefined;
+          const date = new Date(val);
+          date.setHours(23, 59, 59, 999); // Set to end of day
+          return date;
+        })
       });
 
       const filters = querySchema.parse(req.query);
@@ -574,7 +579,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const querySchema = z.object({
         startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+        endDate: z.string().optional().transform(val => {
+          if (!val) return undefined;
+          const date = new Date(val);
+          date.setHours(23, 59, 59, 999); // Set to end of day
+          return date;
+        })
       });
 
       const filters = querySchema.parse(req.query);
@@ -594,7 +604,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const querySchema = z.object({
         startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+        endDate: z.string().optional().transform(val => {
+          if (!val) return undefined;
+          const date = new Date(val);
+          date.setHours(23, 59, 59, 999); // Set to end of day
+          return date;
+        })
       });
 
       const filters = querySchema.parse(req.query);
@@ -614,7 +629,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const querySchema = z.object({
         startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+        endDate: z.string().optional().transform(val => {
+          if (!val) return undefined;
+          const date = new Date(val);
+          date.setHours(23, 59, 59, 999); // Set to end of day
+          return date;
+        })
       });
 
       const filters = querySchema.parse(req.query);
@@ -634,7 +654,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const querySchema = z.object({
         startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-        endDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+        endDate: z.string().optional().transform(val => {
+          if (!val) return undefined;
+          const date = new Date(val);
+          date.setHours(23, 59, 59, 999); // Set to end of day
+          return date;
+        })
       });
 
       const filters = querySchema.parse(req.query);

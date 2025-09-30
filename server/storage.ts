@@ -2224,7 +2224,7 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause);
 
     // Get cases by age ranges - use raw SQL to avoid GROUP BY issues with column references
-    const casesByAge = await db.execute<{ ageRange: string; count: number }>(sql`
+    const casesByAge = await db.execute<{ age_range: string; count: number }>(sql`
       SELECT 
         CASE 
           WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 1 THEN '0-1 days'
@@ -2237,14 +2237,14 @@ export class DatabaseStorage implements IStorage {
         count(*)::int as count
       FROM cases
       ${whereClause ? sql`WHERE ${whereClause}` : sql``}
-      GROUP BY age_range
+      GROUP BY 1
       ORDER BY 
-        CASE age_range
-          WHEN '0-1 days' THEN 1
-          WHEN '1-3 days' THEN 2
-          WHEN '3-7 days' THEN 3
-          WHEN '7-14 days' THEN 4
-          WHEN '14-30 days' THEN 5
+        CASE 
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 1 THEN 1
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 3 THEN 2
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 7 THEN 3
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 14 THEN 4
+          WHEN EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 < 30 THEN 5
           ELSE 6
         END
     `);
@@ -2261,7 +2261,7 @@ export class DatabaseStorage implements IStorage {
       breachedSla,
       complianceRate,
       avgResolutionTimeHours: totals?.avgResolutionTimeHours ? Math.round(totals.avgResolutionTimeHours * 10) / 10 : null,
-      casesByAge: casesByAge.rows.map(row => ({ ageRange: row.ageRange, count: row.count }))
+      casesByAge: casesByAge.rows.map(row => ({ ageRange: row.age_range, count: row.count }))
     };
   }
 
