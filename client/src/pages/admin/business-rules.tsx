@@ -52,6 +52,11 @@ const slaPolicySchema = z.object({
   priority: z.enum(["critical", "high", "medium", "low"]),
   responseTimeHours: z.number().min(1, "Response time must be at least 1 hour").max(168, "Response time cannot exceed 1 week"),
   resolutionTimeHours: z.number().min(1, "Resolution time must be at least 1 hour").max(720, "Resolution time cannot exceed 1 month"),
+  conditions: z.array(z.object({
+    field: z.string(),
+    operator: z.string(),
+    value: z.any().optional()
+  })).min(1, "At least one condition is required"),
   active: z.boolean().default(true),
 });
 
@@ -185,6 +190,7 @@ export default function BusinessRulesManagement() {
       priority: "medium",
       responseTimeHours: 24,
       resolutionTimeHours: 72,
+      conditions: [{ field: "caseOriginationName", operator: "equals", value: "" }],
       active: true,
     },
   });
@@ -299,7 +305,10 @@ export default function BusinessRulesManagement() {
   // SLA Policy mutations
   const createSLAPolicyMutation = useMutation({
     mutationFn: (data: SLAPolicyForm) => 
-      apiRequest("POST", "/api/sla-policies", data),
+      apiRequest("POST", "/api/sla-policies", {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sla-policies"] });
       setShowSLADialog(false);
@@ -313,7 +322,10 @@ export default function BusinessRulesManagement() {
 
   const updateSLAPolicyMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: SLAPolicyForm }) => 
-      apiRequest("PUT", `/api/sla-policies/${id}`, data),
+      apiRequest("PUT", `/api/sla-policies/${id}`, {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sla-policies"] });
       setShowSLADialog(false);
@@ -437,12 +449,25 @@ export default function BusinessRulesManagement() {
 
   const handleEditSLAPolicy = (policy: any) => {
     setEditingSLAPolicy(policy);
+    
+    // Parse conditions from JSON string
+    let parsedConditions;
+    try {
+      parsedConditions = typeof policy.conditions === "string" 
+        ? JSON.parse(policy.conditions) 
+        : policy.conditions;
+    } catch (error) {
+      console.error("Error parsing policy conditions:", error);
+      parsedConditions = [{ field: "caseOriginationName", operator: "equals", value: "" }];
+    }
+    
     slaPolicyForm.reset({
       name: policy.name,
       description: policy.description,
       priority: policy.priority,
       responseTimeHours: policy.responseTimeHours,
       resolutionTimeHours: policy.resolutionTimeHours,
+      conditions: parsedConditions,
       active: policy.active,
     });
     setShowSLADialog(true);
@@ -1247,6 +1272,23 @@ export default function BusinessRulesManagement() {
                                 placeholder="Brief description of this policy..." 
                                 {...field}
                                 data-testid="input-sla-policy-description"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={slaPolicyForm.control}
+                        name="conditions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Conditions</FormLabel>
+                            <FormControl>
+                              <RuleBuilder
+                                conditions={field.value}
+                                onChange={field.onChange}
+                                allowedFields={['caseOriginationName', 'caseTypeName', 'categoryName', 'state', 'lenderName']}
                               />
                             </FormControl>
                             <FormMessage />

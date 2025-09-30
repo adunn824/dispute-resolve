@@ -339,6 +339,7 @@ export const slaPolicies = pgTable("sla_policies", {
   priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).notNull(),
   responseTimeHours: integer("response_time_hours").notNull(),
   resolutionTimeHours: integer("resolution_time_hours").notNull(),
+  conditions: json("conditions").notNull(), // JSON for structured conditions
   targetHours: integer("target_hours"),
   clockStartsOn: text("clock_starts_on"),
   pauseOnStatus: json("pause_on_status").$type<string[]>(),
