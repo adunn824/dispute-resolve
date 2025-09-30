@@ -1070,13 +1070,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sla-policies", requireAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { name, description, priority, responseTimeHours, resolutionTimeHours, active } = req.body;
+      const { name, description, priority, responseTimeHours, resolutionTimeHours, conditions, active } = req.body;
       const policy = await storage.createSlaPolicy({
         name,
         description,
         priority,
         responseTimeHours,
         resolutionTimeHours,
+        conditions,
         isActive: active,
       });
       res.status(201).json(policy);
@@ -1089,13 +1090,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/sla-policies/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, priority, responseTimeHours, resolutionTimeHours, active } = req.body;
+      const { name, description, priority, responseTimeHours, resolutionTimeHours, conditions, active } = req.body;
       const policy = await storage.updateSlaPolicy(id, {
         name,
         description,
         priority,
         responseTimeHours,
         resolutionTimeHours,
+        conditions,
         isActive: active,
       });
       res.json(policy);
