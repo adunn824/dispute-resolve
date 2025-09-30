@@ -219,7 +219,7 @@ export const categories = pgTable("categories", {
 // Legacy category-specific checklist templates (keep for backward compatibility)
 export const checklistTemplates = pgTable("checklist_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").notNull().references(() => categories.id),
+  categoryId: varchar("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
   key: text("key").notNull(),
   label: text("label").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -261,7 +261,7 @@ export type InsertReusableChecklistItem = z.infer<typeof insertReusableChecklist
 
 export const documentRequirements = pgTable("document_requirements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").notNull().references(() => categories.id),
+  categoryId: varchar("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
   key: text("key").notNull(),
   label: text("label").notNull(),
   isRequired: boolean("is_required").notNull().default(false),
@@ -271,7 +271,7 @@ export const documentRequirements = pgTable("document_requirements", {
 
 export const priorityRules = pgTable("priority_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").references(() => categories.id),
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).notNull(),
@@ -284,7 +284,7 @@ export const priorityRules = pgTable("priority_rules", {
 
 export const tagRules = pgTable("tag_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").references(() => categories.id),
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   tag: text("tag").notNull(),
@@ -297,7 +297,7 @@ export const tagRules = pgTable("tag_rules", {
 
 export const checklistAssignmentRules = pgTable("checklist_assignment_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").references(() => categories.id),
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   // Support both legacy and new template systems
@@ -311,13 +311,13 @@ export const checklistAssignmentRules = pgTable("checklist_assignment_rules", {
 
 export const resolutionConfigs = pgTable("resolution_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").notNull().references(() => categories.id),
+  categoryId: varchar("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
   fieldsJson: json("fields_json").notNull(),
 });
 
 export const slaPolicies = pgTable("sla_policies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  categoryId: varchar("category_id").references(() => categories.id),
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).notNull(),
