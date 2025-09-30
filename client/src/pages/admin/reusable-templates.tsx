@@ -150,10 +150,13 @@ export default function ReusableTemplatesManagement() {
 
   // Item mutations
   const createItemMutation = useMutation({
-    mutationFn: async (data: ReusableItemForm) => 
-      await apiRequest("POST", `/api/reusable-checklist-templates/${selectedTemplateId}/items`, data),
+    mutationFn: async (data: ReusableItemForm) => {
+      const templateId = selectedTemplateId || editingTemplate?.id;
+      return await apiRequest("POST", `/api/reusable-checklist-templates/${templateId}/items`, data);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"] });
+      const templateId = selectedTemplateId || editingTemplate?.id;
+      queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", templateId, "items"] });
       setShowItemDialog(false);
       itemForm.reset();
       toast({ title: "Success", description: "Checklist item created successfully" });
@@ -167,7 +170,8 @@ export default function ReusableTemplatesManagement() {
     mutationFn: async ({ id, data }: { id: string; data: ReusableItemForm }) => 
       await apiRequest("PUT", `/api/reusable-checklist-items/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"] });
+      const templateId = selectedTemplateId || editingTemplate?.id;
+      queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", templateId, "items"] });
       setShowItemDialog(false);
       setEditingItem(null);
       itemForm.reset();
@@ -182,12 +186,20 @@ export default function ReusableTemplatesManagement() {
     mutationFn: async (id: string) => 
       await apiRequest("DELETE", `/api/reusable-checklist-items/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"] });
+      const templateId = selectedTemplateId || editingTemplate?.id;
+      queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", templateId, "items"] });
       toast({ title: "Success", description: "Checklist item deleted successfully" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete checklist item", variant: "destructive" });
     },
+  });
+
+  // Fetch items for the template being edited
+  const { data: editingTemplateItems = [] } = useQuery<ReusableItem[]>({
+    queryKey: ["/api/reusable-checklist-templates", editingTemplate?.id, "items"],
+    enabled: !!editingTemplate?.id,
+    select: (response: any) => response.data || response || [],
   });
 
   // Handlers
@@ -519,57 +531,300 @@ export default function ReusableTemplatesManagement() {
               Add Template
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTemplate ? "Edit Reusable Template" : "Create Reusable Template"}
               </DialogTitle>
             </DialogHeader>
             <Form {...templateForm}>
-              <form onSubmit={templateForm.handleSubmit(onSubmitTemplate)} className="space-y-4">
-                <FormField
-                  control={templateForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Template name..." {...field} data-testid="input-template-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={templateForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Template description..." {...field} data-testid="input-template-description" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={templateForm.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-template-active"
-                        />
-                      </FormControl>
-                      <FormLabel>Active Template</FormLabel>
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end space-x-2">
+              <form onSubmit={templateForm.handleSubmit(onSubmitTemplate)} className="space-y-6">
+                <div className="space-y-4">
+                  <FormField
+                    control={templateForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Template name..." {...field} data-testid="input-template-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={templateForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Template description..." {...field} data-testid="input-template-description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={templateForm.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-template-active"
+                          />
+                        </FormControl>
+                        <FormLabel>Active Template</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {editingTemplate && (
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <ListChecks className="w-5 h-5" />
+                          Checklist Items
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Individual steps in this checklist template
+                        </p>
+                      </div>
+                      <Dialog open={showItemDialog} onOpenChange={setShowItemDialog}>
+                        <DialogTrigger asChild>
+                          <Button type="button" size="sm" data-testid="button-add-item-in-dialog">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Item
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl" onClick={(e) => e.stopPropagation()}>
+                          <DialogHeader>
+                            <DialogTitle>
+                              {editingItem ? "Edit Checklist Item" : "Create Checklist Item"}
+                            </DialogTitle>
+                          </DialogHeader>
+                          <Form {...itemForm}>
+                            <form onSubmit={itemForm.handleSubmit(onSubmitItem)} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={itemForm.control}
+                                  name="key"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Key</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="unique_key" {...field} data-testid="input-item-key" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={itemForm.control}
+                                  name="sortOrder"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Sort Order</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          type="number" 
+                                          placeholder="0" 
+                                          {...field} 
+                                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                          data-testid="input-item-sort-order"
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <FormField
+                                control={itemForm.control}
+                                name="label"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Label</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="Step description" {...field} data-testid="input-item-label" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={itemForm.control}
+                                name="description"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Description</FormLabel>
+                                    <FormControl>
+                                      <Textarea placeholder="Detailed description of this step" {...field} data-testid="input-item-description" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={itemForm.control}
+                                name="helpText"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Help Text / Instructions</FormLabel>
+                                    <FormControl>
+                                      <Textarea placeholder="Additional guidance for completing this step" {...field} data-testid="input-item-help-text" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={itemForm.control}
+                                  name="estimatedDuration"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Estimated Duration (minutes)</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          type="number" 
+                                          placeholder="30" 
+                                          {...field} 
+                                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                                          data-testid="input-item-duration"
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={itemForm.control}
+                                  name="isRequired"
+                                  render={({ field }) => (
+                                    <FormItem className="flex items-center space-x-2 pt-6">
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          data-testid="switch-item-required"
+                                        />
+                                      </FormControl>
+                                      <FormLabel>Required Step</FormLabel>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setShowItemDialog(false);
+                                    setEditingItem(null);
+                                    itemForm.reset();
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button type="submit" data-testid="button-submit-item">
+                                  {editingItem ? "Update" : "Create"} Item
+                                </Button>
+                              </div>
+                            </form>
+                          </Form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    {editingTemplateItems.length > 0 ? (
+                      <div className="border rounded-lg">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">Order</TableHead>
+                              <TableHead>Label</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead>Instructions</TableHead>
+                              <TableHead className="w-24">Duration</TableHead>
+                              <TableHead className="w-24">Required</TableHead>
+                              <TableHead className="w-24">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {editingTemplateItems
+                              .sort((a, b) => a.sortOrder - b.sortOrder)
+                              .map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="text-center">{item.sortOrder}</TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium">{item.label}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Key: <code className="bg-muted px-1 rounded">{item.key}</code>
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm">{item.description || "—"}</TableCell>
+                                  <TableCell className="text-sm">{item.helpText || "—"}</TableCell>
+                                  <TableCell className="text-center">
+                                    {item.estimatedDuration ? `${item.estimatedDuration} min` : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant={item.isRequired ? "destructive" : "secondary"}>
+                                      {item.isRequired ? "Required" : "Optional"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center space-x-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditItem(item);
+                                        }}
+                                        data-testid={`button-edit-item-${item.id}`}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteItemMutation.mutate(item.id);
+                                        }}
+                                        data-testid={`button-delete-item-${item.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 border rounded-lg bg-muted/20">
+                        <ListChecks className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">No checklist items yet</p>
+                        <p className="text-sm text-muted-foreground">Click "Add Item" to create your first step</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2 pt-4 border-t">
                   <Button
                     type="button"
                     variant="outline"
