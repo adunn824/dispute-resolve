@@ -195,14 +195,13 @@ export default function CaseTypesManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Case Origination (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => field.onChange(value || undefined)} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger data-testid="select-case-origination">
-                              <SelectValue placeholder="Select case origination..." />
+                              <SelectValue placeholder="None - Select if needed..." />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
                             {caseOriginations.map((origination) => (
                               <SelectItem key={origination.id} value={origination.id}>
                                 {origination.name}
