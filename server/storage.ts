@@ -502,7 +502,7 @@ export class DatabaseStorage implements IStorage {
         caseTypeColor: caseTypes.color,
         
         // Case origination fields
-        caseOriginationId: caseTypes.caseOriginationId,
+        caseOriginationId: cases.caseOriginationId,
         caseOriginationName: caseOriginations.name,
         caseOriginationDescription: caseOriginations.description,
         
@@ -523,7 +523,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(customers, eq(cases.customerId, customers.id))
       .leftJoin(lenders, eq(cases.lenderId, lenders.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
-      .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
+      .leftJoin(caseOriginations, eq(cases.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
       .leftJoin(users, eq(cases.assignedToUserId, users.id))
