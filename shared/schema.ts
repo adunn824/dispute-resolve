@@ -35,7 +35,6 @@ export const RULE_FIELDS = {
   // Case basic fields
   'details': { type: 'text', label: 'Complaint Details', description: 'The complaint description text' },
   'loanId': { type: 'text', label: 'Loan ID', description: 'Loan identifier' },
-  'lenderName': { type: 'text', label: 'Lender Name', description: 'Financial institution name' },
   'state': { type: 'text', label: 'Customer State', description: 'Customer state abbreviation' },
   'status': { type: 'enum', label: 'Case Status', description: 'Current case status', options: ['open', 'in_progress', 'resolved'] },
   'hasRepresentative': { type: 'boolean', label: 'Has Representative', description: 'Whether customer has POA/Attorney' },
@@ -45,11 +44,12 @@ export const RULE_FIELDS = {
   'customerName': { type: 'text', label: 'Customer Name', description: 'Customer full name' },
   'customerState': { type: 'text', label: 'Customer State', description: 'Customer state (alternative field)' },
   
-  // Category/Type/Origination fields (via join)
-  'caseOriginationName': { type: 'text', label: 'Case Origination', description: 'Case origination name' },
-  'categoryCode': { type: 'text', label: 'Category Code', description: 'Case category code' },
-  'categoryName': { type: 'text', label: 'Category Name', description: 'Case category name' },
-  'caseTypeName': { type: 'text', label: 'Case Type', description: 'Case type name' },
+  // Reference fields - dynamically loaded from database
+  'lenderName': { type: 'reference', label: 'Lender Name', description: 'Financial institution name', endpoint: '/api/lenders', labelField: 'name', valueField: 'name' },
+  'caseOriginationName': { type: 'reference', label: 'Case Origination', description: 'Case origination name', endpoint: '/api/case-originations', labelField: 'name', valueField: 'name' },
+  'categoryCode': { type: 'reference', label: 'Category Code', description: 'Case category code', endpoint: '/api/categories', labelField: 'code', valueField: 'code' },
+  'categoryName': { type: 'reference', label: 'Category Name', description: 'Case category name', endpoint: '/api/categories', labelField: 'name', valueField: 'name' },
+  'caseTypeName': { type: 'reference', label: 'Case Type', description: 'Case type name', endpoint: '/api/case-types', labelField: 'name', valueField: 'name' },
   
   // Calculated fields
   'ageInDays': { type: 'number', label: 'Case Age (Days)', description: 'Days since case creation' },

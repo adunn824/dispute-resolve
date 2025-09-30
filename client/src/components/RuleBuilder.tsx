@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,11 @@ const OPERATORS_BY_TYPE = {
     { value: 'equals', label: 'Equals' },
     { value: 'in', label: 'Is one of' },
     { value: 'notIn', label: 'Is not one of' }
+  ],
+  reference: [
+    { value: 'equals', label: 'Equals' },
+    { value: 'in', label: 'Is one of' },
+    { value: 'notIn', label: 'Is not one of' }
   ]
 };
 
@@ -60,6 +66,29 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
         Object.entries(RULE_FIELDS).filter(([key]) => allowedFields.includes(key))
       )
     : RULE_FIELDS;
+
+  // Fetch reference data for all reference fields
+  const referenceFields = Object.entries(availableFields).filter(
+    ([_, field]: [string, any]) => field.type === 'reference'
+  );
+
+  // Create queries for each reference field
+  const referenceQueries = referenceFields.map(([fieldKey, field]: [string, any]) => {
+    return useQuery({
+      queryKey: [field.endpoint],
+      select: (response: any) => {
+        const data = response.data || response;
+        return Array.isArray(data) ? data : [];
+      },
+      staleTime: 60000, // Cache for 1 minute
+    });
+  });
+
+  // Build a map of field key to options
+  const referenceOptions: Record<string, any[]> = {};
+  referenceFields.forEach(([fieldKey, _]: [string, any], index: number) => {
+    referenceOptions[fieldKey] = referenceQueries[index].data || [];
+  });
 
   // Add a new condition
   const addCondition = () => {
@@ -156,30 +185,105 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
           />
         );
 
+      case 'reference':
+        const refOptions = referenceOptions[condition.field] || [];
+        const refFieldDef: any = fieldDef;
+        const labelField = refFieldDef.labelField || 'name';
+        const valueField = refFieldDef.valueField || 'name';
+
+        if (condition.operator === 'in' || condition.operator === 'notIn') {
+          // Multiple selection for in/notIn operators
+          const selectedValues = Array.isArray(condition.value) ? condition.value : [];
+          return (
+            <div className="space-y-2">
+              {selectedValues.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectedValues.map((val: string, valIndex: number) => (
+                    <Badge key={valIndex} variant="secondary" className="text-xs">
+                      {val}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newValues = selectedValues.filter((_: any, i: number) => i !== valIndex);
+                          updateCondition(index, { value: newValues });
+                        }}
+                        className="ml-1 hover:text-destructive"
+                        data-testid={`button-remove-ref-value-${index}-${valIndex}`}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <Select
+                value=""
+                onValueChange={(value) => {
+                  if (!selectedValues.includes(value)) {
+                    updateCondition(index, { value: [...selectedValues, value] });
+                  }
+                }}
+              >
+                <SelectTrigger data-testid={`select-condition-value-${index}`}>
+                  <SelectValue placeholder="Select options..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {refOptions.map((option: any) => (
+                    <SelectItem key={option.id || option[valueField]} value={option[valueField]}>
+                      {option[labelField]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        } else {
+          // Single selection for equals
+          return (
+            <Select
+              value={condition.value || ''}
+              onValueChange={(value) => updateCondition(index, { value })}
+            >
+              <SelectTrigger data-testid={`select-condition-value-${index}`}>
+                <SelectValue placeholder="Select value..." />
+              </SelectTrigger>
+              <SelectContent>
+                {refOptions.map((option: any) => (
+                  <SelectItem key={option.id || option[valueField]} value={option[valueField]}>
+                    {option[labelField]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
       case 'enum':
         if (condition.operator === 'in' || condition.operator === 'notIn') {
           // Multiple selection for in/notIn operators
           const selectedValues = Array.isArray(condition.value) ? condition.value : [];
           return (
             <div className="space-y-2">
-              <div className="flex flex-wrap gap-1">
-                {selectedValues.map((val: string, valIndex: number) => (
-                  <Badge key={valIndex} variant="secondary" className="text-xs">
-                    {val}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newValues = selectedValues.filter((_: any, i: number) => i !== valIndex);
-                        updateCondition(index, { value: newValues });
-                      }}
-                      className="ml-1 hover:text-destructive"
-                      data-testid={`button-remove-enum-value-${index}-${valIndex}`}
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-              </div>
+              {selectedValues.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectedValues.map((val: string, valIndex: number) => (
+                    <Badge key={valIndex} variant="secondary" className="text-xs">
+                      {val}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newValues = selectedValues.filter((_: any, i: number) => i !== valIndex);
+                          updateCondition(index, { value: newValues });
+                        }}
+                        className="ml-1 hover:text-destructive"
+                        data-testid={`button-remove-enum-value-${index}-${valIndex}`}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
               <Select
                 value=""
                 onValueChange={(value) => {
@@ -282,82 +386,85 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
         </Card>
       )}
 
-      {conditions.map((condition, index) => (
-        <Card key={index}>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              {/* Field Selection */}
-              <div>
-                <Label className="text-sm mb-1.5 block">Field</Label>
-                <Select
-                  value={condition.field}
-                  onValueChange={(value) => updateCondition(index, { field: value })}
-                >
-                  <SelectTrigger data-testid={`select-condition-field-${index}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(availableFields).map(([key, field]) => (
-                      <SelectItem key={key} value={key}>
-                        <div className="flex flex-col">
-                          <span>{field.label}</span>
-                          <span className="text-xs text-muted-foreground">{field.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <div className="space-y-3">
+        {conditions.map((condition, index) => (
+          <div key={index}>
+            <div className="bg-card border rounded-md p-3">
+              <div className="grid grid-cols-1 md:grid-cols-[2fr,1.5fr,2fr,auto] gap-3 items-end">
+                {/* Field Selection */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Field</Label>
+                  <Select
+                    value={condition.field}
+                    onValueChange={(value) => updateCondition(index, { field: value })}
+                  >
+                    <SelectTrigger data-testid={`select-condition-field-${index}`} className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(availableFields).map(([key, field]) => (
+                        <SelectItem key={key} value={key}>
+                          <div className="flex flex-col">
+                            <span>{field.label}</span>
+                            <span className="text-xs text-muted-foreground">{field.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Operator Selection */}
-              <div>
-                <Label className="text-sm mb-1.5 block">Operator</Label>
-                <Select
-                  value={condition.operator}
-                  onValueChange={(value) => updateCondition(index, { operator: value })}
-                >
-                  <SelectTrigger data-testid={`select-condition-operator-${index}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableOperators(condition.field).map((op) => (
-                      <SelectItem key={op.value} value={op.value}>
-                        {op.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* Operator Selection */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Operator</Label>
+                  <Select
+                    value={condition.operator}
+                    onValueChange={(value) => updateCondition(index, { operator: value })}
+                  >
+                    <SelectTrigger data-testid={`select-condition-operator-${index}`} className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableOperators(condition.field).map((op) => (
+                        <SelectItem key={op.value} value={op.value}>
+                          {op.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Value Input */}
-              <div>
-                <Label className="text-sm mb-1.5 block">Value</Label>
-                {renderValueInput(condition, index)}
-              </div>
+                {/* Value Input */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Value</Label>
+                  {renderValueInput(condition, index)}
+                </div>
 
-              {/* Actions */}
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeCondition(index)}
-                  disabled={conditions.length === 1}
-                  data-testid={`button-remove-condition-${index}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {/* Actions */}
+                <div className="flex items-end pb-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeCondition(index)}
+                    disabled={conditions.length === 1}
+                    data-testid={`button-remove-condition-${index}`}
+                    className="h-9 w-9"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
             {index < conditions.length - 1 && (
-              <div className="flex items-center justify-center mt-4 pt-4 border-t">
-                <Badge variant="outline" className="text-xs">AND</Badge>
+              <div className="flex items-center justify-center py-2">
+                <Badge variant="outline" className="text-xs font-medium">AND</Badge>
               </div>
             )}
-          </CardContent>
-        </Card>
-      ))}
+          </div>
+        ))}
+      </div>
 
       {showJsonPreview && conditions.length > 0 && (
         <Card className="mt-4">
