@@ -1065,7 +1065,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/checklist-assignment-rules", requireAuth, requireRole("compliance"), async (req, res) => {
     try {
       const rules = await storage.getAllChecklistAssignmentRules();
-      res.json({ data: rules });
+      // Map database fields to frontend expected fields
+      const mappedRules = rules.map(rule => ({
+        ...rule,
+        templateId: rule.reusableTemplateId, // Map reusableTemplateId to templateId for frontend
+        active: rule.isActive, // Map isActive to active for frontend
+      }));
+      res.json({ data: mappedRules });
     } catch (error) {
       console.error("Error fetching checklist assignment rules:", error);
       res.status(500).json({ error: "Failed to fetch checklist assignment rules" });
@@ -1078,9 +1084,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rule = await storage.createChecklistAssignmentRule({
         name,
         description,
-        templateId,
+        reusableTemplateId: templateId, // Map templateId to reusableTemplateId
         conditions,
-        active: active !== undefined ? active : true,
+        isActive: active !== undefined ? active : true,
       });
       res.status(201).json({ data: rule });
     } catch (error) {
@@ -1096,9 +1102,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rule = await storage.updateChecklistAssignmentRule(id, {
         name,
         description,
-        templateId,
+        reusableTemplateId: templateId, // Map templateId to reusableTemplateId
         conditions,
-        active,
+        isActive: active,
       });
       res.json({ data: rule });
     } catch (error) {
