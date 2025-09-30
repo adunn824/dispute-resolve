@@ -67,27 +67,45 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
       )
     : RULE_FIELDS;
 
-  // Fetch reference data for all reference fields
-  const referenceFields = Object.entries(availableFields).filter(
-    ([_, field]: [string, any]) => field.type === 'reference'
-  );
-
-  // Create queries for each reference field
-  const referenceQueries = referenceFields.map(([fieldKey, field]: [string, any]) => {
-    return useQuery({
-      queryKey: [field.endpoint],
-      select: (response: any) => {
-        const data = response.data || response;
-        return Array.isArray(data) ? data : [];
-      },
-      staleTime: 60000, // Cache for 1 minute
-    });
+  // Fetch reference data - one query per endpoint
+  const { data: categories = [] } = useQuery({
+    queryKey: ['/api/categories'],
+    select: (response: any) => response.data || [],
+    staleTime: 60000,
   });
 
-  // Build a map of field key to options
+  const { data: caseTypes = [] } = useQuery({
+    queryKey: ['/api/case-types'],
+    select: (response: any) => response.data || [],
+    staleTime: 60000,
+  });
+
+  const { data: caseOriginations = [] } = useQuery({
+    queryKey: ['/api/case-originations'],
+    select: (response: any) => response.data || [],
+    staleTime: 60000,
+  });
+
+  const { data: lenders = [] } = useQuery({
+    queryKey: ['/api/lenders'],
+    select: (response: any) => response.data || [],
+    staleTime: 60000,
+  });
+
+  // Build a map of field key to options based on endpoint
   const referenceOptions: Record<string, any[]> = {};
-  referenceFields.forEach(([fieldKey, _]: [string, any], index: number) => {
-    referenceOptions[fieldKey] = referenceQueries[index].data || [];
+  Object.entries(availableFields).forEach(([fieldKey, field]: [string, any]) => {
+    if (field.type === 'reference') {
+      if (field.endpoint === '/api/categories') {
+        referenceOptions[fieldKey] = categories;
+      } else if (field.endpoint === '/api/case-types') {
+        referenceOptions[fieldKey] = caseTypes;
+      } else if (field.endpoint === '/api/case-originations') {
+        referenceOptions[fieldKey] = caseOriginations;
+      } else if (field.endpoint === '/api/lenders') {
+        referenceOptions[fieldKey] = lenders;
+      }
+    }
   });
 
   // Add a new condition
