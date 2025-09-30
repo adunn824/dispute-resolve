@@ -208,16 +208,35 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                         </button>
                       </TableCell>
                       <TableCell>
-                        <div>
+                        <div className="space-y-2">
                           <p className={`font-medium ${item.completed ? "line-through text-muted-foreground" : ""}`}>
                             {item.label}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Key: <code className="text-xs bg-muted px-1 py-0.5 rounded">{item.key}</code>
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            From: {item.templateName}
-                          </p>
+                          {item.description && (
+                            <p className="text-sm">
+                              {item.description}
+                            </p>
+                          )}
+                          {item.helpText && (
+                            <div className="text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded p-2 mt-1">
+                              <p className="text-blue-900 dark:text-blue-100">
+                                <strong>Instructions:</strong> {item.helpText}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                            <span>
+                              Key: <code className="bg-muted px-1 py-0.5 rounded">{item.key}</code>
+                            </span>
+                            <span>•</span>
+                            <span>From: {item.templateName}</span>
+                            {item.estimatedDuration && (
+                              <>
+                                <span>•</span>
+                                <span>Est. {item.estimatedDuration} min</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
