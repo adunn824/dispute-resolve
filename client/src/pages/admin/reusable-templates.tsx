@@ -106,10 +106,7 @@ export default function ReusableTemplatesManagement() {
   // Template mutations
   const createTemplateMutation = useMutation({
     mutationFn: async (data: ReusableTemplateForm) => 
-      await apiRequest("/api/reusable-checklist-templates", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      await apiRequest("POST", "/api/reusable-checklist-templates", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates"] });
       setShowTemplateDialog(false);
@@ -123,10 +120,7 @@ export default function ReusableTemplatesManagement() {
 
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ReusableTemplateForm }) => 
-      await apiRequest(`/api/reusable-checklist-templates/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
+      await apiRequest("PUT", `/api/reusable-checklist-templates/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates"] });
       setShowTemplateDialog(false);
@@ -141,7 +135,7 @@ export default function ReusableTemplatesManagement() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => 
-      await apiRequest(`/api/reusable-checklist-templates/${id}`, { method: "DELETE" }),
+      await apiRequest("DELETE", `/api/reusable-checklist-templates/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates"] });
       if (selectedTemplateId === editingTemplate?.id) {
@@ -157,10 +151,7 @@ export default function ReusableTemplatesManagement() {
   // Item mutations
   const createItemMutation = useMutation({
     mutationFn: async (data: ReusableItemForm) => 
-      await apiRequest(`/api/reusable-checklist-templates/${selectedTemplateId}/items`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      await apiRequest("POST", `/api/reusable-checklist-templates/${selectedTemplateId}/items`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"] });
       setShowItemDialog(false);
@@ -174,10 +165,7 @@ export default function ReusableTemplatesManagement() {
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ReusableItemForm }) => 
-      await apiRequest(`/api/reusable-checklist-items/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
+      await apiRequest("PUT", `/api/reusable-checklist-items/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"] });
       setShowItemDialog(false);
@@ -192,7 +180,7 @@ export default function ReusableTemplatesManagement() {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (id: string) => 
-      await apiRequest(`/api/reusable-checklist-items/${id}`, { method: "DELETE" }),
+      await apiRequest("DELETE", `/api/reusable-checklist-items/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates", selectedTemplateId, "items"] });
       toast({ title: "Success", description: "Checklist item deleted successfully" });
