@@ -31,11 +31,14 @@ import {
   kbArticleVersions,
   kbChangeEvents,
   kbArticleLinks,
+  lenders,
   type User, 
   type InsertUser,
   type UpsertUser,
   type Customer,
   type InsertCustomer,
+  type Lender,
+  type InsertLender,
   type Case,
   type InsertCase,
   type ChecklistItem,
@@ -132,6 +135,13 @@ export interface IStorage {
   getCustomers(filters?: { limit?: number; offset?: number }): Promise<Customer[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   findCustomerByName(name: string): Promise<Customer[]>;
+  
+  // Lender methods
+  getLenders(): Promise<Lender[]>;
+  getLender(id: string): Promise<Lender | undefined>;
+  createLender(lender: InsertLender): Promise<Lender>;
+  updateLender(id: string, updates: Partial<InsertLender>): Promise<Lender>;
+  deleteLender(id: string): Promise<void>;
   
   // Case methods
   getCase(id: string): Promise<Case | undefined>;
@@ -410,6 +420,43 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(customers).where(ilike(customers.name, `%${name}%`));
   }
 
+  // Lender methods
+  async getLenders(): Promise<Lender[]> {
+    return await db.select().from(lenders).orderBy(asc(lenders.name));
+  }
+
+  async getLender(id: string): Promise<Lender | undefined> {
+    const [lender] = await db.select().from(lenders).where(eq(lenders.id, id));
+    return lender || undefined;
+  }
+
+  async createLender(insertLender: InsertLender): Promise<Lender> {
+    const [lender] = await db
+      .insert(lenders)
+      .values({
+        ...insertLender,
+        updatedAt: new Date()
+      })
+      .returning();
+    return lender;
+  }
+
+  async updateLender(id: string, updates: Partial<InsertLender>): Promise<Lender> {
+    const [lender] = await db
+      .update(lenders)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(lenders.id, id))
+      .returning();
+    return lender;
+  }
+
+  async deleteLender(id: string): Promise<void> {
+    await db.delete(lenders).where(eq(lenders.id, id));
+  }
+
   // Case methods
   async getCase(id: string): Promise<Case | undefined> {
     const [caseRecord] = await db.select().from(cases).where(eq(cases.id, id));
@@ -421,13 +468,14 @@ export class DatabaseStorage implements IStorage {
       .select({
         // Case fields
         id: cases.id,
+        caseNumber: cases.caseNumber,
         caseTypeId: cases.caseTypeId,
         categoryId: cases.categoryId,
         priorityRuleId: cases.priorityRuleId,
         customerId: cases.customerId,
         assignedToUserId: cases.assignedToUserId,
         loanId: cases.loanId,
-        lenderName: cases.lenderName,
+        lenderId: cases.lenderId,
         state: cases.state,
         details: cases.details,
         status: cases.status,
@@ -443,6 +491,11 @@ export class DatabaseStorage implements IStorage {
         // Customer fields
         customerName: customers.name,
         customerState: customers.state,
+        
+        // Lender fields
+        lenderName: lenders.name,
+        lenderDba: lenders.dba,
+        lenderContactPerson: lenders.contactPerson,
         
         // Case type fields
         caseTypeName: caseTypes.name,
@@ -468,6 +521,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(lenders, eq(cases.lenderId, lenders.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
       .leftJoin(caseOriginations, eq(caseTypes.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
@@ -484,7 +538,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         details: cases.details,
         loanId: cases.loanId,
-        lenderName: cases.lenderName,
+        lenderName: lenders.name,
         state: cases.state,
         status: cases.status,
         hasRepresentative: cases.hasRepresentative,
@@ -505,6 +559,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(lenders, eq(cases.lenderId, lenders.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
       .where(eq(cases.id, id))
@@ -657,7 +712,8 @@ export class DatabaseStorage implements IStorage {
           sql`LOWER(${cases.details}) LIKE ${searchTerm}`,
           sql`LOWER(${cases.loanId}) LIKE ${searchTerm}`,
           sql`LOWER(${caseTypes.name}) LIKE ${searchTerm}`,
-          sql`LOWER(${categories.name}) LIKE ${searchTerm}`
+          sql`LOWER(${categories.name}) LIKE ${searchTerm}`,
+          sql`LOWER(${lenders.name}) LIKE ${searchTerm}`
         )
       );
     }
@@ -673,6 +729,7 @@ export class DatabaseStorage implements IStorage {
         customerId: cases.customerId,
         assignedToUserId: cases.assignedToUserId,
         loanId: cases.loanId,
+        lenderId: cases.lenderId,
         state: cases.state,
         details: cases.details,
         status: cases.status,
@@ -682,6 +739,9 @@ export class DatabaseStorage implements IStorage {
         // Customer fields
         customerName: customers.name,
         customerState: customers.state,
+        
+        // Lender fields
+        lenderName: lenders.name,
         
         // Case type fields
         caseTypeName: caseTypes.name,
@@ -702,6 +762,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(lenders, eq(cases.lenderId, lenders.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
@@ -749,7 +810,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCase(insertCase: InsertCase): Promise<Case> {
-    // First, get customer and category info for rule evaluation
+    // First, get customer, category, case type, and optionally lender info for rule evaluation
     const customer = await db
       .select()
       .from(customers)
@@ -772,12 +833,23 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Customer, category, or case type not found");
     }
 
+    // Fetch lender name if lenderId is provided
+    let lenderName: string | null = null;
+    if (insertCase.lenderId) {
+      const lender = await db
+        .select()
+        .from(lenders)
+        .where(eq(lenders.id, insertCase.lenderId))
+        .limit(1);
+      lenderName = lender.length > 0 ? lender[0].name : null;
+    }
+
     // Prepare case data for rule evaluation
     const now = new Date();
     const caseData: CaseData = {
       details: insertCase.details,
       loanId: insertCase.loanId || null,
-      lenderName: insertCase.lenderName || null,
+      lenderName: lenderName,
       state: insertCase.state,
       status: insertCase.status || 'open',
       hasRepresentative: insertCase.hasRepresentative || false,

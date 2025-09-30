@@ -106,7 +106,7 @@ export const cases = pgTable("cases", {
   customerId: varchar("customer_id").notNull().references(() => customers.id),
   assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
   loanId: text("loan_id"),
-  lenderName: text("lender_name"),
+  lenderId: varchar("lender_id").references(() => lenders.id),
   state: text("state").notNull(),
   details: text("details").notNull(),
   status: text("status", { enum: ["open", "in_progress", "resolved"] }).notNull().default("open"),
@@ -191,6 +191,18 @@ export const caseOriginations = pgTable("case_originations", {
   name: text("name").notNull().unique(),
   description: text("description"),
   externalKey: text("external_key"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const lenders = pgTable("lenders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  dba: text("dba"),
+  address: text("address"),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -675,6 +687,12 @@ export const insertCaseOriginationSchema = createInsertSchema(caseOriginations).
   updatedAt: true,
 });
 
+export const insertLenderSchema = createInsertSchema(lenders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCaseTypeSchema = createInsertSchema(caseTypes).omit({
   id: true,
 });
@@ -755,6 +773,9 @@ export type UpsertUser = typeof users.$inferInsert;
 
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+
+export type Lender = typeof lenders.$inferSelect;
+export type InsertLender = z.infer<typeof insertLenderSchema>;
 
 export type Case = typeof cases.$inferSelect;
 export type InsertCase = z.infer<typeof insertCaseSchema>;

@@ -7,6 +7,7 @@ import {
   insertCustomerSchema,
   insertCaseNoteSchema,
   insertCaseOriginationSchema,
+  insertLenderSchema,
   insertKbCategorySchema,
   insertKbArticleSchema,
   insertKbChangeEventSchema,
@@ -749,6 +750,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ message: "Failed to delete case origination" });
+    }
+  });
+
+  // Lenders Admin Management  
+  app.get("/api/lenders", requireAuth, async (req, res) => {
+    try {
+      const lenders = await storage.getLenders();
+      res.json({ data: lenders });
+    } catch (error) {
+      console.error("Failed to fetch lenders:", error);
+      res.status(500).json({ error: "Failed to fetch lenders" });
+    }
+  });
+
+  app.post("/api/lenders", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const validatedData = insertLenderSchema.parse(req.body);
+      const lender = await storage.createLender(validatedData);
+      res.status(201).json(lender);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating lender:", error);
+      res.status(500).json({ message: "Failed to create lender" });
+    }
+  });
+
+  app.put("/api/lenders/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertLenderSchema.parse(req.body);
+      const lender = await storage.updateLender(id, validatedData);
+      res.json(lender);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating lender:", error);
+      res.status(500).json({ message: "Failed to update lender" });
+    }
+  });
+
+  app.delete("/api/lenders/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteLender(id);
+      res.json({ message: "Lender deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting lender:", error);
+      
+      // Check if it's a foreign key constraint error
+      if ((error as any).code === '23503' || (error as any).message?.includes('foreign key')) {
+        return res.status(400).json({ 
+          message: "Cannot delete lender because it is being referenced by existing cases. Please reassign these cases first.",
+          code: 'FOREIGN_KEY_CONSTRAINT'
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to delete lender" });
     }
   });
 

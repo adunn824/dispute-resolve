@@ -20,7 +20,7 @@ const caseSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
   customerState: z.string().min(2, "State is required"),
   loanId: z.string().optional(),
-  lenderName: z.string().optional(),
+  lenderId: z.string().optional(),
   details: z.string().min(10, "Details must be at least 10 characters"),
   hasRepresentative: z.boolean().optional().default(false),
   representativeCompanyName: z.string().optional(),
@@ -74,6 +74,13 @@ interface Category {
   description?: string;
 }
 
+interface Lender {
+  id: string;
+  name: string;
+  dba?: string | null;
+  contactPerson?: string | null;
+}
+
 const usStates = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
   "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -112,7 +119,14 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
     enabled: !!selectedCaseTypeId,
   });
 
+  // Fetch lenders
+  const { data: lendersData, isLoading: loadingLenders, error: lendersError } = useQuery<{data: Lender[]}>({ 
+    queryKey: ["/api/lenders"],
+    queryFn: () => apiRequest("GET", "/api/lenders")
+  });
+
   const categories = categoriesData?.data || [];
+  const lenders = lendersData?.data || [];
 
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema),
@@ -123,7 +137,7 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
       customerName: "",
       customerState: "",
       loanId: "",
-      lenderName: "",
+      lenderId: "",
       details: "",
       hasRepresentative: false,
       representativeCompanyName: "",
@@ -161,7 +175,13 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
   });
 
   const handleSubmit = (data: CaseFormValues) => {
-    createCaseMutation.mutate(data);
+    // Normalize empty strings to undefined for optional foreign key fields
+    const normalizedData = {
+      ...data,
+      lenderId: data.lenderId && data.lenderId.trim() !== "" ? data.lenderId : undefined,
+      loanId: data.loanId && data.loanId.trim() !== "" ? data.loanId : undefined,
+    };
+    createCaseMutation.mutate(normalizedData);
   };
 
   return (
@@ -355,13 +375,30 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
 
               <FormField
                 control={form.control}
-                name="lenderName"
+                name="lenderId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Lender Name (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter lender name" {...field} data-testid="input-lender-name" />
-                    </FormControl>
+                    <FormLabel>Lender (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} data-testid="select-lender">
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select lender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {loadingLenders ? (
+                          <SelectItem value="loading" disabled>Loading lenders...</SelectItem>
+                        ) : lenders.length === 0 ? (
+                          <SelectItem value="none" disabled>No lenders available</SelectItem>
+                        ) : (
+                          lenders.map((lender) => (
+                            <SelectItem key={lender.id} value={lender.id}>
+                              {lender.name}{lender.dba ? ` (${lender.dba})` : ""}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
