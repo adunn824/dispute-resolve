@@ -666,6 +666,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         // Case fields
         id: cases.id,
+        caseNumber: cases.caseNumber,
         caseTypeId: cases.caseTypeId,
         categoryId: cases.categoryId,
         priorityRuleId: cases.priorityRuleId,

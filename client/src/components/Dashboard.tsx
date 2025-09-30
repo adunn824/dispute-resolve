@@ -228,7 +228,7 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
                   stats.recentCases.map((caseItem: any) => (
                     <div key={caseItem.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div>
-                        <p className="font-medium">{caseItem.id}</p>
+                        <p className="font-medium">Case #{caseItem.caseNumber}</p>
                         <p className="text-sm text-muted-foreground">{caseItem.details || "Case details"}</p>
                       </div>
                       <div className="text-right">

@@ -427,7 +427,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                   {cases.map((caseItem) => (
                     <TableRow key={caseItem.id} data-testid={`row-case-${caseItem.id}`}>
                       <TableCell className="font-mono text-xs">
-                        {caseItem.id.substring(0, 8)}...
+                        #{caseItem.caseNumber}
                       </TableCell>
                       <TableCell>
                         <div>

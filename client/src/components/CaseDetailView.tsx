@@ -287,7 +287,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">Case #{caseDetails.id}</h1>
+          <h1 className="text-2xl font-bold">Case #{caseDetails.caseNumber}</h1>
           <p className="text-muted-foreground">
             {caseDetails.caseOriginationName && `${caseDetails.caseOriginationName} • `}
             {caseDetails.caseTypeName} • {caseDetails.categoryName}
