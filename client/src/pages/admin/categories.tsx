@@ -71,10 +71,7 @@ export default function CategoriesManagement() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: CategoryForm) => apiRequest("/api/categories", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    mutationFn: (data: CategoryForm) => apiRequest("POST", "/api/categories", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Success", description: "Category created successfully" });
@@ -89,10 +86,7 @@ export default function CategoriesManagement() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, ...data }: CategoryForm & { id: string }) => 
-      apiRequest(`/api/categories/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
+      apiRequest("PUT", `/api/categories/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Success", description: "Category updated successfully" });
@@ -107,7 +101,7 @@ export default function CategoriesManagement() {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/categories/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/categories/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Success", description: "Category deleted successfully" });
