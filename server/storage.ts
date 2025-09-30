@@ -1286,8 +1286,29 @@ export class DatabaseStorage implements IStorage {
       return results;
     }
     
-    // Get all case types
-    return await db.select().from(caseTypes);
+    // Get all case types with their originations
+    const allCaseTypes = await db.select().from(caseTypes);
+    
+    // For each case type, fetch its originations
+    const caseTypesWithOriginations = await Promise.all(
+      allCaseTypes.map(async (caseType) => {
+        const originations = await db
+          .select({
+            id: caseOriginations.id,
+            name: caseOriginations.name,
+          })
+          .from(caseOriginations)
+          .innerJoin(caseTypeOriginations, eq(caseOriginations.id, caseTypeOriginations.caseOriginationId))
+          .where(eq(caseTypeOriginations.caseTypeId, caseType.id));
+        
+        return {
+          ...caseType,
+          originations,
+        };
+      })
+    );
+    
+    return caseTypesWithOriginations;
   }
 
   async getCaseType(id: string): Promise<CaseType | undefined> {

@@ -319,8 +319,14 @@ export default function CaseTypesManagement() {
                   <TableRow key={caseType.id}>
                     <TableCell className="font-medium">{caseType.name}</TableCell>
                     <TableCell>
-                      {caseType.caseOriginationName ? (
-                        <span className="text-sm">{caseType.caseOriginationName}</span>
+                      {caseType.originations && caseType.originations.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {caseType.originations.map((orig: any) => (
+                            <Badge key={orig.id} variant="secondary" className="text-xs">
+                              {orig.name}
+                            </Badge>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground italic">None</span>
                       )}
