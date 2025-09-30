@@ -44,9 +44,10 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
   const checklistItems = checklistResponse?.data || [];
 
   // Fetch users for assignment
-  const { data: users = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+  const { data: usersResponse } = useQuery<{ data: { id: string; name: string; email: string; role: string }[] }>({
     queryKey: ["/api/users"],
   });
+  const users = usersResponse?.data || [];
 
   // Complete/reopen dynamic checklist item
   const toggleMutation = useMutation({
