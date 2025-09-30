@@ -1739,6 +1739,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/cases/:caseId/checklist/:key/complete - Mark a dynamic checklist item as complete
+  app.post("/api/cases/:caseId/checklist/:key/complete", requireAuth, async (req: any, res) => {
+    try {
+      const { caseId, key } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Check if a checklist item record already exists for this case+key
+      const existingItems = await storage.getChecklistItems(caseId);
+      const existingItem = existingItems.find(item => item.key === key);
+
+      let item;
+      if (existingItem) {
+        // Update existing item
+        item = await storage.updateChecklistItem(existingItem.id, {
+          status: "complete",
+          completedAt: new Date(),
+          assignedToUserId: userId,
+        });
+      } else {
+        // Create new completion record with minimal data
+        item = await storage.createChecklistItem({
+          caseId,
+          key,
+          label: key, // Use key as label temporarily
+          isRequired: false,
+          status: "complete",
+          completedAt: new Date(),
+          assignedToUserId: userId,
+        });
+      }
+
+      // Log the completion in audit log
+      await storage.createAuditLog({
+        caseId,
+        actorUserId: userId,
+        action: "checklist_item_completed",
+        details: { key, checklistItemId: item.id }
+      });
+
+      res.json({ data: item });
+    } catch (error) {
+      console.error("Failed to complete dynamic checklist item:", error);
+      res.status(500).json({ error: "Failed to complete checklist item" });
+    }
+  });
+
+  // POST /api/cases/:caseId/checklist/:key/reopen - Reopen a dynamic checklist item
+  app.post("/api/cases/:caseId/checklist/:key/reopen", requireAuth, async (req: any, res) => {
+    try {
+      const { caseId, key } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Find the existing checklist item record
+      const existingItems = await storage.getChecklistItems(caseId);
+      const existingItem = existingItems.find(item => item.key === key);
+
+      if (!existingItem) {
+        // If no record exists, there's nothing to reopen
+        return res.status(404).json({ error: "Checklist item not found" });
+      }
+
+      // Update to open status
+      const item = await storage.updateChecklistItem(existingItem.id, {
+        status: "open",
+        completedAt: null,
+      });
+
+      // Log the reopening in audit log
+      await storage.createAuditLog({
+        caseId,
+        actorUserId: userId,
+        action: "checklist_item_reopened",
+        details: { key, checklistItemId: item.id }
+      });
+
+      res.json({ data: item });
+    } catch (error) {
+      console.error("Failed to reopen dynamic checklist item:", error);
+      res.status(500).json({ error: "Failed to reopen checklist item" });
+    }
+  });
+
   // Get users for assignment
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
