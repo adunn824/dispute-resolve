@@ -46,14 +46,9 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
   const [selectedDisposition, setSelectedDisposition] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch checklist items to determine completion status
+  // Fetch dynamic checklist items to determine completion status
   const { data: checklistItems, isLoading: loadingChecklist } = useQuery({
-    queryKey: ['/api/cases', caseId, 'checklist-items'],
-    queryFn: async () => {
-      const res = await fetch(`/api/cases/${caseId}/checklist-items`);
-      if (!res.ok) throw new Error('Failed to fetch checklist');
-      return res.json();
-    },
+    queryKey: [`/api/cases/${caseId}/dynamic-checklist`],
     select: (response: any) => response.data || response
   });
 
