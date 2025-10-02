@@ -85,7 +85,7 @@ export default function ResolutionOptionsManagement() {
   const [showSubDispositionDialog, setShowSubDispositionDialog] = useState(false);
   const [showPolicyViolationDialog, setShowPolicyViolationDialog] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{id: string, name: string, type: string} | null>(null);
-  const [selectedDispositionId, setSelectedDispositionId] = useState<string>("");
+  const [selectedDispositionId, setSelectedDispositionId] = useState<string>("all");
   const { toast } = useToast();
 
   const { data: dispositions = [], isLoading: loadingDispositions } = useQuery<Disposition[]>({
@@ -285,7 +285,7 @@ export default function ResolutionOptionsManagement() {
     setEditingSubDisposition(null);
     const nextSortOrder = subDispositions.length > 0 ? Math.max(...subDispositions.map(s => s.sortOrder)) + 1 : 0;
     subDispositionForm.reset({
-      dispositionId: selectedDispositionId || (dispositions[0]?.id || ""),
+      dispositionId: (selectedDispositionId !== "all" ? selectedDispositionId : "") || (dispositions[0]?.id || ""),
       name: "",
       description: "",
       sortOrder: nextSortOrder,
@@ -360,7 +360,7 @@ export default function ResolutionOptionsManagement() {
     }
   };
 
-  const filteredSubDispositions = selectedDispositionId
+  const filteredSubDispositions = selectedDispositionId && selectedDispositionId !== "all"
     ? subDispositions.filter(s => s.dispositionId === selectedDispositionId)
     : subDispositions;
 
@@ -479,7 +479,7 @@ export default function ResolutionOptionsManagement() {
                       <SelectValue placeholder="All dispositions" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All dispositions</SelectItem>
+                      <SelectItem value="all">All dispositions</SelectItem>
                       {dispositions.map((d) => (
                         <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                       ))}
@@ -497,7 +497,7 @@ export default function ResolutionOptionsManagement() {
                 <div className="text-center py-8">Loading sub-dispositions...</div>
               ) : filteredSubDispositions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  {selectedDispositionId
+                  {selectedDispositionId && selectedDispositionId !== "all"
                     ? "No sub-dispositions found for this disposition."
                     : "No sub-dispositions found. Create your first sub-disposition to get started."}
                 </div>
