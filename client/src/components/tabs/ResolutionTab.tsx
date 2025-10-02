@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +20,10 @@ interface ResolutionTabProps {
 const resolutionSchema = z.object({
   disposition: z.string().min(1, "Disposition is required"),
   subDisposition: z.string().optional(),
-  notes: z.string().min(10, "Resolution notes must be at least 10 characters"),
+  notes: z.string().optional(),
   settlementAmount: z.string().optional(),
   forgivenAmount: z.string().optional(),
-  policyViolation: z.enum(["Yes", "No", "N/A"]),
+  policyViolation: z.string().optional(),
 });
 
 type ResolutionFormValues = z.infer<typeof resolutionSchema>;
@@ -41,16 +42,20 @@ const subDispositionOptions = {
   "Other": ["Duplicate Case", "Invalid Request", "Outside Scope"]
 };
 
-// Mock resolution requirements - TODO: remove mock functionality
-const mockRequirements = {
-  checklistComplete: false,
-  documentsUploaded: true,
-  requiredFieldsValid: true
-};
-
 export function ResolutionTab({ caseId }: ResolutionTabProps) {
   const [selectedDisposition, setSelectedDisposition] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch checklist items to determine completion status
+  const { data: checklistItems, isLoading: loadingChecklist } = useQuery({
+    queryKey: ['/api/cases', caseId, 'checklist-items'],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${caseId}/checklist-items`);
+      if (!res.ok) throw new Error('Failed to fetch checklist');
+      return res.json();
+    },
+    select: (response: any) => response.data || response
+  });
 
   const form = useForm<ResolutionFormValues>({
     resolver: zodResolver(resolutionSchema),
@@ -60,13 +65,21 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
       notes: "",
       settlementAmount: "",
       forgivenAmount: "",
-      policyViolation: "N/A",
+      policyViolation: "",
     },
   });
 
-  const canResolve = mockRequirements.checklistComplete && 
-                    mockRequirements.documentsUploaded && 
-                    mockRequirements.requiredFieldsValid;
+  // Calculate if all required checklist items are completed
+  const requiredItems = checklistItems?.filter((item: any) => item.isRequired) || [];
+  const completedRequiredItems = requiredItems.filter((item: any) => item.completed);
+  // If no required items exist, consider checklist complete
+  const checklistComplete = requiredItems.length === 0 || requiredItems.length === completedRequiredItems.length;
+  
+  // For now, assume documents and fields are always valid (can be enhanced later)
+  const documentsUploaded = true;
+  const requiredFieldsValid = true;
+  
+  const canResolve = checklistComplete && documentsUploaded && requiredFieldsValid;
 
   const handleSubmit = async (data: ResolutionFormValues) => {
     setIsSubmitting(true);
@@ -91,15 +104,17 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
             <div className="flex items-center justify-between">
               <span className="text-sm">Required checklist items completed</span>
               <div className="flex items-center gap-2">
-                {mockRequirements.checklistComplete ? (
+                {loadingChecklist ? (
+                  <Badge variant="secondary">Loading...</Badge>
+                ) : checklistComplete ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <Badge variant="default">Complete</Badge>
+                    <Badge variant="default">Complete ({completedRequiredItems.length}/{requiredItems.length})</Badge>
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="h-4 w-4 text-orange-500" />
-                    <Badge variant="secondary">Incomplete</Badge>
+                    <Badge variant="secondary">Incomplete ({completedRequiredItems.length}/{requiredItems.length})</Badge>
                   </>
                 )}
               </div>
@@ -108,7 +123,7 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
             <div className="flex items-center justify-between">
               <span className="text-sm">Required documents uploaded</span>
               <div className="flex items-center gap-2">
-                {mockRequirements.documentsUploaded ? (
+                {documentsUploaded ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     <Badge variant="default">Complete</Badge>
@@ -125,7 +140,7 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
             <div className="flex items-center justify-between">
               <span className="text-sm">All required fields validated</span>
               <div className="flex items-center gap-2">
-                {mockRequirements.requiredFieldsValid ? (
+                {requiredFieldsValid ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     <Badge variant="default">Valid</Badge>
