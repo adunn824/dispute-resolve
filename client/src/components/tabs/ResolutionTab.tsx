@@ -28,18 +28,27 @@ const resolutionSchema = z.object({
 
 type ResolutionFormValues = z.infer<typeof resolutionSchema>;
 
-const dispositionOptions = [
-  "Addressed",
-  "Inquiry Only", 
-  "No Customer Info Found",
-  "Other",
-  "Resolved & Closed"
-];
+type Disposition = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
 
-const subDispositionOptions = {
-  "Addressed": ["Partial Resolution", "Full Resolution", "Referred to Third Party"],
-  "Inquiry Only": ["Information Provided", "No Action Required"],
-  "Other": ["Duplicate Case", "Invalid Request", "Outside Scope"]
+type SubDisposition = {
+  id: string;
+  dispositionId: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+type PolicyViolationOption = {
+  id: string;
+  value: string;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
 };
 
 export function ResolutionTab({ caseId }: ResolutionTabProps) {
@@ -50,6 +59,28 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
   const { data: checklistItems, isLoading: loadingChecklist } = useQuery({
     queryKey: [`/api/cases/${caseId}/dynamic-checklist`],
     select: (response: any) => response.data || response
+  });
+
+  // Fetch resolution options from API
+  const { data: dispositions = [] } = useQuery<Disposition[]>({
+    queryKey: ["/api/dispositions"],
+    select: (response: any) => (response.data || [])
+      .filter((d: Disposition) => d.isActive)
+      .sort((a: Disposition, b: Disposition) => a.sortOrder - b.sortOrder),
+  });
+
+  const { data: subDispositions = [] } = useQuery<SubDisposition[]>({
+    queryKey: ["/api/sub-dispositions"],
+    select: (response: any) => (response.data || [])
+      .filter((s: SubDisposition) => s.isActive)
+      .sort((a: SubDisposition, b: SubDisposition) => a.sortOrder - b.sortOrder),
+  });
+
+  const { data: policyViolationOptions = [] } = useQuery<PolicyViolationOption[]>({
+    queryKey: ["/api/policy-violation-options"],
+    select: (response: any) => (response.data || [])
+      .filter((p: PolicyViolationOption) => p.isActive)
+      .sort((a: PolicyViolationOption, b: PolicyViolationOption) => a.sortOrder - b.sortOrder),
   });
 
   const form = useForm<ResolutionFormValues>({
@@ -191,9 +222,9 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {dispositionOptions.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
+                          {dispositions.map((disposition) => (
+                            <SelectItem key={disposition.id} value={disposition.id}>
+                              {disposition.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -220,11 +251,13 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {selectedDisposition && subDispositionOptions[selectedDisposition as keyof typeof subDispositionOptions]?.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
+                          {subDispositions
+                            .filter(sub => sub.dispositionId === selectedDisposition)
+                            .map((subDisposition) => (
+                              <SelectItem key={subDisposition.id} value={subDisposition.id}>
+                                {subDisposition.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -285,9 +318,11 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Yes">Yes</SelectItem>
-                          <SelectItem value="No">No</SelectItem>
-                          <SelectItem value="N/A">N/A</SelectItem>
+                          {policyViolationOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
