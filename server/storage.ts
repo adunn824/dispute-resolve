@@ -21,6 +21,9 @@ import {
   priorityRules,
   tagRules,
   resolutionConfigs,
+  dispositions,
+  subDispositions,
+  policyViolationOptions,
   slaPolicies,
   valueSets,
   configAudits,
@@ -80,6 +83,12 @@ import {
   type InsertTagRule,
   type ResolutionConfig,
   type InsertResolutionConfig,
+  type Disposition,
+  type InsertDisposition,
+  type SubDisposition,
+  type InsertSubDisposition,
+  type PolicyViolationOption,
+  type InsertPolicyViolationOption,
   type SlaPolicy,
   type InsertSlaPolicy,
   type ValueSet,
@@ -260,6 +269,27 @@ export interface IStorage {
   createResolutionConfig(config: InsertResolutionConfig): Promise<ResolutionConfig>;
   updateResolutionConfig(id: string, updates: Partial<InsertResolutionConfig>): Promise<ResolutionConfig>;
   deleteResolutionConfig(id: string): Promise<void>;
+  
+  // Config methods - Dispositions
+  getDispositions(): Promise<Disposition[]>;
+  getDisposition(id: string): Promise<Disposition | undefined>;
+  createDisposition(disposition: InsertDisposition): Promise<Disposition>;
+  updateDisposition(id: string, updates: Partial<InsertDisposition>): Promise<Disposition>;
+  deleteDisposition(id: string): Promise<void>;
+  
+  // Config methods - Sub-Dispositions
+  getSubDispositions(dispositionId?: string): Promise<SubDisposition[]>;
+  getSubDisposition(id: string): Promise<SubDisposition | undefined>;
+  createSubDisposition(subDisposition: InsertSubDisposition): Promise<SubDisposition>;
+  updateSubDisposition(id: string, updates: Partial<InsertSubDisposition>): Promise<SubDisposition>;
+  deleteSubDisposition(id: string): Promise<void>;
+  
+  // Config methods - Policy Violation Options
+  getPolicyViolationOptions(): Promise<PolicyViolationOption[]>;
+  getPolicyViolationOption(id: string): Promise<PolicyViolationOption | undefined>;
+  createPolicyViolationOption(option: InsertPolicyViolationOption): Promise<PolicyViolationOption>;
+  updatePolicyViolationOption(id: string, updates: Partial<InsertPolicyViolationOption>): Promise<PolicyViolationOption>;
+  deletePolicyViolationOption(id: string): Promise<void>;
   
   getSlaPolicies(categoryId: string): Promise<SlaPolicy[]>;
   createSlaPolicy(policy: InsertSlaPolicy): Promise<SlaPolicy>;
@@ -1897,6 +1927,107 @@ export class DatabaseStorage implements IStorage {
 
   async deleteResolutionConfig(id: string): Promise<void> {
     await db.delete(resolutionConfigs).where(eq(resolutionConfigs.id, id));
+  }
+
+  // Config methods - Dispositions
+  async getDispositions(): Promise<Disposition[]> {
+    return await db.select().from(dispositions)
+      .orderBy(asc(dispositions.sortOrder), asc(dispositions.name));
+  }
+
+  async getDisposition(id: string): Promise<Disposition | undefined> {
+    const [disposition] = await db.select().from(dispositions).where(eq(dispositions.id, id));
+    return disposition || undefined;
+  }
+
+  async createDisposition(insertDisposition: InsertDisposition): Promise<Disposition> {
+    const [disposition] = await db
+      .insert(dispositions)
+      .values(insertDisposition)
+      .returning();
+    return disposition;
+  }
+
+  async updateDisposition(id: string, updates: Partial<InsertDisposition>): Promise<Disposition> {
+    const [disposition] = await db
+      .update(dispositions)
+      .set(updates)
+      .where(eq(dispositions.id, id))
+      .returning();
+    return disposition;
+  }
+
+  async deleteDisposition(id: string): Promise<void> {
+    await db.delete(dispositions).where(eq(dispositions.id, id));
+  }
+
+  // Config methods - Sub-Dispositions
+  async getSubDispositions(dispositionId?: string): Promise<SubDisposition[]> {
+    if (dispositionId) {
+      return await db.select().from(subDispositions)
+        .where(eq(subDispositions.dispositionId, dispositionId))
+        .orderBy(asc(subDispositions.sortOrder), asc(subDispositions.name));
+    }
+    return await db.select().from(subDispositions)
+      .orderBy(asc(subDispositions.sortOrder), asc(subDispositions.name));
+  }
+
+  async getSubDisposition(id: string): Promise<SubDisposition | undefined> {
+    const [subDisposition] = await db.select().from(subDispositions).where(eq(subDispositions.id, id));
+    return subDisposition || undefined;
+  }
+
+  async createSubDisposition(insertSubDisposition: InsertSubDisposition): Promise<SubDisposition> {
+    const [subDisposition] = await db
+      .insert(subDispositions)
+      .values(insertSubDisposition)
+      .returning();
+    return subDisposition;
+  }
+
+  async updateSubDisposition(id: string, updates: Partial<InsertSubDisposition>): Promise<SubDisposition> {
+    const [subDisposition] = await db
+      .update(subDispositions)
+      .set(updates)
+      .where(eq(subDispositions.id, id))
+      .returning();
+    return subDisposition;
+  }
+
+  async deleteSubDisposition(id: string): Promise<void> {
+    await db.delete(subDispositions).where(eq(subDispositions.id, id));
+  }
+
+  // Config methods - Policy Violation Options
+  async getPolicyViolationOptions(): Promise<PolicyViolationOption[]> {
+    return await db.select().from(policyViolationOptions)
+      .orderBy(asc(policyViolationOptions.sortOrder), asc(policyViolationOptions.label));
+  }
+
+  async getPolicyViolationOption(id: string): Promise<PolicyViolationOption | undefined> {
+    const [option] = await db.select().from(policyViolationOptions).where(eq(policyViolationOptions.id, id));
+    return option || undefined;
+  }
+
+  async createPolicyViolationOption(insertOption: InsertPolicyViolationOption): Promise<PolicyViolationOption> {
+    const [option] = await db
+      .insert(policyViolationOptions)
+      .values(insertOption)
+      .returning();
+    return option;
+  }
+
+  async updatePolicyViolationOption(id: string, updates: Partial<InsertPolicyViolationOption>): Promise<PolicyViolationOption> {
+    const [option] = await db
+      .update(policyViolationOptions)
+      .set(updates)
+      .where(eq(policyViolationOptions.id, id))
+      .returning();
+    return option;
+  }
+
+  async deletePolicyViolationOption(id: string): Promise<void> {
+    await db.delete(policyViolationOptions).where(eq(policyViolationOptions.id, id));
   }
 
   // Config methods - SLA Policies

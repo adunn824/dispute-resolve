@@ -344,6 +344,39 @@ export const resolutionConfigs = pgTable("resolution_configs", {
   fieldsJson: json("fields_json").notNull(),
 });
 
+export const dispositions = pgTable("dispositions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const subDispositions = pgTable("sub_dispositions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dispositionId: varchar("disposition_id").notNull().references(() => dispositions.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.dispositionId, table.name),
+]);
+
+export const policyViolationOptions = pgTable("policy_violation_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  value: text("value").notNull().unique(),
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const slaPolicies = pgTable("sla_policies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
@@ -617,6 +650,17 @@ export const resolutionConfigsRelations = relations(resolutionConfigs, ({ one })
   }),
 }));
 
+export const dispositionsRelations = relations(dispositions, ({ many }) => ({
+  subDispositions: many(subDispositions),
+}));
+
+export const subDispositionsRelations = relations(subDispositions, ({ one }) => ({
+  disposition: one(dispositions, {
+    fields: [subDispositions.dispositionId],
+    references: [dispositions.id],
+  }),
+}));
+
 export const slaPoliciesRelations = relations(slaPolicies, ({ one }) => ({
   category: one(categories, {
     fields: [slaPolicies.categoryId],
@@ -736,6 +780,24 @@ export const insertResolutionConfigSchema = createInsertSchema(resolutionConfigs
   id: true,
 });
 
+export const insertDispositionSchema = createInsertSchema(dispositions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSubDispositionSchema = createInsertSchema(subDispositions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPolicyViolationOptionSchema = createInsertSchema(policyViolationOptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertSlaPolicySchema = createInsertSchema(slaPolicies).omit({
   id: true,
 });
@@ -827,6 +889,15 @@ export type InsertChecklistAssignmentRule = z.infer<typeof insertChecklistAssign
 
 export type ResolutionConfig = typeof resolutionConfigs.$inferSelect;
 export type InsertResolutionConfig = z.infer<typeof insertResolutionConfigSchema>;
+
+export type Disposition = typeof dispositions.$inferSelect;
+export type InsertDisposition = z.infer<typeof insertDispositionSchema>;
+
+export type SubDisposition = typeof subDispositions.$inferSelect;
+export type InsertSubDisposition = z.infer<typeof insertSubDispositionSchema>;
+
+export type PolicyViolationOption = typeof policyViolationOptions.$inferSelect;
+export type InsertPolicyViolationOption = z.infer<typeof insertPolicyViolationOptionSchema>;
 
 export type SlaPolicy = typeof slaPolicies.$inferSelect;
 export type InsertSlaPolicy = z.infer<typeof insertSlaPolicySchema>;

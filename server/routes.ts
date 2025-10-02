@@ -8,6 +8,9 @@ import {
   insertCaseNoteSchema,
   insertCaseOriginationSchema,
   insertLenderSchema,
+  insertDispositionSchema,
+  insertSubDispositionSchema,
+  insertPolicyViolationOptionSchema,
   insertKbCategorySchema,
   insertKbArticleSchema,
   insertKbChangeEventSchema,
@@ -847,6 +850,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ message: "Failed to delete lender" });
+    }
+  });
+
+  // Disposition Options Management
+  app.get("/api/dispositions", requireAuth, async (req, res) => {
+    try {
+      const dispositions = await storage.getDispositions();
+      res.json({ data: dispositions });
+    } catch (error) {
+      console.error("Failed to fetch dispositions:", error);
+      res.status(500).json({ error: "Failed to fetch dispositions" });
+    }
+  });
+
+  app.post("/api/dispositions", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const validatedData = insertDispositionSchema.parse(req.body);
+      const disposition = await storage.createDisposition(validatedData);
+      res.status(201).json(disposition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating disposition:", error);
+      res.status(500).json({ message: "Failed to create disposition" });
+    }
+  });
+
+  app.put("/api/dispositions/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertDispositionSchema.parse(req.body);
+      const disposition = await storage.updateDisposition(id, validatedData);
+      res.json(disposition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating disposition:", error);
+      res.status(500).json({ message: "Failed to update disposition" });
+    }
+  });
+
+  app.delete("/api/dispositions/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteDisposition(id);
+      res.json({ message: "Disposition deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting disposition:", error);
+      if ((error as any).code === '23503' || (error as any).message?.includes('foreign key')) {
+        return res.status(400).json({ 
+          message: "Cannot delete disposition because it has sub-dispositions or is referenced by existing resolutions.",
+          code: 'FOREIGN_KEY_CONSTRAINT'
+        });
+      }
+      res.status(500).json({ message: "Failed to delete disposition" });
+    }
+  });
+
+  // Sub-Disposition Options Management  
+  app.get("/api/sub-dispositions", requireAuth, async (req, res) => {
+    try {
+      const { dispositionId } = req.query;
+      const subDispositions = await storage.getSubDispositions(dispositionId as string);
+      res.json({ data: subDispositions });
+    } catch (error) {
+      console.error("Failed to fetch sub-dispositions:", error);
+      res.status(500).json({ error: "Failed to fetch sub-dispositions" });
+    }
+  });
+
+  app.post("/api/sub-dispositions", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const validatedData = insertSubDispositionSchema.parse(req.body);
+      const subDisposition = await storage.createSubDisposition(validatedData);
+      res.status(201).json(subDisposition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating sub-disposition:", error);
+      res.status(500).json({ message: "Failed to create sub-disposition" });
+    }
+  });
+
+  app.put("/api/sub-dispositions/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertSubDispositionSchema.parse(req.body);
+      const subDisposition = await storage.updateSubDisposition(id, validatedData);
+      res.json(subDisposition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating sub-disposition:", error);
+      res.status(500).json({ message: "Failed to update sub-disposition" });
+    }
+  });
+
+  app.delete("/api/sub-dispositions/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSubDisposition(id);
+      res.json({ message: "Sub-disposition deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting sub-disposition:", error);
+      res.status(500).json({ message: "Failed to delete sub-disposition" });
+    }
+  });
+
+  // Policy Violation Options Management
+  app.get("/api/policy-violation-options", requireAuth, async (req, res) => {
+    try {
+      const options = await storage.getPolicyViolationOptions();
+      res.json({ data: options });
+    } catch (error) {
+      console.error("Failed to fetch policy violation options:", error);
+      res.status(500).json({ error: "Failed to fetch policy violation options" });
+    }
+  });
+
+  app.post("/api/policy-violation-options", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const validatedData = insertPolicyViolationOptionSchema.parse(req.body);
+      const option = await storage.createPolicyViolationOption(validatedData);
+      res.status(201).json(option);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating policy violation option:", error);
+      res.status(500).json({ message: "Failed to create policy violation option" });
+    }
+  });
+
+  app.put("/api/policy-violation-options/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertPolicyViolationOptionSchema.parse(req.body);
+      const option = await storage.updatePolicyViolationOption(id, validatedData);
+      res.json(option);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating policy violation option:", error);
+      res.status(500).json({ message: "Failed to update policy violation option" });
+    }
+  });
+
+  app.delete("/api/policy-violation-options/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePolicyViolationOption(id);
+      res.json({ message: "Policy violation option deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting policy violation option:", error);
+      res.status(500).json({ message: "Failed to delete policy violation option" });
     }
   });
 
