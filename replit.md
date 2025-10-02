@@ -32,9 +32,10 @@ Preferred communication style: Simple, everyday language.
 - **Schema**: Comprehensive relational model for user management (role-based access), customer/case entities, dynamic checklists (case-specific and reusable templates), document management, resolution tracking, audit logging, and configurable business rules (priority, tags, checklist assignment, SLA policies).
 
 ### Configuration Management
-- **Admin Panel**: Dynamic system for runtime updates to case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations, SLA policies, value sets, and feature flags.
+- **Admin Panel**: Dynamic system for runtime updates to case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations (dispositions, sub-dispositions, policy violations), SLA policies, value sets, and feature flags.
 - **Audit Trail**: Tracking of configuration changes with rollback capability.
 - **Rule-Based Automation**: Intelligent workflow automation using configurable business rules.
+- **Resolution Options**: Fully configurable disposition options, hierarchical sub-dispositions linked to parent dispositions, and policy violation options - all manageable through the admin interface at /admin/resolution-options.
 
 ### File Management
 - **Strategy**: Prepared for S3 integration with presigned URL patterns.
