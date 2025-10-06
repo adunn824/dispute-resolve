@@ -2113,11 +2113,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get users for assignment
+  // Get all users for user management
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
-      // Return actual database users instead of mock data
-      const users = await storage.getAvailableAssignees();
+      // Return all database users regardless of role or status
+      const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);
