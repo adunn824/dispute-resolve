@@ -72,6 +72,19 @@ export const sessions = pgTable(
 
 // Runtime Tables
 
+// Lenders must be defined before users since users references it
+export const lenders = pgTable("lenders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  dba: text("dba"),
+  address: text("address"),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").unique().notNull(),
@@ -83,6 +96,14 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: text("role", { enum: ["agent", "compliance", "admin"] }).notNull().default("agent"),
   status: text("status").notNull().default("active"),
+  
+  // Permission fields
+  restrictedLenderId: varchar("restricted_lender_id").references(() => lenders.id), // Restrict user to specific lender
+  isViewOnly: boolean("is_view_only").notNull().default(false), // Read-only access
+  canResolve: boolean("can_resolve").notNull().default(true), // Can resolve cases
+  canDelete: boolean("can_delete").notNull().default(false), // Can delete cases/items
+  canAssign: boolean("can_assign").notNull().default(true), // Can assign cases
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -198,18 +219,6 @@ export const caseOriginations = pgTable("case_originations", {
   name: text("name").notNull().unique(),
   description: text("description"),
   externalKey: text("external_key"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const lenders = pgTable("lenders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  dba: text("dba"),
-  address: text("address"),
-  contactPerson: text("contact_person"),
-  email: text("email"),
-  phone: text("phone"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
