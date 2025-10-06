@@ -344,14 +344,17 @@ export default function UsersManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Restricted to Lender (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <Select 
+                          onValueChange={(value) => field.onChange(value === "none" ? null : value)} 
+                          value={field.value || "none"}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-restricted-lender">
                               <SelectValue placeholder="No restriction - All lenders" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">No restriction - All lenders</SelectItem>
+                            <SelectItem value="none">No restriction - All lenders</SelectItem>
                             {lenders.map((lender) => (
                               <SelectItem key={lender.id} value={lender.id}>
                                 {lender.name}
