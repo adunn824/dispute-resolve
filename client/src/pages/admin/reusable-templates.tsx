@@ -604,7 +604,7 @@ export default function ReusableTemplatesManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-template-category">
                               <SelectValue placeholder="Select category for auto-assignment..." />
