@@ -38,10 +38,11 @@ Preferred communication style: Simple, everyday language.
 - **Resolution Options**: Fully configurable disposition options, hierarchical sub-dispositions linked to parent dispositions, and policy violation options - all manageable through the admin interface at /admin/resolution-options.
 
 ### Unified Checklist Template System
-- **Flexible Templates**: Checklist templates support both category-specific auto-assignment and reusable library modes. Templates can be:
-  - Category-specific: Automatically applied to all cases in a category
-  - Reusable: Available in the library for assignment via business rules
-  - Both: Auto-applied to a category AND available for rule-based assignment
+- **Single Template System**: The platform uses **reusableChecklistTemplates** as the single source of truth for all checklist templates. The legacy `checklistTemplates` system has been deprecated and consolidated.
+- **Automatic Assignment**: Templates are automatically assigned to cases through two mechanisms:
+  - **Category-specific**: Templates with a `categoryId` are automatically applied to all cases in that category
+  - **Rule-based**: Templates can be conditionally assigned via business rules (checklistAssignmentRules)
+- **Dynamic Evaluation**: The system evaluates which templates apply to each case on-demand using the `/api/cases/:id/dynamic-checklist` endpoint
 - **Six Field Types**: Each checklist item supports multiple field types:
   - **Checkbox**: Traditional toggle-based completion (default)
   - **Dropdown**: Select from pre-configured options
@@ -51,7 +52,8 @@ Preferred communication style: Simple, everyday language.
   - **File**: Text input for file references (URLs or file IDs from object storage)
 - **Dynamic Configuration**: Field options (dropdown choices) and default values are configurable per item
 - **Case Detail Rendering**: Each field type renders appropriately in the case detail view with type-specific inputs
-- **Data Migration**: Legacy category-specific templates have been migrated to the unified system with backward compatibility maintained
+- **Admin Interface**: Single unified templates page at `/admin/templates` for managing all reusable templates
+- **Legacy System**: The old `checklistTemplates` API routes and storage methods have been removed. The database schema remains for historical data but is no longer actively used.
 
 ### File Management
 - **Strategy**: Prepared for S3 integration with presigned URL patterns.
