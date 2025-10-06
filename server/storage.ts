@@ -249,10 +249,11 @@ export interface IStorage {
   getCategoryWithCaseTypes(id: string): Promise<Category & { caseTypes: CaseType[] }>;
   
   // Config methods - Templates & Requirements
-  getChecklistTemplates(categoryId: string): Promise<ChecklistTemplate[]>;
-  createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate>;
-  updateChecklistTemplate(id: string, updates: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate>;
-  deleteChecklistTemplate(id: string): Promise<void>;
+  // DEPRECATED: Legacy checklist templates - replaced by reusableChecklistTemplates
+  // getChecklistTemplates(categoryId: string): Promise<ChecklistTemplate[]>;
+  // createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate>;
+  // updateChecklistTemplate(id: string, updates: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate>;
+  // deleteChecklistTemplate(id: string): Promise<void>;
   
   getDocumentRequirements(categoryId: string): Promise<DocumentRequirement[]>;
   createDocumentRequirement(requirement: InsertDocumentRequirement): Promise<DocumentRequirement>;
@@ -1749,7 +1750,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(categories).where(eq(categories.id, id));
   }
 
-  // Config methods - Checklist Templates
+  // DEPRECATED: Legacy Config methods - Checklist Templates
+  // These methods are deprecated in favor of reusableChecklistTemplates
+  // Keeping them commented out for reference
+  /*
   async getChecklistTemplates(categoryId: string): Promise<ChecklistTemplate[]> {
     return await db.select().from(checklistTemplates)
       .where(eq(checklistTemplates.categoryId, categoryId))
@@ -1776,6 +1780,7 @@ export class DatabaseStorage implements IStorage {
   async deleteChecklistTemplate(id: string): Promise<void> {
     await db.delete(checklistTemplates).where(eq(checklistTemplates.id, id));
   }
+  */
 
   // Config methods - Reusable Checklist Templates
   async getReusableChecklistTemplates(): Promise<ReusableChecklistTemplate[]> {

@@ -1556,68 +1556,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Checklist Templates Management
-  app.get("/api/categories/:categoryId/checklist-templates", requireAuth, async (req, res) => {
-    try {
-      const { categoryId } = req.params;
-      const templates = await storage.getChecklistTemplates(categoryId);
-      res.json(templates);
-    } catch (error) {
-      console.error("Error fetching checklist templates:", error);
-      res.status(500).json({ message: "Failed to fetch checklist templates" });
-    }
-  });
-
-  app.post("/api/categories/:categoryId/checklist-templates", requireAuth, requireRole("admin"), async (req, res) => {
-    try {
-      const { categoryId } = req.params;
-      const { key, label, sortOrder, isRequired, conditionJson, helpText } = req.body;
-      const template = await storage.createChecklistTemplate({
-        categoryId,
-        key,
-        label,
-        sortOrder: sortOrder || 0,
-        isRequired: isRequired || false,
-        conditionJson,
-        helpText,
-      });
-      res.status(201).json(template);
-    } catch (error) {
-      console.error("Error creating checklist template:", error);
-      res.status(500).json({ message: "Failed to create checklist template" });
-    }
-  });
-
-  app.put("/api/checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { key, label, sortOrder, isRequired, conditionJson, helpText } = req.body;
-      const template = await storage.updateChecklistTemplate(id, {
-        key,
-        label,
-        sortOrder,
-        isRequired,
-        conditionJson,
-        helpText,
-      });
-      res.json(template);
-    } catch (error) {
-      console.error("Error updating checklist template:", error);
-      res.status(500).json({ message: "Failed to update checklist template" });
-    }
-  });
-
-  app.delete("/api/checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deleteChecklistTemplate(id);
-      res.json({ message: "Checklist template deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting checklist template:", error);
-      res.status(500).json({ message: "Failed to delete checklist template" });
-    }
-  });
-
   // Reusable Checklist Templates Management
   app.get("/api/reusable-checklist-templates", requireAuth, async (req, res) => {
     try {
@@ -1961,43 +1899,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching checklist items:", error);
       res.status(500).json({ message: "Failed to fetch checklist items" });
-    }
-  });
-
-  app.post("/api/cases/:caseId/checklist-items/generate", requireAuth, async (req, res) => {
-    try {
-      const { caseId } = req.params;
-      
-      // Get case to determine category
-      const caseRecord = await storage.getCase(caseId);
-      if (!caseRecord) {
-        return res.status(404).json({ message: "Case not found" });
-      }
-
-      // Get checklist templates for this category
-      const templates = await storage.getChecklistTemplates(caseRecord.categoryId);
-      
-      // Generate checklist items from templates
-      const checklistItems = [];
-      for (const template of templates) {
-        // TODO: Add condition evaluation here
-        const item = await storage.createChecklistItem({
-          caseId,
-          key: template.key,
-          label: template.label,
-          isRequired: template.isRequired,
-          status: "open",
-        });
-        checklistItems.push(item);
-      }
-
-      res.status(201).json({ 
-        message: `Generated ${checklistItems.length} checklist items`,
-        items: checklistItems
-      });
-    } catch (error) {
-      console.error("Error generating checklist items:", error);
-      res.status(500).json({ message: "Failed to generate checklist items" });
     }
   });
 
