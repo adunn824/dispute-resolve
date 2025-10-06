@@ -1646,10 +1646,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/reusable-checklist-templates", requireAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { name, description, isActive } = req.body;
+      const { name, description, categoryId, isReusable, isActive } = req.body;
       const template = await storage.createReusableChecklistTemplate({
         name,
         description,
+        categoryId: categoryId || null,
+        isReusable: isReusable !== undefined ? isReusable : true,
         isActive: isActive !== undefined ? isActive : true,
       });
       res.status(201).json(template);
@@ -1662,10 +1664,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/reusable-checklist-templates/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, isActive } = req.body;
+      const { name, description, categoryId, isReusable, isActive } = req.body;
       const template = await storage.updateReusableChecklistTemplate(id, {
         name,
         description,
+        categoryId: categoryId !== undefined ? categoryId : undefined,
+        isReusable: isReusable !== undefined ? isReusable : undefined,
         isActive,
       });
       res.json(template);
@@ -1701,7 +1705,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/reusable-checklist-templates/:templateId/items", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { templateId } = req.params;
-      const { key, label, description, isRequired, sortOrder, helpText, estimatedDuration } = req.body;
+      const { key, label, description, isRequired, sortOrder, helpText, estimatedDuration, fieldType, fieldOptions, defaultValue, conditionJson } = req.body;
+      
+      // Validate field type
+      const validFieldTypes = ['checkbox', 'dropdown', 'text', 'number', 'date', 'file'];
+      const sanitizedFieldType = fieldType && validFieldTypes.includes(fieldType) ? fieldType : 'checkbox';
+      
+      // Validate field options (must be array for dropdown)
+      let sanitizedFieldOptions = null;
+      if (sanitizedFieldType === 'dropdown' && Array.isArray(fieldOptions)) {
+        sanitizedFieldOptions = fieldOptions.filter(opt => typeof opt === 'string');
+      }
+      
       const item = await storage.createReusableChecklistItem({
         templateId,
         key,
@@ -1711,6 +1726,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortOrder: sortOrder || 0,
         helpText,
         estimatedDuration,
+        fieldType: sanitizedFieldType,
+        fieldOptions: sanitizedFieldOptions,
+        defaultValue: defaultValue || null,
+        conditionJson: conditionJson || null,
       });
       res.status(201).json(item);
     } catch (error) {
@@ -1722,7 +1741,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/reusable-checklist-items/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { key, label, description, isRequired, sortOrder, helpText, estimatedDuration } = req.body;
+      const { key, label, description, isRequired, sortOrder, helpText, estimatedDuration, fieldType, fieldOptions, defaultValue, conditionJson } = req.body;
+      
+      // Validate field type
+      const validFieldTypes = ['checkbox', 'dropdown', 'text', 'number', 'date', 'file'];
+      let sanitizedFieldType = undefined;
+      if (fieldType !== undefined) {
+        sanitizedFieldType = validFieldTypes.includes(fieldType) ? fieldType : undefined;
+      }
+      
+      // Validate field options (must be array for dropdown)
+      let sanitizedFieldOptions = undefined;
+      if (fieldOptions !== undefined) {
+        if (Array.isArray(fieldOptions)) {
+          sanitizedFieldOptions = fieldOptions.filter(opt => typeof opt === 'string');
+        } else {
+          sanitizedFieldOptions = null;
+        }
+      }
+      
       const item = await storage.updateReusableChecklistItem(id, {
         key,
         label,
@@ -1731,6 +1768,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortOrder,
         helpText,
         estimatedDuration,
+        fieldType: sanitizedFieldType,
+        fieldOptions: sanitizedFieldOptions,
+        defaultValue,
+        conditionJson,
       });
       res.json(item);
     } catch (error) {

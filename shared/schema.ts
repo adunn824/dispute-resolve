@@ -131,6 +131,12 @@ export const checklistItems = pgTable("checklist_items", {
   status: text("status", { enum: ["open", "complete"] }).notNull().default("open"),
   assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
   completedAt: timestamp("completed_at"),
+  // Field type and value support
+  fieldType: text("field_type", { 
+    enum: ["checkbox", "dropdown", "text", "number", "date", "file"] 
+  }).notNull().default("checkbox"),
+  fieldValue: text("field_value"), // Stores the actual value: "true"/"false" for checkbox, selected option for dropdown, entered value for text/number/date
+  fieldOptions: json("field_options").$type<string[]>(), // For dropdown fields
 });
 
 export const documents = pgTable("documents", {
@@ -257,17 +263,21 @@ export const checklistTemplates = pgTable("checklist_templates", {
   helpText: text("help_text"),
 });
 
-// New reusable checklist templates (for rule-based assignment)
+// Unified checklist templates (supports both category-specific and reusable modes)
 export const reusableChecklistTemplates = pgTable("reusable_checklist_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  // If categoryId is set, template auto-applies to all cases in that category
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
+  // If true, template is available in the library for business rules assignment
+  isReusable: boolean("is_reusable").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Individual items within reusable checklist templates
+// Individual items within checklist templates with field type support
 export const reusableChecklistItems = pgTable("reusable_checklist_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   templateId: varchar("template_id").notNull().references(() => reusableChecklistTemplates.id, { onDelete: "cascade" }),
@@ -278,6 +288,15 @@ export const reusableChecklistItems = pgTable("reusable_checklist_items", {
   sortOrder: integer("sort_order").notNull().default(0),
   helpText: text("help_text"),
   estimatedDuration: integer("estimated_duration"), // in minutes
+  // Field type support
+  fieldType: text("field_type", { 
+    enum: ["checkbox", "dropdown", "text", "number", "date", "file"] 
+  }).notNull().default("checkbox"),
+  // For dropdown fields: array of option strings
+  fieldOptions: json("field_options").$type<string[]>(),
+  // Default value for the field
+  defaultValue: text("default_value"),
+  conditionJson: json("condition_json"), // Conditional display logic
 });
 
 export const insertReusableChecklistTemplateSchema = createInsertSchema(reusableChecklistTemplates);

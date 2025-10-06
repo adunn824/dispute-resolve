@@ -141,11 +141,16 @@ export interface DynamicChecklistItem {
   estimatedDuration?: number | null;
   templateId: string;
   templateName: string;
+  // Field type support
+  fieldType: 'checkbox' | 'dropdown' | 'text' | 'number' | 'date' | 'file';
+  fieldOptions?: string[] | null;
+  defaultValue?: string | null;
   // Completion state fields
   completed: boolean;
   completedAt?: Date | null;
   assignedToUserId?: string | null;
   checklistItemId?: string | null; // ID from checklistItems table if exists
+  fieldValue?: string | null; // The actual value stored for this field
 }
 
 export interface IStorage {
@@ -1292,7 +1297,8 @@ export class DatabaseStorage implements IStorage {
             completed: item.status === 'complete',
             completedAt: item.completedAt,
             assignedToUserId: item.assignedToUserId,
-            checklistItemId: item.id
+            checklistItemId: item.id,
+            fieldValue: item.fieldValue
           }
         ])
       );
@@ -1336,10 +1342,16 @@ export class DatabaseStorage implements IStorage {
                   estimatedDuration: templateItem.estimatedDuration,
                   templateId: template.id,
                   templateName: template.name,
+                  // Field type support
+                  fieldType: templateItem.fieldType || 'checkbox',
+                  fieldOptions: templateItem.fieldOptions || null,
+                  defaultValue: templateItem.defaultValue || null,
+                  // Completion state
                   completed: completion?.completed ?? false,
                   completedAt: completion?.completedAt ?? null,
                   assignedToUserId: completion?.assignedToUserId ?? null,
-                  checklistItemId: completion?.checklistItemId ?? null
+                  checklistItemId: completion?.checklistItemId ?? null,
+                  fieldValue: completion?.fieldValue ?? null
                 });
 
                 seenKeys.add(templateItem.key);
