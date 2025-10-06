@@ -192,6 +192,7 @@ export interface IStorage {
   updateCase(id: string, updates: Partial<InsertCase>): Promise<Case>;
   assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case>;
   getAvailableAssignees(): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
   
   // Case notes methods
   getCaseNotes(caseId: string): Promise<Array<CaseNote & { authorUser: { name: string; role: string } }>>;
@@ -1199,6 +1200,12 @@ export class DatabaseStorage implements IStorage {
         inArray(users.role, ["agent", "compliance"]),
         eq(users.status, "active")
       ))
+      .orderBy(asc(users.name));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    // Return all users regardless of role or status
+    return await db.select().from(users)
       .orderBy(asc(users.name));
   }
 
