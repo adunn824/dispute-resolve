@@ -37,6 +37,22 @@ Preferred communication style: Simple, everyday language.
 - **Rule-Based Automation**: Intelligent workflow automation using configurable business rules.
 - **Resolution Options**: Fully configurable disposition options, hierarchical sub-dispositions linked to parent dispositions, and policy violation options - all manageable through the admin interface at /admin/resolution-options.
 
+### Unified Checklist Template System
+- **Flexible Templates**: Checklist templates support both category-specific auto-assignment and reusable library modes. Templates can be:
+  - Category-specific: Automatically applied to all cases in a category
+  - Reusable: Available in the library for assignment via business rules
+  - Both: Auto-applied to a category AND available for rule-based assignment
+- **Six Field Types**: Each checklist item supports multiple field types:
+  - **Checkbox**: Traditional toggle-based completion (default)
+  - **Dropdown**: Select from pre-configured options
+  - **Text**: Free-form text input
+  - **Number**: Numeric input with validation
+  - **Date**: Date picker for deadline/date fields
+  - **File**: Text input for file references (URLs or file IDs from object storage)
+- **Dynamic Configuration**: Field options (dropdown choices) and default values are configurable per item
+- **Case Detail Rendering**: Each field type renders appropriately in the case detail view with type-specific inputs
+- **Data Migration**: Legacy category-specific templates have been migrated to the unified system with backward compatibility maintained
+
 ### File Management
 - **Strategy**: Prepared for S3 integration with presigned URL patterns.
 - **Document Types**: Support for various file types (PDF, images, archives).
