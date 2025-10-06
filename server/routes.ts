@@ -31,6 +31,14 @@ const requireAuth = (req: any, res: any, next: any) => {
   next();
 };
 
+// Custom error for authorization failures
+class AuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthorizationError';
+  }
+}
+
 // Role hierarchy: admin > compliance > agent
 const roleHierarchy = {
   'admin': 3,
@@ -62,6 +70,45 @@ const requireRole = (roles: string | string[]) => (req: any, res: any, next: any
   next();
 };
 
+// Permission check helpers
+const checkUserPermissions = {
+  // Check if user can modify cases (not view-only)
+  canModify: (user: any) => {
+    if (user.isViewOnly) {
+      throw new AuthorizationError("You have view-only access and cannot make modifications");
+    }
+  },
+  
+  // Check if user can resolve cases
+  canResolve: (user: any) => {
+    if (!user.canResolve) {
+      throw new AuthorizationError("You do not have permission to resolve cases");
+    }
+  },
+  
+  // Check if user can delete items
+  canDelete: (user: any) => {
+    if (!user.canDelete) {
+      throw new AuthorizationError("You do not have permission to delete items");
+    }
+  },
+  
+  // Check if user can assign cases
+  canAssign: (user: any) => {
+    if (!user.canAssign) {
+      throw new AuthorizationError("You do not have permission to assign cases");
+    }
+  },
+  
+  // Check if user has access to a specific lender's case
+  hasLenderAccess: (user: any, caseLenderId: string | null) => {
+    // If user is restricted to a specific lender, check if case belongs to that lender
+    if (user.restrictedLenderId && user.restrictedLenderId !== caseLenderId) {
+      throw new AuthorizationError("You do not have access to cases from this lender");
+    }
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup multer for file uploads
@@ -76,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Case Management API Endpoints
   
   // GET /api/cases - List cases with filtering and pagination
-  app.get("/api/cases", requireAuth, async (req, res) => {
+  app.get("/api/cases", requireAuth, async (req: any, res) => {
     try {
       const querySchema = z.object({
         status: z.string().optional(),
@@ -95,6 +142,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const filters = querySchema.parse(req.query);
+      
+      // Apply lender restriction if user has one
+      if (req.user.restrictedLenderId) {
+        // Override any lenderId filter with user's restricted lender
+        (filters as any).lenderId = req.user.restrictedLenderId;
+      }
       
       // Use detailed view if requested, otherwise basic view
       const cases = filters.detailed 
@@ -119,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/cases/:id - Get single case by ID with detailed information
-  app.get("/api/cases/:id", requireAuth, async (req, res) => {
+  app.get("/api/cases/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const caseRecord = await storage.getCaseWithDetails(id);
@@ -128,8 +181,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Case not found" });
       }
       
+      // Check lender access permission
+      checkUserPermissions.hasLenderAccess(req.user, caseRecord.lenderId);
+      
       res.json({ data: caseRecord });
     } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
       console.error("Failed to fetch case:", error);
       res.status(500).json({ error: "Failed to fetch case" });
     }
@@ -150,9 +209,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid status. Must be one of: open, in_progress, resolved" });
       }
 
+      // Get the case to check permissions
+      const existingCase = await storage.getCase(id);
+      if (!existingCase) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+
+      // Permission checks
+      checkUserPermissions.canModify(req.user);
+      checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
+      
+      // If resolving, check resolve permission
+      if (status === "resolved") {
+        checkUserPermissions.canResolve(req.user);
+      }
+
       const updatedCase = await storage.updateCaseStatus(id, status, userId);
       res.json({ data: updatedCase });
     } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
       console.error("Failed to update case status:", error);
       if (error instanceof Error && error.message === "Case not found") {
         return res.status(404).json({ error: "Case not found" });
@@ -177,9 +254,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid assignedToUserId. Must be a string or null." });
       }
 
+      // Get the case to check permissions
+      const existingCase = await storage.getCase(id);
+      if (!existingCase) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+
+      // Permission checks
+      checkUserPermissions.canAssign(req.user);
+      checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
+
       const updatedCase = await storage.assignCase(id, assignedToUserId, userId);
       res.json({ data: updatedCase });
     } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
       console.error("Failed to assign case:", error);
       if (error instanceof Error && error.message === "Case not found") {
         return res.status(404).json({ error: "Case not found" });
@@ -445,6 +535,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Case not found" });
       }
       
+      // Permission checks
+      checkUserPermissions.canModify(req.user);
+      checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
+      
       const updatedCase = await storage.updateCase(id, updates);
       
       // Create audit log for case update
@@ -457,6 +551,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ data: updatedCase });
     } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid update data", details: error.errors });
       }
