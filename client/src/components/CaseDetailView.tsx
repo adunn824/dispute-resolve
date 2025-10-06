@@ -24,6 +24,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Form schema for editing case details
 const editCaseSchema = z.object({
@@ -68,12 +69,14 @@ interface CaseDetailViewProps {
 
 interface CaseDetailData {
   id: string;
+  caseNumber?: string;
   caseTypeId: string;
   categoryId: string;
   customerId: string;
   assignedToUserId?: string;
   loanId?: string;
   lenderName?: string;
+  lenderId?: string;
   state: string;
   details: string;
   status: "open" | "in_progress" | "resolved";
@@ -113,6 +116,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [hasRepresentative, setHasRepresentative] = useState(false);
   const { toast } = useToast();
+  const { user, isLoading: isAuthLoading } = useAuth();
   
   // Fetch case details from API
   const { data: caseData, isLoading, error } = useQuery<{data: CaseDetailData}>({
@@ -297,20 +301,24 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
           <PriorityBadge priority={caseDetails.priorityValue as "Low" | "Medium" | "High"} />
           <div className="flex items-center gap-2">
             <StatusBadge status={caseDetails.status} />
-            <Select
-              value={caseDetails.status}
-              onValueChange={handleStatusChange}
-              disabled={updateStatusMutation.isPending}
-            >
-              <SelectTrigger className="w-32" data-testid="select-case-status">
-                <Settings className="h-4 w-4" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open" data-testid="option-status-open">Open</SelectItem>
-                <SelectItem value="in_progress" data-testid="option-status-in-progress">In Progress</SelectItem>
-                <SelectItem value="resolved" data-testid="option-status-resolved">Resolved</SelectItem>
-              </SelectContent>
-            </Select>
+            {user && !user.isViewOnly && (
+              <Select
+                value={caseDetails.status}
+                onValueChange={handleStatusChange}
+                disabled={updateStatusMutation.isPending || isAuthLoading}
+              >
+                <SelectTrigger className="w-32" data-testid="select-case-status">
+                  <Settings className="h-4 w-4" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open" data-testid="option-status-open">Open</SelectItem>
+                  <SelectItem value="in_progress" data-testid="option-status-in-progress">In Progress</SelectItem>
+                  {user.canResolve && (
+                    <SelectItem value="resolved" data-testid="option-status-resolved">Resolved</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
             {updateStatusMutation.isPending && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             )}
@@ -363,29 +371,35 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground mb-2">Assigned to:</p>
-                <Select
-                  value={caseDetails.assignedToUserId || "unassigned"}
-                  onValueChange={handleAssignmentChange}
-                  disabled={assignCaseMutation.isPending}
-                  data-testid="select-case-assignment"
-                >
-                  <SelectTrigger className="w-full" data-testid="trigger-assignment-dropdown">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent data-testid="content-assignment-options">
-                    <SelectItem value="unassigned" data-testid="option-unassigned">Unassigned</SelectItem>
-                    {assignees.map((assignee) => (
-                      <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-assignee-${assignee.id}`}>
-                        <div className="flex items-center gap-2">
-                          <span>{assignee.name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {assignee.role}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {user && user.canAssign && !user.isViewOnly ? (
+                  <Select
+                    value={caseDetails.assignedToUserId || "unassigned"}
+                    onValueChange={handleAssignmentChange}
+                    disabled={assignCaseMutation.isPending || isAuthLoading}
+                    data-testid="select-case-assignment"
+                  >
+                    <SelectTrigger className="w-full" data-testid="trigger-assignment-dropdown">
+                      <SelectValue placeholder="Select assignee" />
+                    </SelectTrigger>
+                    <SelectContent data-testid="content-assignment-options">
+                      <SelectItem value="unassigned" data-testid="option-unassigned">Unassigned</SelectItem>
+                      {assignees.map((assignee) => (
+                        <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-assignee-${assignee.id}`}>
+                          <div className="flex items-center gap-2">
+                            <span>{assignee.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {assignee.role}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm" data-testid="text-assignment-readonly">
+                    {caseDetails.assignedUserName || "Unassigned"}
+                  </p>
+                )}
               </div>
               {caseDetails.assignedUserName && (
                 <div className="flex-1" data-testid="section-current-assignee">
@@ -449,13 +463,19 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
       {/* Action Buttons */}
       <div className="flex justify-end gap-4">
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" onClick={handleEditCase} data-testid="button-edit-case">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Case
-            </Button>
-          </DialogTrigger>
+        {user && !user.isViewOnly && (
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                onClick={handleEditCase} 
+                disabled={isAuthLoading}
+                data-testid="button-edit-case"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Case
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Case Details</DialogTitle>
@@ -687,11 +707,18 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
               </form>
             </Form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        )}
 
-        <Button onClick={handleResolveCase} disabled={caseDetails.status === "resolved"} data-testid="button-resolve-case">
-          Resolve Case
-        </Button>
+        {user && user.canResolve && !user.isViewOnly && (
+          <Button 
+            onClick={handleResolveCase} 
+            disabled={caseDetails.status === "resolved" || isAuthLoading} 
+            data-testid="button-resolve-case"
+          >
+            Resolve Case
+          </Button>
+        )}
       </div>
     </div>
   );

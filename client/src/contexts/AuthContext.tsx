@@ -7,6 +7,11 @@ interface User {
   email: string;
   name: string;
   role: string;
+  restrictedLenderId: string | null;
+  isViewOnly: boolean;
+  canResolve: boolean;
+  canDelete: boolean;
+  canAssign: boolean;
 }
 
 interface AuthContextType {

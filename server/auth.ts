@@ -123,6 +123,11 @@ export function setupAuth(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          restrictedLenderId: user.restrictedLenderId,
+          isViewOnly: user.isViewOnly,
+          canResolve: user.canResolve,
+          canDelete: user.canDelete,
+          canAssign: user.canAssign,
         });
       });
     } catch (error) {
@@ -139,6 +144,11 @@ export function setupAuth(app: Express) {
       email: user.email,
       name: user.name,
       role: user.role,
+      restrictedLenderId: user.restrictedLenderId,
+      isViewOnly: user.isViewOnly,
+      canResolve: user.canResolve,
+      canDelete: user.canDelete,
+      canAssign: user.canAssign,
     });
   });
 
@@ -160,6 +170,11 @@ export function setupAuth(app: Express) {
       email: user.email,
       name: user.name,
       role: user.role,
+      restrictedLenderId: user.restrictedLenderId,
+      isViewOnly: user.isViewOnly,
+      canResolve: user.canResolve,
+      canDelete: user.canDelete,
+      canAssign: user.canAssign,
     });
   });
 }
