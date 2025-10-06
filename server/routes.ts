@@ -2164,6 +2164,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/cases/:caseId/checklist/:key/value - Save field value for a dynamic checklist item
+  app.post("/api/cases/:caseId/checklist/:key/value", requireAuth, async (req: any, res) => {
+    try {
+      const { caseId, key } = req.params;
+      const { value } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Check if a checklist item record already exists for this case+key
+      const existingItems = await storage.getChecklistItems(caseId);
+      const existingItem = existingItems.find(item => item.key === key);
+
+      let item;
+      if (existingItem) {
+        // Update existing item with the new value
+        item = await storage.updateChecklistItem(existingItem.id, {
+          fieldValue: value,
+        });
+      } else {
+        // Create new checklist item with the value
+        item = await storage.createChecklistItem({
+          caseId,
+          key,
+          label: key,
+          isRequired: false,
+          status: "open",
+          fieldValue: value,
+        });
+      }
+
+      // Log the activity
+      await storage.createAuditLog({
+        caseId,
+        actorUserId: userId,
+        action: "checklist_item_value_saved",
+        details: { key, value, checklistItemId: item.id }
+      });
+
+      res.json({ data: item });
+    } catch (error) {
+      console.error("Failed to save field value:", error);
+      res.status(500).json({ error: "Failed to save field value" });
+    }
+  });
+
   // Get users for assignment
   app.get("/api/users", requireAuth, async (req, res) => {
     try {

@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Edit, Trash2, CheckSquare, Clock, ListChecks, ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -21,6 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 const reusableTemplateSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   description: z.string().optional(),
+  categoryId: z.string().optional(),
+  isReusable: z.boolean().default(true),
   isActive: z.boolean().default(true),
 });
 
@@ -32,6 +36,9 @@ const reusableItemSchema = z.object({
   sortOrder: z.number().min(0, "Sort order must be 0 or greater"),
   helpText: z.string().optional(),
   estimatedDuration: z.number().min(0, "Duration must be 0 or greater").optional(),
+  fieldType: z.enum(['checkbox', 'dropdown', 'text', 'number', 'date', 'file']).default('checkbox'),
+  fieldOptions: z.array(z.string()).optional(),
+  defaultValue: z.string().optional(),
 });
 
 type ReusableTemplateForm = z.infer<typeof reusableTemplateSchema>;
@@ -41,6 +48,8 @@ type ReusableTemplate = {
   id: string;
   name: string;
   description: string | null;
+  categoryId: string | null;
+  isReusable: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +65,16 @@ type ReusableItem = {
   sortOrder: number;
   helpText: string | null;
   estimatedDuration: number | null;
+  fieldType: 'checkbox' | 'dropdown' | 'text' | 'number' | 'date' | 'file';
+  fieldOptions: string[] | null;
+  defaultValue: string | null;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
 };
 
 export default function ReusableTemplatesManagement() {
@@ -65,7 +84,15 @@ export default function ReusableTemplatesManagement() {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showItemDialog, setShowItemDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("templates");
+  const [dropdownOptions, setDropdownOptions] = useState<string[]>([]);
+  const [newOption, setNewOption] = useState("");
   const { toast } = useToast();
+
+  // Fetch categories
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    select: (response: any) => response.data || [],
+  });
 
   // Fetch all reusable templates
   const { data: templates = [], isLoading: loadingTemplates, refetch: refetchTemplates } = useQuery<ReusableTemplate[]>({
@@ -86,6 +113,8 @@ export default function ReusableTemplatesManagement() {
     defaultValues: {
       name: "",
       description: "",
+      categoryId: "",
+      isReusable: true,
       isActive: true,
     },
   });
@@ -100,6 +129,9 @@ export default function ReusableTemplatesManagement() {
       sortOrder: 0,
       helpText: "",
       estimatedDuration: undefined,
+      fieldType: 'checkbox',
+      fieldOptions: [],
+      defaultValue: "",
     },
   });
 
@@ -568,6 +600,55 @@ export default function ReusableTemplatesManagement() {
                   />
                   <FormField
                     control={templateForm.control}
+                    name="categoryId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-template-category">
+                              <SelectValue placeholder="Select category for auto-assignment..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None (Library Template)</SelectItem>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          If selected, this template will auto-apply to all cases in this category
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={templateForm.control}
+                    name="isReusable"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-template-reusable"
+                          />
+                        </FormControl>
+                        <div className="space-y-1">
+                          <FormLabel>Available in Library</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            If enabled, this template can be assigned via business rules
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={templateForm.control}
                     name="isActive"
                     render={({ field }) => (
                       <FormItem className="flex items-center space-x-2">
@@ -684,6 +765,115 @@ export default function ReusableTemplatesManagement() {
                                   </FormItem>
                                 )}
                               />
+                              <FormField
+                                control={itemForm.control}
+                                name="fieldType"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Field Type</FormLabel>
+                                    <Select 
+                                      onValueChange={(value) => {
+                                        field.onChange(value);
+                                        if (value !== 'dropdown') {
+                                          itemForm.setValue('fieldOptions', []);
+                                          setDropdownOptions([]);
+                                        }
+                                      }} 
+                                      value={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-field-type">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="checkbox">Checkbox</SelectItem>
+                                        <SelectItem value="dropdown">Dropdown</SelectItem>
+                                        <SelectItem value="text">Text Input</SelectItem>
+                                        <SelectItem value="number">Number Input</SelectItem>
+                                        <SelectItem value="date">Date Picker</SelectItem>
+                                        <SelectItem value="file">File Reference</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              {itemForm.watch('fieldType') === 'dropdown' && (
+                                <div className="space-y-2">
+                                  <Label>Dropdown Options</Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Enter option..."
+                                      value={newOption}
+                                      onChange={(e) => setNewOption(e.target.value)}
+                                      onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          if (newOption.trim()) {
+                                            const updated = [...(itemForm.getValues('fieldOptions') || []), newOption.trim()];
+                                            itemForm.setValue('fieldOptions', updated);
+                                            setDropdownOptions(updated);
+                                            setNewOption("");
+                                          }
+                                        }
+                                      }}
+                                      data-testid="input-dropdown-option"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => {
+                                        if (newOption.trim()) {
+                                          const updated = [...(itemForm.getValues('fieldOptions') || []), newOption.trim()];
+                                          itemForm.setValue('fieldOptions', updated);
+                                          setDropdownOptions(updated);
+                                          setNewOption("");
+                                        }
+                                      }}
+                                      data-testid="button-add-option"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  {(itemForm.watch('fieldOptions') || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      {(itemForm.watch('fieldOptions') || []).map((option, index) => (
+                                        <Badge key={index} variant="secondary" className="gap-1">
+                                          {option}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const updated = (itemForm.getValues('fieldOptions') || []).filter((_, i) => i !== index);
+                                              itemForm.setValue('fieldOptions', updated);
+                                              setDropdownOptions(updated);
+                                            }}
+                                            className="ml-1 hover:text-destructive"
+                                          >
+                                            ×
+                                          </button>
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <FormField
+                                control={itemForm.control}
+                                name="defaultValue"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Default Value (Optional)</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="Default value for this field..." {...field} data-testid="input-default-value" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
                               <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                   control={itemForm.control}

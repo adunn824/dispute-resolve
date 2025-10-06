@@ -3,10 +3,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, Circle, User, Clock, AlertCircle, RefreshCw, Play } from "lucide-react";
+import { CheckCircle, Circle, User, Clock, AlertCircle, RefreshCw, Play, FileText } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,6 +21,11 @@ interface ChecklistItem {
   estimatedDuration?: number | null;
   templateId: string;
   templateName: string;
+  // Field type support
+  fieldType: 'checkbox' | 'dropdown' | 'text' | 'number' | 'date' | 'file';
+  fieldOptions?: string[] | null;
+  defaultValue?: string | null;
+  value?: string | null;
   // Completion state fields
   completed: boolean;
   completedAt?: Date | null;
@@ -62,9 +68,26 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
     },
   });
 
+  // Save field value
+  const saveValueMutation = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      apiRequest("POST", `/api/cases/${caseId}/checklist/${key}/value`, { value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/cases/${caseId}/dynamic-checklist`] });
+      toast({ title: "Success", description: "Field value saved" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save field value", variant: "destructive" });
+    },
+  });
+
   const handleToggleItem = (item: ChecklistItem) => {
     const action = item.completed ? "reopen" : "complete";
     toggleMutation.mutate({ key: item.key, action });
+  };
+
+  const handleFieldValueChange = (item: ChecklistItem, value: string) => {
+    saveValueMutation.mutate({ key: item.key, value });
   };
 
   const getStatusIcon = (completed: boolean, isRequired: boolean) => {
@@ -94,6 +117,99 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
   const totalItems = checklistItems.length;
   const requiredItems = checklistItems.filter(item => item.isRequired);
   const completedRequiredItems = requiredItems.filter(item => item.completed).length;
+
+  // Render field input based on field type
+  const renderFieldInput = (item: ChecklistItem) => {
+    switch (item.fieldType) {
+      case 'checkbox':
+        return (
+          <button
+            onClick={() => handleToggleItem(item)}
+            disabled={toggleMutation.isPending}
+            className="hover:scale-110 transition-transform"
+            data-testid={`button-toggle-${item.key}`}
+          >
+            {getStatusIcon(item.completed, item.isRequired)}
+          </button>
+        );
+      
+      case 'dropdown':
+        return (
+          <Select
+            value={item.value || ''}
+            onValueChange={(value) => handleFieldValueChange(item, value)}
+            disabled={saveValueMutation.isPending}
+          >
+            <SelectTrigger className="w-full" data-testid={`select-${item.key}`}>
+              <SelectValue placeholder="Select option..." />
+            </SelectTrigger>
+            <SelectContent>
+              {(item.fieldOptions || []).map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      
+      case 'text':
+        return (
+          <Input
+            type="text"
+            value={item.value || ''}
+            onChange={(e) => handleFieldValueChange(item, e.target.value)}
+            placeholder="Enter text..."
+            disabled={saveValueMutation.isPending}
+            data-testid={`input-text-${item.key}`}
+          />
+        );
+      
+      case 'number':
+        return (
+          <Input
+            type="number"
+            value={item.value || ''}
+            onChange={(e) => handleFieldValueChange(item, e.target.value)}
+            placeholder="Enter number..."
+            disabled={saveValueMutation.isPending}
+            data-testid={`input-number-${item.key}`}
+          />
+        );
+      
+      case 'date':
+        return (
+          <Input
+            type="date"
+            value={item.value || ''}
+            onChange={(e) => handleFieldValueChange(item, e.target.value)}
+            disabled={saveValueMutation.isPending}
+            data-testid={`input-date-${item.key}`}
+          />
+        );
+      
+      case 'file':
+        return (
+          <div className="space-y-2">
+            <Input
+              type="text"
+              value={item.value || ''}
+              onChange={(e) => handleFieldValueChange(item, e.target.value)}
+              placeholder="File reference..."
+              disabled={saveValueMutation.isPending}
+              data-testid={`input-file-${item.key}`}
+            />
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <FileText className="h-3 w-3" />
+              Enter file reference or URL
+            </p>
+          </div>
+        );
+      
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="space-y-6" data-testid="tab-content-checklist">
@@ -181,10 +297,9 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                   <TableRow>
                     <TableHead className="w-12">Status</TableHead>
                     <TableHead>Task</TableHead>
+                    <TableHead className="w-64">Input / Value</TableHead>
                     <TableHead>Priority</TableHead>
-                    <TableHead>Assigned To</TableHead>
                     <TableHead>Completed</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -198,14 +313,22 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                     .map((item) => (
                     <TableRow key={item.key}>
                       <TableCell>
-                        <button
-                          onClick={() => handleToggleItem(item)}
-                          disabled={toggleMutation.isPending}
-                          className="hover:scale-110 transition-transform"
-                          data-testid={`button-toggle-${item.key}`}
-                        >
-                          {getStatusIcon(item.completed, item.isRequired)}
-                        </button>
+                        {item.fieldType === 'checkbox' ? (
+                          <button
+                            onClick={() => handleToggleItem(item)}
+                            disabled={toggleMutation.isPending}
+                            className="hover:scale-110 transition-transform"
+                            data-testid={`button-toggle-${item.key}`}
+                          >
+                            {getStatusIcon(item.completed, item.isRequired)}
+                          </button>
+                        ) : (
+                          item.value ? (
+                            <CheckCircle className="h-5 w-5 text-green-600" data-testid={`status-icon-${item.key}`} />
+                          ) : (
+                            <Circle className="h-5 w-5 text-muted-foreground" data-testid={`status-icon-${item.key}`} />
+                          )
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-2">
@@ -240,30 +363,25 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(item.completed, item.isRequired)}
+                        <div className="w-full" data-testid={`field-input-${item.key}`}>
+                          {renderFieldInput(item)}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-muted-foreground">—</span>
+                        {getStatusBadge(item.completed, item.isRequired)}
                       </TableCell>
                       <TableCell>
                         {item.completedAt ? (
                           <div className="text-sm">
                             <p>{formatDate(item.completedAt)}</p>
                           </div>
+                        ) : item.value ? (
+                          <div className="text-sm text-green-600">
+                            <p>Value set</p>
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleItem(item)}
-                          disabled={toggleMutation.isPending}
-                          data-testid={`button-action-${item.key}`}
-                        >
-                          {item.completed ? "Reopen" : "Complete"}
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
