@@ -20,7 +20,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const userSchema = z.object({
   username: z.string().min(1, "Username is required"),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  password: z.string().min(6, "Password must be at least 6 characters").or(z.literal("")),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Valid email is required").or(z.literal("")).optional(),
@@ -141,11 +141,7 @@ export default function UsersManagement() {
     };
     
     if (editingUser) {
-      // Only include password if it was provided
-      const updateData = normalizedData.password 
-        ? { ...normalizedData, id: editingUser.id }
-        : { ...normalizedData, id: editingUser.id, password: undefined };
-      updateMutation.mutate(updateData);
+      updateMutation.mutate({ ...normalizedData, id: editingUser.id });
     } else {
       createMutation.mutate(normalizedData);
     }
