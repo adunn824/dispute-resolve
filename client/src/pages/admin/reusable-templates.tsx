@@ -113,7 +113,7 @@ export default function ReusableTemplatesManagement() {
     defaultValues: {
       name: "",
       description: "",
-      categoryId: "",
+      categoryId: "none",
       isReusable: true,
       isActive: true,
     },
@@ -240,6 +240,8 @@ export default function ReusableTemplatesManagement() {
     templateForm.reset({
       name: template.name,
       description: template.description || "",
+      categoryId: template.categoryId || "none",
+      isReusable: template.isReusable,
       isActive: template.isActive,
     });
     setShowTemplateDialog(true);
@@ -260,10 +262,14 @@ export default function ReusableTemplatesManagement() {
   };
 
   const onSubmitTemplate = (data: ReusableTemplateForm) => {
+    const submitData = {
+      ...data,
+      categoryId: data.categoryId === "none" ? undefined : data.categoryId,
+    };
     if (editingTemplate) {
-      updateTemplateMutation.mutate({ id: editingTemplate.id, data });
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data: submitData });
     } else {
-      createTemplateMutation.mutate(data);
+      createTemplateMutation.mutate(submitData);
     }
   };
 
@@ -604,14 +610,14 @@ export default function ReusableTemplatesManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <Select onValueChange={field.onChange} value={field.value || "none"}>
                           <FormControl>
                             <SelectTrigger data-testid="select-template-category">
                               <SelectValue placeholder="Select category for auto-assignment..." />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None (Library Template)</SelectItem>
+                            <SelectItem value="none">None (Library Template)</SelectItem>
                             {categories.map((category) => (
                               <SelectItem key={category.id} value={category.id}>
                                 {category.name}
