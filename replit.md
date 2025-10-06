@@ -61,9 +61,32 @@ Preferred communication style: Simple, everyday language.
 
 ### Security & Compliance
 - **Authentication**: OAuth-based with Replit integration.
-- **Authorization**: Role-based access control.
+- **Authorization**: Role-based access control with granular user permissions.
 - **Audit Logging**: Comprehensive tracking of user actions and system changes.
 - **Data Validation**: Zod schemas for type safety and validation.
+
+### User Permission System
+- **Permission Model**: Granular permission system with five configurable fields per user:
+  - **restrictedLenderId**: Restricts user access to cases from a specific lender (null = access all lenders)
+  - **isViewOnly**: Prevents user from making any modifications to cases
+  - **canResolve**: Allows user to mark cases as resolved
+  - **canDelete**: Allows user to delete cases and related entities
+  - **canAssign**: Allows user to assign/reassign cases to other users
+- **Default Permissions**: New users are created with all permissions enabled (non-restricted) except restrictedLenderId (null)
+- **Backend Enforcement**: 
+  - Custom `AuthorizationError` class returns 403 Forbidden responses for permission violations
+  - Permission checks in all case management routes (GET, PATCH status, PATCH assign, PUT)
+  - Lender filtering automatically applied to case lists for restricted users
+  - View-only users blocked from all modification operations
+- **Frontend Enforcement**:
+  - Conditional rendering of action buttons based on user permissions
+  - Status/assignment dropdowns replaced with read-only text for restricted users
+  - Loading state protection prevents permission bypass during auth fetch
+  - Buttons disabled during authentication loading
+- **Admin Interface**: Permission configuration available in Users Management (/admin/users) with:
+  - Lender restriction dropdown
+  - Toggle switches for view-only, resolve, delete, and assign permissions
+  - Real-time validation and clear permission descriptions
 
 ## External Dependencies
 
