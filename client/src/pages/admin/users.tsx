@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +26,13 @@ const userSchema = z.object({
   email: z.string().email("Valid email is required").or(z.literal("")).optional(),
   role: z.enum(["admin", "compliance", "agent"]),
   active: z.boolean().default(true),
+  
+  // Permission fields
+  restrictedLenderId: z.string().optional(),
+  isViewOnly: z.boolean().default(false),
+  canResolve: z.boolean().default(true),
+  canDelete: z.boolean().default(false),
+  canAssign: z.boolean().default(true),
 });
 
 type UserForm = z.infer<typeof userSchema>;
@@ -37,6 +46,11 @@ type User = {
   email: string;
   role: "admin" | "compliance" | "agent";
   status: string;
+  restrictedLenderId?: string;
+  isViewOnly: boolean;
+  canResolve: boolean;
+  canDelete: boolean;
+  canAssign: boolean;
   createdAt: string;
 };
 
@@ -50,6 +64,12 @@ export default function UsersManagement() {
     queryKey: ["/api/users"],
   });
 
+  // Fetch lenders for restriction dropdown
+  const { data: lenders = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["/api/lenders"],
+    select: (response: any) => response.data || [],
+  });
+
   // Form
   const form = useForm<UserForm>({
     resolver: zodResolver(userSchema),
@@ -61,6 +81,11 @@ export default function UsersManagement() {
       email: "",
       role: "agent",
       active: true,
+      restrictedLenderId: undefined,
+      isViewOnly: false,
+      canResolve: true,
+      canDelete: false,
+      canAssign: true,
     },
   });
 
@@ -151,6 +176,11 @@ export default function UsersManagement() {
       email: user.email || "",
       role: user.role,
       active: user.status === "active",
+      restrictedLenderId: user.restrictedLenderId || undefined,
+      isViewOnly: user.isViewOnly || false,
+      canResolve: user.canResolve !== undefined ? user.canResolve : true,
+      canDelete: user.canDelete || false,
+      canAssign: user.canAssign !== undefined ? user.canAssign : true,
     });
     setShowDialog(true);
   };
@@ -303,6 +333,126 @@ export default function UsersManagement() {
                     </FormItem>
                   )}
                 />
+                
+                <Separator className="my-4" />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium">Permissions & Restrictions</h3>
+                  
+                  <FormField
+                    control={form.control}
+                    name="restrictedLenderId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Restricted to Lender (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-restricted-lender">
+                              <SelectValue placeholder="No restriction - All lenders" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">No restriction - All lenders</SelectItem>
+                            {lenders.map((lender) => (
+                              <SelectItem key={lender.id} value={lender.id}>
+                                {lender.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="isViewOnly"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>View Only</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            User can only view cases, cannot make any changes
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-view-only"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="canResolve"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Can Resolve Cases</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Allow user to resolve and close cases
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-can-resolve"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="canAssign"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Can Assign Cases</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Allow user to assign cases to other users
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-can-assign"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="canDelete"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Can Delete</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Allow user to delete cases and documents
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-can-delete"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
                 <div className="flex justify-end gap-2">
                   <Button
                     type="button"
