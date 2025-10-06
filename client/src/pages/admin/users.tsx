@@ -21,7 +21,7 @@ const userSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Valid email is required"),
+  email: z.string().email("Valid email is required").or(z.literal("")).optional(),
   role: z.enum(["admin", "compliance", "agent"]),
   active: z.boolean().default(true),
 });
@@ -31,11 +31,12 @@ type UserForm = z.infer<typeof userSchema>;
 type User = {
   id: string;
   username: string;
-  firstName: string;
-  lastName: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   role: "admin" | "compliance" | "agent";
-  active: boolean;
+  status: string;
   createdAt: string;
 };
 
@@ -115,27 +116,48 @@ export default function UsersManagement() {
   });
 
   const handleSubmit = (data: UserForm) => {
+    // Normalize empty email to null to avoid unique constraint violations
+    const normalizedData = {
+      ...data,
+      email: data.email && data.email.trim() !== "" ? data.email : undefined,
+    };
+    
     if (editingUser) {
       // Only include password if it was provided
-      const updateData = data.password 
-        ? { ...data, id: editingUser.id }
-        : { ...data, id: editingUser.id, password: undefined };
+      const updateData = normalizedData.password 
+        ? { ...normalizedData, id: editingUser.id }
+        : { ...normalizedData, id: editingUser.id, password: undefined };
       updateMutation.mutate(updateData);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(normalizedData);
     }
   };
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
+    
+    // Auto-split name for legacy users who only have the combined name field
+    let firstName = user.firstName || "";
+    let lastName = user.lastName || "";
+    
+    if (!firstName && !lastName && user.name) {
+      const nameParts = user.name.trim().split(/\s+/);
+      if (nameParts.length === 1) {
+        firstName = nameParts[0];
+      } else if (nameParts.length >= 2) {
+        firstName = nameParts[0];
+        lastName = nameParts.slice(1).join(" ");
+      }
+    }
+    
     form.reset({
       username: user.username,
       password: "", // Don't populate password
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
+      firstName,
+      lastName,
+      email: user.email || "",
       role: user.role,
-      active: user.active,
+      active: user.status === "active",
     });
     setShowDialog(true);
   };
@@ -338,21 +360,23 @@ export default function UsersManagement() {
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.firstName} {user.lastName}
+                  <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                    <TableCell className="font-medium" data-testid={`cell-name-${user.id}`}>
+                      {user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}` 
+                        : user.name}
                     </TableCell>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell data-testid={`cell-username-${user.id}`}>{user.username}</TableCell>
+                    <TableCell data-testid={`cell-email-${user.id}`}>{user.email || '-'}</TableCell>
                     <TableCell>
-                      <Badge variant={getRoleColor(user.role)} className="flex items-center gap-1 w-fit">
+                      <Badge variant={getRoleColor(user.role)} className="flex items-center gap-1 w-fit" data-testid={`badge-role-${user.id}`}>
                         {getRoleIcon(user.role)}
                         {user.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.active ? "default" : "secondary"}>
-                        {user.active ? "Active" : "Inactive"}
+                      <Badge variant={user.status === "active" ? "default" : "secondary"} data-testid={`badge-status-${user.id}`}>
+                        {user.status === "active" ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
