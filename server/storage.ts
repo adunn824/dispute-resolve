@@ -1277,14 +1277,6 @@ export class DatabaseStorage implements IStorage {
         return [];
       }
 
-      // Get all active checklist assignment rules
-      const allRules = await this.getAllChecklistAssignmentRules();
-      const activeRules = allRules.filter(rule => rule.isActive);
-
-      if (activeRules.length === 0) {
-        return [];
-      }
-
       // Get existing completion state from checklistItems table
       const completionState = await db.select().from(checklistItems)
         .where(eq(checklistItems.caseId, caseId));
@@ -1308,7 +1300,73 @@ export class DatabaseStorage implements IStorage {
       const dynamicItems: DynamicChecklistItem[] = [];
       const seenKeys = new Set<string>();
 
-      // Evaluate each rule
+      // Helper function to add template items
+      const addTemplateItems = (template: any) => {
+        if (!template || !template.isActive || !template.items || template.items.length === 0) {
+          return;
+        }
+
+        for (const templateItem of template.items) {
+          // Skip if this key already exists
+          if (seenKeys.has(templateItem.key)) {
+            continue;
+          }
+
+          const completion = completionMap.get(templateItem.key);
+          
+          dynamicItems.push({
+            key: templateItem.key,
+            label: templateItem.label,
+            description: templateItem.description,
+            isRequired: templateItem.isRequired,
+            sortOrder: templateItem.sortOrder,
+            helpText: templateItem.helpText,
+            estimatedDuration: templateItem.estimatedDuration,
+            templateId: template.id,
+            templateName: template.name,
+            // Field type support
+            fieldType: templateItem.fieldType || 'checkbox',
+            fieldOptions: templateItem.fieldOptions || null,
+            defaultValue: templateItem.defaultValue || null,
+            // Completion state
+            completed: completion?.completed ?? false,
+            completedAt: completion?.completedAt ?? null,
+            assignedToUserId: completion?.assignedToUserId ?? null,
+            checklistItemId: completion?.checklistItemId ?? null,
+            fieldValue: completion?.fieldValue ?? null
+          });
+
+          seenKeys.add(templateItem.key);
+        }
+
+        assignedTemplateIds.add(template.id);
+      };
+
+      // STEP 1: Load category-specific reusable templates (auto-apply templates)
+      // These are templates with a categoryId that matches the case's category
+      const categoryTemplates = await db.select().from(reusableChecklistTemplates)
+        .where(and(
+          eq(reusableChecklistTemplates.categoryId, caseData.categoryId),
+          eq(reusableChecklistTemplates.isActive, true)
+        ));
+
+      for (const categoryTemplate of categoryTemplates) {
+        if (assignedTemplateIds.has(categoryTemplate.id)) {
+          continue;
+        }
+
+        try {
+          const template = await this.getReusableChecklistTemplateWithItems(categoryTemplate.id);
+          addTemplateItems(template);
+        } catch (error) {
+          console.error(`Error loading category template "${categoryTemplate.name}":`, error);
+        }
+      }
+
+      // STEP 2: Evaluate business rules for additional templates
+      const allRules = await this.getAllChecklistAssignmentRules();
+      const activeRules = allRules.filter(rule => rule.isActive);
+
       for (const rule of activeRules) {
         if (!rule.conditions || !rule.reusableTemplateId || assignedTemplateIds.has(rule.reusableTemplateId)) {
           continue;
@@ -1319,46 +1377,8 @@ export class DatabaseStorage implements IStorage {
           const matches = RuleEvaluator.evaluate(rule.conditions, caseData);
 
           if (matches) {
-            // Get the template with items
             const template = await this.getReusableChecklistTemplateWithItems(rule.reusableTemplateId);
-            
-            if (template && template.isActive && template.items && template.items.length > 0) {
-              // Add items from this template (skip duplicates based on key)
-              for (const templateItem of template.items) {
-                // Skip if this key already exists
-                if (seenKeys.has(templateItem.key)) {
-                  continue;
-                }
-
-                const completion = completionMap.get(templateItem.key);
-                
-                dynamicItems.push({
-                  key: templateItem.key,
-                  label: templateItem.label,
-                  description: templateItem.description,
-                  isRequired: templateItem.isRequired,
-                  sortOrder: templateItem.sortOrder,
-                  helpText: templateItem.helpText,
-                  estimatedDuration: templateItem.estimatedDuration,
-                  templateId: template.id,
-                  templateName: template.name,
-                  // Field type support
-                  fieldType: templateItem.fieldType || 'checkbox',
-                  fieldOptions: templateItem.fieldOptions || null,
-                  defaultValue: templateItem.defaultValue || null,
-                  // Completion state
-                  completed: completion?.completed ?? false,
-                  completedAt: completion?.completedAt ?? null,
-                  assignedToUserId: completion?.assignedToUserId ?? null,
-                  checklistItemId: completion?.checklistItemId ?? null,
-                  fieldValue: completion?.fieldValue ?? null
-                });
-
-                seenKeys.add(templateItem.key);
-              }
-
-              assignedTemplateIds.add(rule.reusableTemplateId);
-            }
+            addTemplateItems(template);
           }
         } catch (error) {
           console.error(`Error evaluating checklist rule "${rule.name}":`, error);
