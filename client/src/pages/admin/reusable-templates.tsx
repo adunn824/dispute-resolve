@@ -139,11 +139,24 @@ export default function ReusableTemplatesManagement() {
   const createTemplateMutation = useMutation({
     mutationFn: async (data: ReusableTemplateForm) => 
       await apiRequest("POST", "/api/reusable-checklist-templates", data),
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/reusable-checklist-templates"] });
-      setShowTemplateDialog(false);
-      templateForm.reset();
-      toast({ title: "Success", description: "Reusable template created successfully" });
+      const newTemplate = response.data || response;
+      
+      // Immediately open the newly created template for editing to add items
+      setEditingTemplate(newTemplate);
+      templateForm.reset({
+        name: newTemplate.name,
+        description: newTemplate.description || "",
+        categoryId: newTemplate.categoryId || "none",
+        isReusable: newTemplate.isReusable,
+        isActive: newTemplate.isActive,
+      });
+      
+      toast({ 
+        title: "Success", 
+        description: "Template created! Now add checklist items to complete your template." 
+      });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create reusable template", variant: "destructive" });
@@ -257,7 +270,11 @@ export default function ReusableTemplatesManagement() {
       sortOrder: item.sortOrder,
       helpText: item.helpText || "",
       estimatedDuration: item.estimatedDuration || undefined,
+      fieldType: item.fieldType || 'checkbox',
+      fieldOptions: item.fieldOptions || [],
+      defaultValue: item.defaultValue || "",
     });
+    setDropdownOptions(item.fieldOptions || []);
     setShowItemDialog(true);
   };
 
@@ -562,9 +579,29 @@ export default function ReusableTemplatesManagement() {
             Create reusable checklist templates that can be assigned to cases based on rules
           </p>
         </div>
-        <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <Dialog open={showTemplateDialog} onOpenChange={(open) => {
+          setShowTemplateDialog(open);
+          if (!open) {
+            // Clear editing state when dialog closes
+            setEditingTemplate(null);
+            templateForm.reset();
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-template">
+            <Button 
+              onClick={() => {
+                // Clear editing state when opening for new template
+                setEditingTemplate(null);
+                templateForm.reset({
+                  name: "",
+                  description: "",
+                  categoryId: "none",
+                  isReusable: true,
+                  isActive: true,
+                });
+              }}
+              data-testid="button-add-template"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Template
             </Button>
@@ -683,9 +720,36 @@ export default function ReusableTemplatesManagement() {
                           Individual steps in this checklist template
                         </p>
                       </div>
-                      <Dialog open={showItemDialog} onOpenChange={setShowItemDialog}>
+                      <Dialog open={showItemDialog} onOpenChange={(open) => {
+                        setShowItemDialog(open);
+                        if (!open) {
+                          setEditingItem(null);
+                          itemForm.reset();
+                          setDropdownOptions([]);
+                        }
+                      }}>
                         <DialogTrigger asChild>
-                          <Button type="button" size="sm" data-testid="button-add-item-in-dialog">
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            onClick={() => {
+                              setEditingItem(null);
+                              itemForm.reset({
+                                key: "",
+                                label: "",
+                                description: "",
+                                isRequired: false,
+                                sortOrder: 0,
+                                helpText: "",
+                                estimatedDuration: undefined,
+                                fieldType: 'checkbox',
+                                fieldOptions: [],
+                                defaultValue: "",
+                              });
+                              setDropdownOptions([]);
+                            }}
+                            data-testid="button-add-item-in-dialog"
+                          >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Item
                           </Button>
