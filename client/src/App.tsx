@@ -21,7 +21,6 @@ import CaseOriginationsManagement from "./pages/admin/case-originations";
 import LendersManagement from "./pages/admin/lenders";
 import ResolutionOptionsManagement from "./pages/admin/resolution-options";
 import BusinessRulesManagement from "./pages/admin/business-rules";
-import TemplatesManagement from "./pages/admin/templates";
 import ReusableTemplatesManagement from "./pages/admin/reusable-templates";
 import CategoriesManagement from "./pages/admin/categories";
 import UsersManagement from "./pages/admin/users";
@@ -121,11 +120,6 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/admin/templates">
-        <ProtectedRoute requiredRole="admin">
-          <TemplatesManagement />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/admin/reusable-templates">
         <ProtectedRoute requiredRole="admin">
           <ReusableTemplatesManagement />
         </ProtectedRoute>
