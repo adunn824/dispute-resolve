@@ -160,6 +160,7 @@ export const resolutions = pgTable("resolutions", {
   settlementAmount: decimal("settlement_amount", { precision: 10, scale: 2 }),
   forgivenAmount: decimal("forgiven_amount", { precision: 10, scale: 2 }),
   policyViolation: text("policy_violation", { enum: ["Yes", "No", "N/A"] }).notNull().default("N/A"),
+  clientAcceptedResolution: text("client_accepted_resolution", { enum: ["Yes", "No", "Pending", "N/A"] }).notNull().default("N/A"),
   resolvedAt: timestamp("resolved_at").defaultNow().notNull(),
 });
 

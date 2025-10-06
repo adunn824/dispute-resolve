@@ -24,6 +24,7 @@ const resolutionSchema = z.object({
   settlementAmount: z.string().optional(),
   forgivenAmount: z.string().optional(),
   policyViolation: z.string().optional(),
+  clientAcceptedResolution: z.string().optional(),
 });
 
 type ResolutionFormValues = z.infer<typeof resolutionSchema>;
@@ -92,6 +93,7 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
       settlementAmount: "",
       forgivenAmount: "",
       policyViolation: "",
+      clientAcceptedResolution: "",
     },
   });
 
@@ -266,7 +268,7 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="settlementAmount"
@@ -323,6 +325,30 @@ export function ResolutionTab({ caseId }: ResolutionTabProps) {
                               {option.label}
                             </SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="clientAcceptedResolution"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client Accepted Resolution</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!canResolve} data-testid="select-client-accepted-resolution">
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
