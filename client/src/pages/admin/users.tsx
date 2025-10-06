@@ -48,7 +48,6 @@ export default function UsersManagement() {
   // Fetch users
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    select: (response: any) => response.data || [],
   });
 
   // Form
@@ -67,10 +66,7 @@ export default function UsersManagement() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: UserForm) => apiRequest("/api/users", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    mutationFn: (data: UserForm) => apiRequest("POST", "/api/users", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "Success", description: "User created successfully" });
@@ -86,10 +82,7 @@ export default function UsersManagement() {
   const updateMutation = useMutation({
     mutationFn: ({ id, password, ...data }: UserForm & { id: string }) => {
       const updateData = password ? { ...data, password } : data;
-      return apiRequest(`/api/users/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(updateData),
-      });
+      return apiRequest("PUT", `/api/users/${id}`, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -105,7 +98,7 @@ export default function UsersManagement() {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/users/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "Success", description: "User deleted successfully" });
