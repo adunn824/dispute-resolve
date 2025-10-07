@@ -2222,6 +2222,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user (admin only)
+  app.put("/api/users/:id", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { hashPassword } = await import("./auth");
+      
+      const updateSchema = z.object({
+        username: z.string().min(1).optional(),
+        password: z.string().min(6).or(z.literal("")).optional(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        email: z.string().email().or(z.literal("")).optional(),
+        role: z.enum(["admin", "compliance", "agent"]).optional(),
+        active: z.boolean().optional(),
+        restrictedLenderId: z.string().nullable().optional(),
+        isViewOnly: z.boolean().optional(),
+        canResolve: z.boolean().optional(),
+        canDelete: z.boolean().optional(),
+        canAssign: z.boolean().optional(),
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+      
+      // Build update object, excluding empty password
+      const updates: any = {};
+      
+      for (const [key, value] of Object.entries(validatedData)) {
+        if (key === 'password') {
+          // Only update password if it's provided and not empty
+          if (value && value !== '') {
+            updates.password = await hashPassword(value as string);
+          }
+        } else if (key === 'firstName' || key === 'lastName') {
+          // Update firstName/lastName
+          updates[key] = value;
+          
+          // Also update name field for compatibility
+          if (!updates.name) {
+            const user = await storage.getUser(id);
+            if (user) {
+              const firstName = key === 'firstName' ? value : user.firstName || user.name?.split(' ')[0] || '';
+              const lastName = key === 'lastName' ? value : user.lastName || user.name?.split(' ').slice(1).join(' ') || '';
+              updates.name = `${firstName} ${lastName}`.trim();
+            }
+          }
+        } else if (key === 'restrictedLenderId') {
+          // Handle null value for lender restriction
+          updates.restrictedLenderId = value || null;
+        } else if (value !== undefined) {
+          updates[key] = value;
+        }
+      }
+
+      const updatedUser = await storage.updateUser(id, updates);
+      
+      res.json({
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        status: updatedUser.status,
+        restrictedLenderId: updatedUser.restrictedLenderId,
+        isViewOnly: updatedUser.isViewOnly,
+        canResolve: updatedUser.canResolve,
+        canDelete: updatedUser.canDelete,
+        canAssign: updatedUser.canAssign,
+        createdAt: updatedUser.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid user data", details: error.errors });
+      }
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Create new user (admin only)
+  app.post("/api/users", requireRole("admin"), async (req, res) => {
+    try {
+      const { hashPassword } = await import("./auth");
+      
+      const createSchema = z.object({
+        username: z.string().min(1, "Username is required"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        email: z.string().email().or(z.literal("")).optional(),
+        role: z.enum(["admin", "compliance", "agent"]),
+        active: z.boolean().default(true),
+        restrictedLenderId: z.string().nullable().optional(),
+        isViewOnly: z.boolean().default(false),
+        canResolve: z.boolean().default(true),
+        canDelete: z.boolean().default(false),
+        canAssign: z.boolean().default(true),
+      });
+
+      const validatedData = createSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const newUser = await storage.createUser({
+        username: validatedData.username,
+        password: await hashPassword(validatedData.password),
+        name: `${validatedData.firstName} ${validatedData.lastName}`.trim(),
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        email: validatedData.email || null,
+        role: validatedData.role,
+        status: validatedData.active ? "active" : "inactive",
+        restrictedLenderId: validatedData.restrictedLenderId || null,
+        isViewOnly: validatedData.isViewOnly,
+        canResolve: validatedData.canResolve,
+        canDelete: validatedData.canDelete,
+        canAssign: validatedData.canAssign,
+      });
+      
+      res.status(201).json({
+        id: newUser.id,
+        username: newUser.username,
+        name: newUser.name,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        role: newUser.role,
+        status: newUser.status,
+        restrictedLenderId: newUser.restrictedLenderId,
+        isViewOnly: newUser.isViewOnly,
+        canResolve: newUser.canResolve,
+        canDelete: newUser.canDelete,
+        canAssign: newUser.canAssign,
+        createdAt: newUser.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid user data", details: error.errors });
+      }
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   // Knowledge Base API Endpoints
   
   // Knowledge Base Categories
