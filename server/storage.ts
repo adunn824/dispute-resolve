@@ -194,6 +194,22 @@ export interface IStorage {
   getAvailableAssignees(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   
+  // Email intake methods
+  createEmailIntakeCase(emailData: {
+    from: string;
+    to?: string;
+    subject?: string;
+    receivedDate?: string;
+    messageId?: string;
+    body?: string;
+    bodyPreview?: string;
+    hasAttachments?: boolean;
+    attachmentCount?: number;
+  }): Promise<Case>;
+  getEmailIntakeCases(): Promise<(Case & { ageInHours: number })[]>;
+  completeIntake(caseId: string, caseData: Partial<InsertCase>, actorUserId: string): Promise<Case>;
+  markCaseViewed(caseId: string): Promise<Case>;
+  
   // Case notes methods
   getCaseNotes(caseId: string): Promise<Array<CaseNote & { authorUser: { name: string; role: string } }>>;
   createCaseNote(noteData: InsertCaseNote): Promise<CaseNote>;
@@ -1207,6 +1223,133 @@ export class DatabaseStorage implements IStorage {
     // Return all users regardless of role or status
     return await db.select().from(users)
       .orderBy(asc(users.name));
+  }
+
+  // Email intake methods
+  async createEmailIntakeCase(emailData: {
+    from: string;
+    to?: string;
+    subject?: string;
+    receivedDate?: string;
+    messageId?: string;
+    body?: string;
+    bodyPreview?: string;
+    hasAttachments?: boolean;
+    attachmentCount?: number;
+  }): Promise<Case> {
+    // Create a placeholder customer from email sender
+    const [customer] = await db
+      .insert(customers)
+      .values({
+        name: emailData.from,
+        state: 'Unknown', // Will be filled in during intake
+      })
+      .returning();
+
+    // Get the first available category to use as placeholder
+    const categories = await db.select().from(categories).limit(1);
+    if (categories.length === 0) {
+      throw new Error('No categories available - please create at least one category first');
+    }
+
+    // Get the first available case type
+    const caseTypes = await db.select().from(caseTypes).limit(1);
+    if (caseTypes.length === 0) {
+      throw new Error('No case types available - please create at least one case type first');
+    }
+
+    // Get or create a default priority rule for the category
+    let priorityRule = await db
+      .select()
+      .from(priorityRules)
+      .where(eq(priorityRules.categoryId, categories[0].id))
+      .limit(1);
+
+    if (priorityRule.length === 0) {
+      const [newRule] = await db
+        .insert(priorityRules)
+        .values({
+          categoryId: categories[0].id,
+          name: 'Default Priority',
+          description: 'Auto-generated default priority',
+          priority: 'medium',
+          conditions: { conditions: [], default: true },
+          priorityValue: 'Medium',
+          isActive: true,
+        })
+        .returning();
+      priorityRule = [newRule];
+    }
+
+    // Create the case with pending_intake status
+    const [newCase] = await db
+      .insert(cases)
+      .values({
+        caseTypeId: caseTypes[0].id,
+        categoryId: categories[0].id,
+        priorityRuleId: priorityRule[0].id,
+        customerId: customer.id,
+        state: 'Unknown',
+        details: emailData.body || emailData.bodyPreview || 'Email content',
+        status: 'pending_intake',
+        emailMetadata: emailData as any,
+        receivedAt: emailData.receivedDate ? new Date(emailData.receivedDate) : new Date(),
+        configVersion: 1,
+      })
+      .returning();
+
+    return newCase;
+  }
+
+  async getEmailIntakeCases(): Promise<(Case & { ageInHours: number })[]> {
+    const intakeCases = await db
+      .select()
+      .from(cases)
+      .where(eq(cases.status, 'pending_intake'))
+      .orderBy(asc(cases.receivedAt));
+
+    return intakeCases.map(c => ({
+      ...c,
+      ageInHours: c.receivedAt 
+        ? Math.floor((Date.now() - c.receivedAt.getTime()) / (1000 * 60 * 60))
+        : 0
+    }));
+  }
+
+  async completeIntake(caseId: string, caseData: Partial<InsertCase>, actorUserId: string): Promise<Case> {
+    const [updatedCase] = await db
+      .update(cases)
+      .set({
+        ...caseData,
+        status: 'open',
+        intakeCompletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(cases.id, caseId))
+      .returning();
+
+    // Log the intake completion
+    await this.createAuditLog({
+      caseId,
+      actorUserId,
+      action: 'intake_completed',
+      details: { message: 'Email intake completed and case activated' }
+    });
+
+    return updatedCase;
+  }
+
+  async markCaseViewed(caseId: string): Promise<Case> {
+    const [updatedCase] = await db
+      .update(cases)
+      .set({
+        firstViewedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(cases.id, caseId))
+      .returning();
+
+    return updatedCase;
   }
 
   // Case notes methods
