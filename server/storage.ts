@@ -1249,14 +1249,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     // Get the first available category to use as placeholder
-    const categories = await db.select().from(categories).limit(1);
-    if (categories.length === 0) {
+    const availableCategories = await db.select().from(categories).limit(1);
+    if (availableCategories.length === 0) {
       throw new Error('No categories available - please create at least one category first');
     }
 
     // Get the first available case type
-    const caseTypes = await db.select().from(caseTypes).limit(1);
-    if (caseTypes.length === 0) {
+    const availableCaseTypes = await db.select().from(caseTypes).limit(1);
+    if (availableCaseTypes.length === 0) {
       throw new Error('No case types available - please create at least one case type first');
     }
 
@@ -1264,14 +1264,14 @@ export class DatabaseStorage implements IStorage {
     let priorityRule = await db
       .select()
       .from(priorityRules)
-      .where(eq(priorityRules.categoryId, categories[0].id))
+      .where(eq(priorityRules.categoryId, availableCategories[0].id))
       .limit(1);
 
     if (priorityRule.length === 0) {
       const [newRule] = await db
         .insert(priorityRules)
         .values({
-          categoryId: categories[0].id,
+          categoryId: availableCategories[0].id,
           name: 'Default Priority',
           description: 'Auto-generated default priority',
           priority: 'medium',
@@ -1287,8 +1287,8 @@ export class DatabaseStorage implements IStorage {
     const [newCase] = await db
       .insert(cases)
       .values({
-        caseTypeId: caseTypes[0].id,
-        categoryId: categories[0].id,
+        caseTypeId: availableCaseTypes[0].id,
+        categoryId: availableCategories[0].id,
         priorityRuleId: priorityRule[0].id,
         customerId: customer.id,
         state: 'Unknown',
