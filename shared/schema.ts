@@ -113,6 +113,14 @@ export const users = pgTable("users", {
   canDelete: boolean("can_delete").notNull().default(false), // Can delete cases/items
   canAssign: boolean("can_assign").notNull().default(true), // Can assign cases
   
+  // Email configuration for Outlook/Microsoft 365 (for sending notices to clients)
+  emailEnabled: boolean("email_enabled").notNull().default(false),
+  outlookEmail: text("outlook_email"), // User's Outlook email address
+  outlookClientId: text("outlook_client_id"), // Azure app client ID
+  outlookTenantId: text("outlook_tenant_id"), // Azure tenant ID
+  outlookClientSecret: text("outlook_client_secret"), // Azure app client secret
+  outlookRedirectUri: text("outlook_redirect_uri"), // OAuth redirect URI
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
