@@ -81,6 +81,15 @@ export const lenders = pgTable("lenders", {
   contactPerson: text("contact_person"),
   email: text("email"),
   phone: text("phone"),
+  
+  // Email intake configuration for Outlook/Microsoft 365
+  emailIntakeEnabled: boolean("email_intake_enabled").notNull().default(false),
+  outlookEmail: text("outlook_email"), // The mailbox email address to monitor
+  outlookClientId: text("outlook_client_id"), // Azure app client ID
+  outlookTenantId: text("outlook_tenant_id"), // Azure tenant ID
+  outlookClientSecret: text("outlook_client_secret"), // Azure app client secret
+  outlookRedirectUri: text("outlook_redirect_uri"), // OAuth redirect URI
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
