@@ -613,14 +613,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       
       const intakeSchema = z.object({
+        caseOriginationId: z.string().min(1, "Case origination is required"),
         caseTypeId: z.string().min(1, "Case type is required"),
         categoryId: z.string().min(1, "Category is required"),
-        priorityRuleId: z.string().min(1, "Priority rule is required"),
         lenderId: z.string().optional(),
         loanId: z.string().optional(),
         customerName: z.string().min(1, "Customer name is required"),
         customerState: z.string().min(2, "State is required"),
-        details: z.string().optional(), // Allow keeping email body or override
+        details: z.string().optional(),
       });
 
       const intakeData = intakeSchema.parse(req.body);
@@ -651,11 +651,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId = newCustomer.id;
       }
 
+      // Auto-assign a priority rule based on the category
+      const priorityRules = await storage.getPriorityRules(intakeData.categoryId);
+      let priorityRuleId: string;
+      
+      if (priorityRules.length > 0) {
+        // Use the first active priority rule for the category
+        priorityRuleId = priorityRules[0].id;
+      } else {
+        // Create a default priority rule for this category
+        const newRule = await storage.createPriorityRule({
+          categoryId: intakeData.categoryId,
+          name: 'Default Priority',
+          description: 'Auto-generated default priority rule',
+          priority: 'medium',
+          conditions: { conditions: [], default: true },
+          priorityValue: 'Medium',
+          isActive: true,
+        });
+        priorityRuleId = newRule.id;
+      }
+
       // Complete the intake with updated case data
       const caseData = {
+        caseOriginationId: intakeData.caseOriginationId,
         caseTypeId: intakeData.caseTypeId,
         categoryId: intakeData.categoryId,
-        priorityRuleId: intakeData.priorityRuleId,
+        priorityRuleId,
         customerId,
         lenderId: intakeData.lenderId || existingCase.lenderId,
         loanId: intakeData.loanId || existingCase.loanId,
