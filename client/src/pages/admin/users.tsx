@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Trash2, Loader2, User, Shield, AlertTriangle } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, User, Shield, AlertTriangle, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -33,6 +33,14 @@ const userSchema = z.object({
   canResolve: z.boolean().default(true),
   canDelete: z.boolean().default(false),
   canAssign: z.boolean().default(true),
+  
+  // Email configuration fields
+  emailEnabled: z.boolean().default(false),
+  outlookEmail: z.string().optional(),
+  outlookClientId: z.string().optional(),
+  outlookTenantId: z.string().optional(),
+  outlookClientSecret: z.string().optional(),
+  outlookRedirectUri: z.string().optional(),
 });
 
 type UserForm = z.infer<typeof userSchema>;
@@ -51,6 +59,12 @@ type User = {
   canResolve: boolean;
   canDelete: boolean;
   canAssign: boolean;
+  emailEnabled?: boolean;
+  outlookEmail?: string;
+  outlookClientId?: string;
+  outlookTenantId?: string;
+  outlookClientSecret?: string;
+  outlookRedirectUri?: string;
   createdAt: string;
 };
 
@@ -86,6 +100,12 @@ export default function UsersManagement() {
       canResolve: true,
       canDelete: false,
       canAssign: true,
+      emailEnabled: false,
+      outlookEmail: "",
+      outlookClientId: "",
+      outlookTenantId: "",
+      outlookClientSecret: "",
+      outlookRedirectUri: "",
     },
   });
 
@@ -177,6 +197,12 @@ export default function UsersManagement() {
       canResolve: user.canResolve !== undefined ? user.canResolve : true,
       canDelete: user.canDelete || false,
       canAssign: user.canAssign !== undefined ? user.canAssign : true,
+      emailEnabled: user.emailEnabled || false,
+      outlookEmail: user.outlookEmail || "",
+      outlookClientId: user.outlookClientId || "",
+      outlookTenantId: user.outlookTenantId || "",
+      outlookClientSecret: "", // Don't populate secret
+      outlookRedirectUri: user.outlookRedirectUri || "",
     });
     setShowDialog(true);
   };
@@ -450,6 +476,141 @@ export default function UsersManagement() {
                       </FormItem>
                     )}
                   />
+                </div>
+                
+                <Separator className="my-4" />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    <h3 className="text-sm font-medium">Email Configuration</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Configure Outlook to send emails to clients and external parties
+                  </p>
+                  
+                  <FormField
+                    control={form.control}
+                    name="emailEnabled"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Enable Email</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Allow this user to send emails via Outlook
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-email-enabled"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {form.watch("emailEnabled") && (
+                    <div className="space-y-4 pl-4 border-l-2">
+                      <FormField
+                        control={form.control}
+                        name="outlookEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Outlook Email Address</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="email"
+                                placeholder="user@company.com" 
+                                {...field} 
+                                data-testid="input-outlook-email" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="outlookClientId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Client ID</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Azure app client ID" 
+                                {...field} 
+                                data-testid="input-outlook-client-id" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="outlookTenantId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tenant ID</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Azure tenant ID" 
+                                {...field} 
+                                data-testid="input-outlook-tenant-id" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="outlookClientSecret"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Client Secret {editingUser ? "" : "*"}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="password"
+                                placeholder={editingUser ? "Leave empty to keep existing secret" : "Azure app client secret"} 
+                                {...field} 
+                                data-testid="input-outlook-client-secret-user" 
+                              />
+                            </FormControl>
+                            <div className="text-sm text-muted-foreground">
+                              {editingUser 
+                                ? "Leave empty to keep existing secret. Enter new value to update."
+                                : "Generated in Azure app registration (stored securely)"
+                              }
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="outlookRedirectUri"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Redirect URI</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://yourapp.com/auth/callback" 
+                                {...field} 
+                                data-testid="input-outlook-redirect-uri" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex justify-end gap-2">
