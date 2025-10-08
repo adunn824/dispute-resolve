@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, Download, Trash2, FileText, Image, FileArchive, Plus, AlertCircle } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Document {
   id: string;
@@ -33,6 +34,7 @@ export function DocumentsTab({ caseId }: DocumentsTabProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch documents for this case
   const { data: documents = [], isLoading, refetch } = useQuery<Document[]>({
@@ -328,15 +330,17 @@ export function DocumentsTab({ caseId }: DocumentsTabProps) {
                         >
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(doc.id)}
-                          disabled={deleteMutation.isPending}
-                          data-testid={`button-delete-${doc.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {user?.canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(doc.id)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-${doc.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

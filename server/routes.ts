@@ -2144,16 +2144,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/documents/:id", requireAuth, async (req, res) => {
+  app.delete("/api/documents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user!.id;
+
+      // Check if user has permission to delete
+      checkUserPermissions.canDelete(req.user);
 
       // TODO: In real implementation, also delete from object storage
       await storage.deleteDocument(id);
       
       res.json({ message: "Document deleted successfully" });
     } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ message: error.message });
+      }
       console.error("Error deleting document:", error);
       res.status(500).json({ message: "Failed to delete document" });
     }
