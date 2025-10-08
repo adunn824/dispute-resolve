@@ -57,7 +57,6 @@ export function setupAuth(app: Express) {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
     },
   };
@@ -73,8 +72,9 @@ export function setupAuth(app: Express) {
         const user = await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
+        } else {
+          return done(null, user);
         }
-        return done(null, user);
       } catch (error) {
         return done(error);
       }
@@ -136,32 +136,20 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) {
-        return next(err);
-      }
-      if (!user) {
-        return res.status(401).json({ message: "Invalid username or password" });
-      }
-      req.login(user, (loginErr) => {
-        if (loginErr) {
-          return next(loginErr);
-        }
-        res.status(200).json({
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          restrictedLenderId: user.restrictedLenderId,
-          isViewOnly: user.isViewOnly,
-          canResolve: user.canResolve,
-          canDelete: user.canDelete,
-          canAssign: user.canAssign,
-        });
-      });
-    })(req, res, next);
+  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+    const user = req.user!;
+    res.status(200).json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      restrictedLenderId: user.restrictedLenderId,
+      isViewOnly: user.isViewOnly,
+      canResolve: user.canResolve,
+      canDelete: user.canDelete,
+      canAssign: user.canAssign,
+    });
   });
 
   app.post("/api/logout", (req, res, next) => {

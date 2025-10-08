@@ -13,7 +13,6 @@ import {
   auditLogs,
   caseTypes,
   categories,
-  categoryCaseTypes,
   checklistTemplates,
   documentRequirements,
   priorityRules,
@@ -26,17 +25,13 @@ import {
   kbArticles,
   kbArticleVersions,
   kbChangeEvents,
-  kbArticleLinks,
-  reusableChecklistTemplates,
-  reusableChecklistItems,
-  checklistAssignmentRules,
-  lenders
+  kbArticleLinks
 } from "@shared/schema";
 
 async function seed() {
   console.log("🌱 Starting database seeding...");
 
-  // Clear existing data (order matters for foreign key constraints)
+  // Clear existing data
   await db.delete(auditLogs);
   await db.delete(resolutions);
   await db.delete(documents);
@@ -57,22 +52,17 @@ async function seed() {
   await db.delete(tagRules);
   await db.delete(resolutionConfigs);
   await db.delete(slaPolicies);
-  await db.delete(checklistAssignmentRules);
-  await db.delete(reusableChecklistItems);
-  await db.delete(reusableChecklistTemplates);
-  await db.delete(categoryCaseTypes);
   await db.delete(categories);
   await db.delete(caseTypes);
   await db.delete(valueSets);
   await db.delete(featureFlags);
-  await db.delete(lenders);
 
   // 1. Create Case Types
   console.log("Creating case types...");
   const caseTypeRecords = await db.insert(caseTypes).values([
-    { name: "Mail" },
-    { name: "Complaint" },
-    { name: "Dispute" },
+    { name: "Mail", isActive: true },
+    { name: "Complaint", isActive: true },
+    { name: "Dispute", isActive: true },
   ]).returning();
 
   const mailType = caseTypeRecords.find(ct => ct.name === "Mail")!;
@@ -83,30 +73,19 @@ async function seed() {
   console.log("Creating categories...");
   const categoryRecords = await db.insert(categories).values([
     // Mail categories
-    { name: "General Inquiry", code: "MAIL_GEN", description: "General mail inquiries", sortOrder: 1, version: 1 },
-    { name: "Account Information", code: "MAIL_ACCT", description: "Account-related mail", sortOrder: 2, version: 1 },
+    { caseTypeId: mailType.id, name: "General Inquiry", code: "MAIL_GEN", description: "General mail inquiries", sortOrder: 1, version: 1 },
+    { caseTypeId: mailType.id, name: "Account Information", code: "MAIL_ACCT", description: "Account-related mail", sortOrder: 2, version: 1 },
     
     // Complaint categories
-    { name: "Service Quality", code: "COMP_SVC", description: "Service quality complaints", sortOrder: 1, version: 1 },
-    { name: "Billing Issues", code: "COMP_BILL", description: "Billing-related complaints", sortOrder: 2, version: 1 },
-    { name: "Staff Conduct", code: "COMP_STAFF", description: "Staff conduct complaints", sortOrder: 3, version: 1 },
+    { caseTypeId: complaintType.id, name: "Service Quality", code: "COMP_SVC", description: "Service quality complaints", sortOrder: 1, version: 1 },
+    { caseTypeId: complaintType.id, name: "Billing Issues", code: "COMP_BILL", description: "Billing-related complaints", sortOrder: 2, version: 1 },
+    { caseTypeId: complaintType.id, name: "Staff Conduct", code: "COMP_STAFF", description: "Staff conduct complaints", sortOrder: 3, version: 1 },
     
     // Dispute categories  
-    { name: "Transaction Dispute", code: "DISP_TXN", description: "Transaction disputes", sortOrder: 1, version: 1 },
-    { name: "Billing Dispute", code: "DISP_BILL", description: "Billing disputes", sortOrder: 2, version: 1 },
-    { name: "Service Dispute", code: "DISP_SVC", description: "Service disputes", sortOrder: 3, version: 1 },
+    { caseTypeId: disputeType.id, name: "Transaction Dispute", code: "DISP_TXN", description: "Transaction disputes", sortOrder: 1, version: 1 },
+    { caseTypeId: disputeType.id, name: "Billing Dispute", code: "DISP_BILL", description: "Billing disputes", sortOrder: 2, version: 1 },
+    { caseTypeId: disputeType.id, name: "Service Dispute", code: "DISP_SVC", description: "Service disputes", sortOrder: 3, version: 1 },
   ]).returning();
-  
-  // Link categories to case types via junction table
-  const mailCategories = categoryRecords.filter(c => c.code.startsWith("MAIL_"));
-  const complaintCategories = categoryRecords.filter(c => c.code.startsWith("COMP_"));
-  const disputeCategories = categoryRecords.filter(c => c.code.startsWith("DISP_"));
-  
-  await db.insert(categoryCaseTypes).values([
-    ...mailCategories.map(cat => ({ categoryId: cat.id, caseTypeId: mailType.id })),
-    ...complaintCategories.map(cat => ({ categoryId: cat.id, caseTypeId: complaintType.id })),
-    ...disputeCategories.map(cat => ({ categoryId: cat.id, caseTypeId: disputeType.id })),
-  ]);
 
   // 3. Create Users
   console.log("Creating users...");
@@ -193,34 +172,25 @@ async function seed() {
   // 7. Create Priority Rules
   console.log("Creating priority rules...");
   for (const category of categoryRecords) {
-    const rules: Array<{
-      categoryId: string;
-      name: string;
-      description: string;
-      priority: "critical" | "high" | "medium" | "low";
-      conditions: any;
-      ruleJson?: any;
-      priorityValue: string;
-      isActive: boolean;
-    }> = [];
+    const rules = [];
     
     if (category.code.includes("BILL")) {
       rules.push(
-        { categoryId: category.id, name: "Critical Billing", description: "High value billing issues", priority: "critical" as const, conditions: "amount > 10000", ruleJson: { conditions: [{ field: "amount", operator: ">", value: 10000 }] }, priorityValue: "Critical", isActive: true },
-        { categoryId: category.id, name: "High Priority Billing", description: "Medium value billing issues", priority: "high" as const, conditions: "amount > 1000", ruleJson: { conditions: [{ field: "amount", operator: ">", value: 1000 }] }, priorityValue: "High", isActive: true }
+        { categoryId: category.id, name: "Critical Billing", description: "High value billing issues", priority: "critical", conditions: "amount > 10000", ruleJson: { conditions: [{ field: "amount", operator: ">", value: 10000 }] }, priorityValue: "Critical", isActive: true },
+        { categoryId: category.id, name: "High Priority Billing", description: "Medium value billing issues", priority: "high", conditions: "amount > 1000", ruleJson: { conditions: [{ field: "amount", operator: ">", value: 1000 }] }, priorityValue: "High", isActive: true }
       );
     }
     
     if (category.code.includes("DISP")) {
       rules.push(
-        { categoryId: category.id, name: "BK24 Priority", description: "Urgent dispute cases", priority: "high" as const, conditions: "daysOld > 30", ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 30 }] }, priorityValue: "BK24", isActive: true },
-        { categoryId: category.id, name: "BK48 Priority", description: "Moderate dispute cases", priority: "medium" as const, conditions: "daysOld > 14", ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 14 }] }, priorityValue: "BK48", isActive: true }
+        { categoryId: category.id, name: "BK24 Priority", description: "Urgent dispute cases", priority: "high", conditions: "daysOld > 30", ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 30 }] }, priorityValue: "BK24", isActive: true },
+        { categoryId: category.id, name: "BK48 Priority", description: "Moderate dispute cases", priority: "medium", conditions: "daysOld > 14", ruleJson: { conditions: [{ field: "daysOld", operator: ">", value: 14 }] }, priorityValue: "BK48", isActive: true }
       );
     }
     
     // Default rule
     rules.push(
-      { categoryId: category.id, name: "Default Priority", description: "Default medium priority for all cases", priority: "medium" as const, conditions: "default", ruleJson: { conditions: [], default: true }, priorityValue: "Medium", isActive: true }
+      { categoryId: category.id, name: "Default Priority", description: "Default medium priority for all cases", priority: "medium", conditions: "default", ruleJson: { conditions: [], default: true }, priorityValue: "Medium", isActive: true }
     );
     
     await db.insert(priorityRules).values(rules);
@@ -230,36 +200,16 @@ async function seed() {
   console.log("Creating SLA policies...");
   for (const category of categoryRecords) {
     let targetHours = 72; // Default 3 days
-    let responseHours = 24; // Default 1 day response
-    let priority: "critical" | "high" | "medium" | "low" = "medium";
     
-    if (category.code.startsWith("MAIL_")) {
-      targetHours = 24; // 1 day for mail
-      responseHours = 8;
-      priority = "medium";
-    }
-    if (category.code.startsWith("COMP_")) {
-      targetHours = 48; // 2 days for complaints
-      responseHours = 12;
-      priority = "high";
-    }
-    if (category.code.startsWith("DISP_")) {
-      targetHours = 120; // 5 days for disputes
-      responseHours = 24;
-      priority = "critical";
-    }
+    if (category.code.startsWith("MAIL_")) targetHours = 24; // 1 day for mail
+    if (category.code.startsWith("COMP_")) targetHours = 48; // 2 days for complaints
+    if (category.code.startsWith("DISP_")) targetHours = 120; // 5 days for disputes
     
     await db.insert(slaPolicies).values([{
       categoryId: category.id,
-      name: `SLA for ${category.name}`,
-      description: `SLA policy for ${category.name} category`,
-      priority: priority,
-      responseTimeHours: responseHours,
-      resolutionTimeHours: targetHours,
-      conditions: { default: true },
       targetHours: targetHours,
       clockStartsOn: "case_created",
-      pauseOnStatus: ["in_progress"]
+      pauseOnStatus: ["pending"]
     }]);
   }
 
@@ -327,7 +277,7 @@ async function seed() {
       loanId: "LOAN002",
       state: "NY",
       details: "Customer disputes unauthorized transaction on account. Claims no knowledge of the charge and requests immediate investigation.",
-      status: "in_progress"
+      status: "pending"
     },
     {
       caseTypeId: mailType.id,
@@ -443,8 +393,8 @@ async function seed() {
         action: "case_created",
         details: { 
           message: "Case created and assigned", 
-          category: caseRecord.categoryId,
-          status: caseRecord.status
+          priority: caseRecord.priority,
+          category: caseRecord.categoryId
         }
       },
       {
