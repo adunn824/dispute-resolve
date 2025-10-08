@@ -2387,7 +2387,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Return all database users regardless of role or status
       const users = await storage.getAllUsers();
-      res.json(users);
+      // Mask the outlookClientSecret in all users
+      const sanitizedUsers = users.map(user => ({
+        ...user,
+        outlookClientSecret: user.outlookClientSecret ? "***REDACTED***" : null
+      }));
+      res.json(sanitizedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -2413,6 +2418,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canResolve: z.boolean().optional(),
         canDelete: z.boolean().optional(),
         canAssign: z.boolean().optional(),
+        // Email configuration fields
+        emailEnabled: z.boolean().optional(),
+        outlookEmail: z.string().optional(),
+        outlookClientId: z.string().optional(),
+        outlookTenantId: z.string().optional(),
+        outlookClientSecret: z.string().optional(),
+        outlookRedirectUri: z.string().optional(),
       });
 
       const validatedData = updateSchema.parse(req.body);
@@ -2425,6 +2437,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Only update password if it's provided and not empty
           if (value && value !== '') {
             updates.password = await hashPassword(value as string);
+          }
+        } else if (key === 'outlookClientSecret') {
+          // Only update secret if provided and not empty, otherwise preserve existing
+          if (value && value !== '') {
+            updates.outlookClientSecret = value;
           }
         } else if (key === 'firstName' || key === 'lastName') {
           // Update firstName/lastName
@@ -2463,6 +2480,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canResolve: updatedUser.canResolve,
         canDelete: updatedUser.canDelete,
         canAssign: updatedUser.canAssign,
+        emailEnabled: updatedUser.emailEnabled,
+        outlookEmail: updatedUser.outlookEmail,
+        outlookClientId: updatedUser.outlookClientId,
+        outlookTenantId: updatedUser.outlookTenantId,
+        outlookClientSecret: updatedUser.outlookClientSecret ? "***REDACTED***" : null,
+        outlookRedirectUri: updatedUser.outlookRedirectUri,
         createdAt: updatedUser.createdAt,
       });
     } catch (error) {
@@ -2492,6 +2515,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canResolve: z.boolean().default(true),
         canDelete: z.boolean().default(false),
         canAssign: z.boolean().default(true),
+        // Email configuration fields
+        emailEnabled: z.boolean().default(false),
+        outlookEmail: z.string().optional(),
+        outlookClientId: z.string().optional(),
+        outlookTenantId: z.string().optional(),
+        outlookClientSecret: z.string().optional(),
+        outlookRedirectUri: z.string().optional(),
       });
 
       const validatedData = createSchema.parse(req.body);
@@ -2516,6 +2546,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canResolve: validatedData.canResolve,
         canDelete: validatedData.canDelete,
         canAssign: validatedData.canAssign,
+        emailEnabled: validatedData.emailEnabled,
+        outlookEmail: validatedData.outlookEmail || null,
+        outlookClientId: validatedData.outlookClientId || null,
+        outlookTenantId: validatedData.outlookTenantId || null,
+        outlookClientSecret: validatedData.outlookClientSecret || null,
+        outlookRedirectUri: validatedData.outlookRedirectUri || null,
       });
       
       res.status(201).json({
@@ -2532,6 +2568,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canResolve: newUser.canResolve,
         canDelete: newUser.canDelete,
         canAssign: newUser.canAssign,
+        emailEnabled: newUser.emailEnabled,
+        outlookEmail: newUser.outlookEmail,
+        outlookClientId: newUser.outlookClientId,
+        outlookTenantId: newUser.outlookTenantId,
+        outlookClientSecret: newUser.outlookClientSecret ? "***REDACTED***" : null,
+        outlookRedirectUri: newUser.outlookRedirectUri,
         createdAt: newUser.createdAt,
       });
     } catch (error) {
