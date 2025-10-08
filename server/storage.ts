@@ -1849,6 +1849,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteReusableChecklistTemplate(id: string): Promise<void> {
+    // First delete any checklist assignment rules that reference this template
+    await db.delete(checklistAssignmentRules)
+      .where(eq(checklistAssignmentRules.reusableTemplateId, id));
+    
     // Items will be cascade deleted due to foreign key constraint
     await db.delete(reusableChecklistTemplates).where(eq(reusableChecklistTemplates.id, id));
   }
