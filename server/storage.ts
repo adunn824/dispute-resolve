@@ -193,6 +193,7 @@ export interface IStorage {
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, updates: Partial<InsertCase>): Promise<Case>;
   assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case>;
+  deleteCase(id: string): Promise<void>;
   getAvailableAssignees(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   
@@ -1209,6 +1210,36 @@ export class DatabaseStorage implements IStorage {
     });
 
     return updatedCases[0];
+  }
+
+  async deleteCase(id: string): Promise<void> {
+    // Delete all related entities (cascade delete)
+    // Order matters - delete children before parent
+    
+    // Delete checklist items
+    await db.delete(checklistItems).where(eq(checklistItems.caseId, id));
+    
+    // Delete documents
+    await db.delete(documents).where(eq(documents.caseId, id));
+    
+    // Delete case notes
+    await db.delete(caseNotes).where(eq(caseNotes.caseId, id));
+    
+    // Delete resolutions
+    await db.delete(resolutions).where(eq(resolutions.caseId, id));
+    
+    // Delete flags
+    await db.delete(flags).where(eq(flags.caseId, id));
+    
+    // Delete audit logs
+    await db.delete(auditLogs).where(eq(auditLogs.caseId, id));
+    
+    // Finally, delete the case itself
+    const result = await db.delete(cases).where(eq(cases.id, id)).returning();
+    
+    if (result.length === 0) {
+      throw new Error("Case not found");
+    }
   }
 
   async getAvailableAssignees(): Promise<User[]> {

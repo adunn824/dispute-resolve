@@ -10,7 +10,7 @@ import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
 import { CaseNotesTab } from "./tabs/CaseNotesTab";
-import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit, Mail, Paperclip } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit, Mail, Paperclip, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -319,6 +319,31 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     },
   });
 
+  // Mutation for deleting case
+  const deleteCaseMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/cases/${caseId}`),
+    onSuccess: () => {
+      // Invalidate queries and navigate back
+      queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      
+      toast({
+        title: "Case Deleted",
+        description: "The case has been successfully deleted.",
+      });
+      
+      // Navigate back to cases list
+      onBack();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete case",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Initialize form with current case data
   const editForm = useForm<EditCaseFormValues>({
     resolver: zodResolver(editCaseSchema),
@@ -393,6 +418,12 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     completeIntakeMutation.mutate(data);
   };
 
+  const handleDeleteCase = () => {
+    if (confirm("Are you sure you want to delete this case? This action cannot be undone and will delete all related data including documents, notes, and checklist items.")) {
+      deleteCaseMutation.mutate();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -464,6 +495,18 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             )}
           </div>
+          {user?.canDelete && !isPendingIntake && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteCase}
+              disabled={deleteCaseMutation.isPending || isAuthLoading}
+              data-testid="button-delete-case"
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
