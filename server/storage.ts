@@ -147,7 +147,7 @@ export interface DynamicChecklistItem {
   completedAt?: Date | null;
   assignedToUserId?: string | null;
   checklistItemId?: string | null; // ID from checklistItems table if exists
-  fieldValue?: string | null; // The actual value stored for this field
+  value?: string | null; // The actual value stored for this field
 }
 
 export interface IStorage {
@@ -1338,7 +1338,7 @@ export class DatabaseStorage implements IStorage {
             completedAt: completion?.completedAt ?? null,
             assignedToUserId: completion?.assignedToUserId ?? null,
             checklistItemId: completion?.checklistItemId ?? null,
-            fieldValue: completion?.fieldValue ?? null
+            value: completion?.fieldValue ?? null
           });
 
           seenKeys.add(templateItem.key);
