@@ -125,6 +125,8 @@ export interface DashboardStats {
   averageResolutionTime: string;
   recentCases: Case[];
   slaAlerts: { caseId: string; customerName: string; hoursRemaining: number; }[];
+  pendingEmailIntake: number;
+  avgEmailIntakeAge: number;
 }
 
 // Dynamic checklist item combining template item with completion state
@@ -2385,6 +2387,22 @@ export class DatabaseStorage implements IStorage {
         .then(r => r[0]?.count || 0)
     ]);
 
+    // Get email intake stats
+    const pendingIntakeCases = await db.select().from(cases)
+      .where(eq(cases.status, 'pending_intake'));
+    
+    const pendingEmailIntake = pendingIntakeCases.length;
+    const avgEmailIntakeAge = pendingIntakeCases.length > 0
+      ? Math.round(
+          pendingIntakeCases.reduce((sum, c) => {
+            const age = c.receivedAt 
+              ? (Date.now() - c.receivedAt.getTime()) / (1000 * 60 * 60)
+              : 0;
+            return sum + age;
+          }, 0) / pendingIntakeCases.length
+        )
+      : 0;
+
     // Get recent cases (last 5)
     const recentCases = await db.select().from(cases)
       .orderBy(desc(cases.createdAt))
@@ -2403,7 +2421,9 @@ export class DatabaseStorage implements IStorage {
       slaBreaches,
       averageResolutionTime,
       recentCases,
-      slaAlerts
+      slaAlerts,
+      pendingEmailIntake,
+      avgEmailIntakeAge
     };
   }
 

@@ -171,6 +171,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/cases/email-intake - Get all pending email intake cases (must come before :id route)
+  app.get("/api/cases/email-intake", requireAuth, async (req, res) => {
+    try {
+      const intakeCases = await storage.getEmailIntakeCases();
+      res.json({ data: intakeCases });
+    } catch (error) {
+      console.error("Failed to fetch email intake cases:", error);
+      res.status(500).json({ error: "Failed to fetch email intake cases" });
+    }
+  });
+
   // GET /api/cases/:id - Get single case by ID with detailed information
   app.get("/api/cases/:id", requireAuth, async (req: any, res) => {
     try {
@@ -559,6 +570,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Failed to update case:", error);
       res.status(500).json({ error: "Failed to update case" });
+    }
+  });
+
+  // Email Intake API Endpoints
+  
+  // POST /api/email-intake - Webhook endpoint to receive emails and create pending intake cases
+  app.post("/api/email-intake", async (req, res) => {
+    try {
+      const emailSchema = z.object({
+        from: z.string().min(1, "From address is required"),
+        to: z.string().optional(),
+        subject: z.string().optional(),
+        receivedDate: z.string().optional(),
+        messageId: z.string().optional(),
+        body: z.string().optional(),
+        bodyPreview: z.string().optional(),
+        hasAttachments: z.boolean().optional(),
+        attachmentCount: z.number().optional(),
+      });
+
+      const emailData = emailSchema.parse(req.body);
+      const newCase = await storage.createEmailIntakeCase(emailData);
+      
+      res.status(201).json({ 
+        success: true, 
+        data: newCase,
+        message: "Email intake case created successfully"
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid email data", details: error.errors });
+      }
+      console.error("Failed to create email intake case:", error);
+      res.status(500).json({ error: "Failed to process email intake" });
+    }
+  });
+
+  // POST /api/cases/:id/complete-intake - Complete intake and activate case
+  app.post("/api/cases/:id/complete-intake", requireRole(['agent', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      const intakeSchema = z.object({
+        caseTypeId: z.string().min(1, "Case type is required"),
+        categoryId: z.string().min(1, "Category is required"),
+        priorityRuleId: z.string().min(1, "Priority rule is required"),
+        lenderId: z.string().optional(),
+        loanId: z.string().optional(),
+        customerName: z.string().min(1, "Customer name is required"),
+        customerState: z.string().min(2, "State is required"),
+        details: z.string().optional(), // Allow keeping email body or override
+      });
+
+      const intakeData = intakeSchema.parse(req.body);
+      
+      // Check if case exists and is in pending_intake status
+      const existingCase = await storage.getCase(id);
+      if (!existingCase) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+      if (existingCase.status !== 'pending_intake') {
+        return res.status(400).json({ error: "Case is not in pending intake status" });
+      }
+
+      // Update customer info if needed
+      let customerId = existingCase.customerId;
+      const existingCustomers = await storage.findCustomerByName(intakeData.customerName);
+      const matchingCustomer = existingCustomers.find(c => 
+        c.name === intakeData.customerName && c.state === intakeData.customerState
+      );
+      
+      if (matchingCustomer) {
+        customerId = matchingCustomer.id;
+      } else {
+        const newCustomer = await storage.createCustomer({
+          name: intakeData.customerName,
+          state: intakeData.customerState,
+        });
+        customerId = newCustomer.id;
+      }
+
+      // Complete the intake with updated case data
+      const caseData = {
+        caseTypeId: intakeData.caseTypeId,
+        categoryId: intakeData.categoryId,
+        priorityRuleId: intakeData.priorityRuleId,
+        customerId,
+        lenderId: intakeData.lenderId || existingCase.lenderId,
+        loanId: intakeData.loanId || existingCase.loanId,
+        state: intakeData.customerState,
+        details: intakeData.details || existingCase.details,
+      };
+
+      const updatedCase = await storage.completeIntake(id, caseData, req.dbUser.id);
+      
+      res.json({ data: updatedCase, message: "Intake completed successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid intake data", details: error.errors });
+      }
+      console.error("Failed to complete intake:", error);
+      res.status(500).json({ error: "Failed to complete intake" });
+    }
+  });
+
+  // POST /api/cases/:id/mark-viewed - Mark case as first viewed
+  app.post("/api/cases/:id/mark-viewed", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updatedCase = await storage.markCaseViewed(id);
+      res.json({ data: updatedCase });
+    } catch (error) {
+      console.error("Failed to mark case as viewed:", error);
+      res.status(500).json({ error: "Failed to mark case as viewed" });
     }
   });
 

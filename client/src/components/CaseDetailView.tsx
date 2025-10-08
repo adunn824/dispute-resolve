@@ -10,7 +10,7 @@ import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
 import { CaseNotesTab } from "./tabs/CaseNotesTab";
-import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit, Mail, Paperclip } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -62,9 +62,32 @@ const editCaseSchema = z.object({
 
 type EditCaseFormValues = z.infer<typeof editCaseSchema>;
 
+// Form schema for completing email intake
+const intakeCompletionSchema = z.object({
+  customerName: z.string().min(1, "Customer name is required"),
+  customerState: z.string().min(2, "State is required"),
+  caseTypeId: z.string().min(1, "Case type is required"),
+  categoryId: z.string().min(1, "Category is required"),
+  priorityRuleId: z.string().min(1, "Priority rule is required"),
+  lenderId: z.string().optional(),
+  loanId: z.string().optional(),
+  details: z.string().min(10, "Details must be at least 10 characters"),
+});
+
+type IntakeCompletionFormValues = z.infer<typeof intakeCompletionSchema>;
+
 interface CaseDetailViewProps {
   caseId: string;
   onBack: () => void;
+}
+
+interface EmailMetadata {
+  from: string;
+  to: string;
+  subject: string;
+  receivedAt: string;
+  attachmentCount?: number;
+  bodyPreview: string;
 }
 
 interface CaseDetailData {
@@ -79,7 +102,7 @@ interface CaseDetailData {
   lenderId?: string;
   state: string;
   details: string;
-  status: "open" | "in_progress" | "resolved";
+  status: "open" | "in_progress" | "resolved" | "pending_intake";
   hasRepresentative?: boolean;
   representativeCompanyName?: string;
   representativePersonName?: string;
@@ -102,6 +125,7 @@ interface CaseDetailData {
   assignedUserName?: string;
   assignedUserEmail?: string;
   assignedUserRole?: string;
+  emailMetadata?: EmailMetadata;
 }
 
 interface Assignee {
@@ -111,15 +135,50 @@ interface Assignee {
   role: string;
 }
 
+interface CaseType {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+}
+
+interface PriorityRule {
+  id: string;
+  name: string;
+  priority: string;
+}
+
+interface Lender {
+  id: string;
+  name: string;
+  dba?: string | null;
+}
+
+const usStates = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+];
+
 export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState("checklist");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [hasRepresentative, setHasRepresentative] = useState(false);
+  const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   
   // Fetch case details from API
-  const { data: caseData, isLoading, error } = useQuery<{data: CaseDetailData}>({
+  const { data: caseData, isLoading, error, refetch: refetchCase } = useQuery<{data: CaseDetailData}>({
     queryKey: ["/api/cases", caseId],
     queryFn: () => apiRequest("GET", `/api/cases/${caseId}`)
   });
@@ -132,6 +191,38 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
   const caseDetails = caseData?.data;
   const assignees = assigneesData?.data || [];
+
+  // Queries for intake form (only when status is pending_intake)
+  const isPendingIntake = caseDetails?.status === "pending_intake";
+
+  const { data: caseTypesData } = useQuery<{data: CaseType[]}>({
+    queryKey: ["/api/case-types"],
+    queryFn: () => apiRequest("GET", "/api/case-types"),
+    enabled: isPendingIntake,
+  });
+
+  const { data: categoriesData } = useQuery<{data: Category[]}>({
+    queryKey: ["/api/categories", selectedCaseTypeId],
+    queryFn: () => apiRequest("GET", `/api/categories?caseTypeId=${selectedCaseTypeId}`),
+    enabled: isPendingIntake && !!selectedCaseTypeId,
+  });
+
+  const { data: priorityRulesData } = useQuery<{data: PriorityRule[]}>({
+    queryKey: ["/api/priority-rules"],
+    queryFn: () => apiRequest("GET", "/api/priority-rules"),
+    enabled: isPendingIntake,
+  });
+
+  const { data: lendersData } = useQuery<{data: Lender[]}>({
+    queryKey: ["/api/lenders"],
+    queryFn: () => apiRequest("GET", "/api/lenders"),
+    enabled: isPendingIntake,
+  });
+
+  const caseTypes = caseTypesData?.data || [];
+  const categories = categoriesData?.data || [];
+  const priorityRules = priorityRulesData?.data || [];
+  const lenders = lendersData?.data || [];
 
   // Mutation for updating case status
   const updateStatusMutation = useMutation({
@@ -201,6 +292,33 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     },
   });
 
+  // Mutation for completing email intake
+  const completeIntakeMutation = useMutation({
+    mutationFn: (data: IntakeCompletionFormValues) =>
+      apiRequest("POST", `/api/cases/${caseId}/complete-intake`, data),
+    onSuccess: () => {
+      // Invalidate and refetch relevant queries
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases/email-intake"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      
+      // Refetch case to show normal detail view
+      refetchCase();
+      
+      toast({
+        title: "Intake Completed",
+        description: "Email intake has been successfully completed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to complete intake",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Initialize form with current case data
   const editForm = useForm<EditCaseFormValues>({
     resolver: zodResolver(editCaseSchema),
@@ -215,6 +333,21 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       representativeAddress: caseDetails?.representativeAddress || "",
       representativeEmail: caseDetails?.representativeEmail || "",
       representativePhone: caseDetails?.representativePhone || "",
+    },
+  });
+
+  // Initialize intake completion form
+  const intakeForm = useForm<IntakeCompletionFormValues>({
+    resolver: zodResolver(intakeCompletionSchema),
+    defaultValues: {
+      customerName: caseDetails?.emailMetadata?.from || "",
+      customerState: "",
+      caseTypeId: "",
+      categoryId: "",
+      priorityRuleId: "",
+      lenderId: "",
+      loanId: "",
+      details: caseDetails?.emailMetadata?.bodyPreview || "",
     },
   });
 
@@ -256,6 +389,10 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     updateCaseMutation.mutate(data);
   };
 
+  const handleIntakeSubmit = (data: IntakeCompletionFormValues) => {
+    completeIntakeMutation.mutate(data);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -293,15 +430,19 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Case #{caseDetails.caseNumber}</h1>
           <p className="text-muted-foreground">
-            {caseDetails.caseOriginationName && `${caseDetails.caseOriginationName} • `}
-            {caseDetails.caseTypeName} • {caseDetails.categoryName}
+            {isPendingIntake ? "Email Intake - Pending Completion" : (
+              <>
+                {caseDetails.caseOriginationName && `${caseDetails.caseOriginationName} • `}
+                {caseDetails.caseTypeName} • {caseDetails.categoryName}
+              </>
+            )}
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          <PriorityBadge priority={caseDetails.priorityValue as "Low" | "Medium" | "High"} />
+          {!isPendingIntake && <PriorityBadge priority={caseDetails.priorityValue as "Low" | "Medium" | "High"} />}
           <div className="flex items-center gap-2">
             <StatusBadge status={caseDetails.status} />
-            {user && !user.isViewOnly && (
+            {user && !user.isViewOnly && !isPendingIntake && (
               <Select
                 value={caseDetails.status}
                 onValueChange={handleStatusChange}
@@ -326,8 +467,275 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         </div>
       </div>
 
-      {/* Case Overview */}
-      <Card>
+      {/* Email Intake Section */}
+      {isPendingIntake && caseDetails.emailMetadata && (
+        <>
+          {/* Email Metadata Card */}
+          <Card data-testid="card-email-metadata">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Email Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">From</p>
+                  <p className="text-sm font-medium" data-testid="text-email-from">{caseDetails.emailMetadata.from}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">To</p>
+                  <p className="text-sm font-medium" data-testid="text-email-to">{caseDetails.emailMetadata.to}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Subject</p>
+                  <p className="text-sm font-medium" data-testid="text-email-subject">{caseDetails.emailMetadata.subject}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Received</p>
+                  <p className="text-sm font-medium" data-testid="text-email-received">
+                    {formatDistanceToNow(new Date(caseDetails.emailMetadata.receivedAt), { addSuffix: true })}
+                  </p>
+                </div>
+                {caseDetails.emailMetadata.attachmentCount !== undefined && caseDetails.emailMetadata.attachmentCount > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Attachments</p>
+                    <p className="text-sm font-medium flex items-center gap-1" data-testid="text-email-attachments">
+                      <Paperclip className="h-3 w-3" />
+                      {caseDetails.emailMetadata.attachmentCount} file{caseDetails.emailMetadata.attachmentCount !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Email Body Preview</p>
+                <div className="bg-muted/30 p-3 rounded-md">
+                  <p className="text-sm whitespace-pre-wrap" data-testid="text-email-body">{caseDetails.emailMetadata.bodyPreview}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Intake Completion Form */}
+          <Card data-testid="card-intake-form">
+            <CardHeader>
+              <CardTitle>Complete Intake</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...intakeForm}>
+                <form onSubmit={intakeForm.handleSubmit(handleIntakeSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={intakeForm.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Customer Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter customer name" {...field} data-testid="input-intake-customer-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={intakeForm.control}
+                      name="customerState"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Customer State</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} data-testid="select-intake-customer-state">
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select state" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {usStates.map((state) => (
+                                <SelectItem key={state} value={state}>
+                                  {state}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={intakeForm.control}
+                      name="caseTypeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Case Type</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              setSelectedCaseTypeId(value);
+                              intakeForm.setValue("categoryId", "");
+                            }}
+                            value={field.value}
+                            data-testid="select-intake-case-type"
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select case type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {caseTypes.map((caseType) => (
+                                <SelectItem key={caseType.id} value={caseType.id}>
+                                  {caseType.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={intakeForm.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            disabled={!selectedCaseTypeId}
+                            data-testid="select-intake-category"
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={!selectedCaseTypeId ? "Select case type first" : "Select category"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={intakeForm.control}
+                    name="priorityRuleId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Priority Rule</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} data-testid="select-intake-priority-rule">
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select priority rule" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {priorityRules.map((rule) => (
+                              <SelectItem key={rule.id} value={rule.id}>
+                                {rule.name} ({rule.priority})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={intakeForm.control}
+                      name="lenderId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lender (Optional)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} data-testid="select-intake-lender">
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select lender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {lenders.map((lender) => (
+                                <SelectItem key={lender.id} value={lender.id}>
+                                  {lender.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={intakeForm.control}
+                      name="loanId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Loan ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter loan ID" {...field} data-testid="input-intake-loan-id" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={intakeForm.control}
+                    name="details"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Details</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Enter case details..."
+                            className="min-h-[120px]"
+                            {...field}
+                            data-testid="textarea-intake-details"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="submit"
+                      disabled={completeIntakeMutation.isPending}
+                      data-testid="button-complete-intake"
+                    >
+                      {completeIntakeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Complete Intake
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Normal Case Overview (only when not pending intake) */}
+      {!isPendingIntake && (
+        <Card>
         <CardHeader>
           <CardTitle>Case Overview</CardTitle>
         </CardHeader>
@@ -426,45 +834,49 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="checklist" data-testid="tab-checklist">Checklist</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-          <TabsTrigger value="notes" data-testid="tab-notes">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Notes
-          </TabsTrigger>
-          <TabsTrigger value="resolution" data-testid="tab-resolution">Resolution</TabsTrigger>
-          <TabsTrigger value="audit" data-testid="tab-audit">Audit Log</TabsTrigger>
-        </TabsList>
+      {/* Tabs (only when not pending intake) */}
+      {!isPendingIntake && (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="checklist" data-testid="tab-checklist">Checklist</TabsTrigger>
+            <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+            <TabsTrigger value="notes" data-testid="tab-notes">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Notes
+            </TabsTrigger>
+            <TabsTrigger value="resolution" data-testid="tab-resolution">Resolution</TabsTrigger>
+            <TabsTrigger value="audit" data-testid="tab-audit">Audit Log</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="checklist" className="mt-6">
-          <ChecklistTab caseId={caseId} />
-        </TabsContent>
+          <TabsContent value="checklist" className="mt-6">
+            <ChecklistTab caseId={caseId} />
+          </TabsContent>
 
-        <TabsContent value="documents" className="mt-6">
-          <DocumentsTab caseId={caseId} />
-        </TabsContent>
+          <TabsContent value="documents" className="mt-6">
+            <DocumentsTab caseId={caseId} />
+          </TabsContent>
 
-        <TabsContent value="notes" className="mt-6">
-          <CaseNotesTab caseId={caseId} />
-        </TabsContent>
+          <TabsContent value="notes" className="mt-6">
+            <CaseNotesTab caseId={caseId} />
+          </TabsContent>
 
-        <TabsContent value="resolution" className="mt-6">
-          <ResolutionTab caseId={caseId} />
-        </TabsContent>
+          <TabsContent value="resolution" className="mt-6">
+            <ResolutionTab caseId={caseId} />
+          </TabsContent>
 
-        <TabsContent value="audit" className="mt-6">
-          <AuditTab caseId={caseId} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="audit" className="mt-6">
+            <AuditTab caseId={caseId} />
+          </TabsContent>
+        </Tabs>
+      )}
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-4">
-        {user && !user.isViewOnly && (
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      {/* Action Buttons (only when not pending intake) */}
+      {!isPendingIntake && (
+        <div className="flex justify-end gap-4">
+          {user && !user.isViewOnly && (
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
             <DialogTrigger asChild>
               <Button 
                 variant="outline" 
@@ -719,7 +1131,8 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
             Resolve Case
           </Button>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

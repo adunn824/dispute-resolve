@@ -1,4 +1,4 @@
-import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen, Building, ListChecks, CheckCircle } from "lucide-react";
+import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen, Building, ListChecks, CheckCircle, Mail } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -36,6 +36,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
 
   const agentItems = [
     { title: "Dashboard", url: "/", icon: Home },
+    { title: "Email Intake", url: "/email-intake", icon: Mail },
     { title: "New Case", url: "/cases/new", icon: Plus },
     { title: "My Cases", url: "/cases", icon: FileText },
     { title: "Search", url: "/search", icon: Search },

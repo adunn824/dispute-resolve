@@ -16,7 +16,8 @@ import {
   TrendingUp, 
   Filter,
   Plus,
-  Loader2
+  Loader2,
+  Mail
 } from "lucide-react";
 
 interface DashboardProps {
@@ -34,6 +35,8 @@ interface DashboardStats {
   averageResolutionTime: string;
   recentCases: any[];
   slaAlerts: { caseId: string; customerName: string; hoursRemaining: number; }[];
+  pendingEmailIntake: number;
+  avgEmailIntakeAge: number;
 }
 
 export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: DashboardProps) {
@@ -89,6 +92,15 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
         value: stats.resolvedToday.toString(),
         icon: CheckCircle,
         change: "On track with goals"
+      },
+      {
+        title: "Pending Intake",
+        value: stats.pendingEmailIntake.toString(),
+        icon: Mail,
+        change: stats.avgEmailIntakeAge > 0 
+          ? `Avg age: ${stats.avgEmailIntakeAge}h` 
+          : "No pending emails",
+        onClick: () => setLocation('/email-intake')
       }
     ];
 
@@ -159,7 +171,12 @@ export function Dashboard({ userRole = "agent", onCreateCase, onViewCase }: Dash
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {getStatsCards().map((stat) => (
-          <Card key={stat.title} className="hover-elevate">
+          <Card 
+            key={stat.title} 
+            className={stat.onClick ? "hover-elevate cursor-pointer active-elevate-2" : "hover-elevate"}
+            onClick={stat.onClick}
+            data-testid={`card-stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <stat.icon className="h-4 w-4 text-muted-foreground" />

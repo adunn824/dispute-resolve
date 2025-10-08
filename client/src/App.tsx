@@ -13,6 +13,7 @@ import { CaseIntakeForm } from "./components/CaseIntakeForm";
 import { CaseDetailView } from "./components/CaseDetailView";
 import { AdminConfigPanel } from "./components/AdminConfigPanel";
 import { CaseListPage } from "./pages/CaseListPage";
+import EmailIntakePage from "./pages/EmailIntakePage";
 import SearchPage from "./pages/SearchPage";
 import KnowledgeBasePage from "./pages/KnowledgeBasePage";
 import KnowledgeBaseArticlePage from "./pages/KnowledgeBaseArticlePage";
@@ -194,6 +195,11 @@ function Router() {
             />
           </ProtectedRoute>
         )}
+      </Route>
+      <Route path="/email-intake">
+        <ProtectedRoute>
+          <EmailIntakePage />
+        </ProtectedRoute>
       </Route>
       <Route path="/compliance/cases">
         <ProtectedRoute requiredRole={["compliance", "admin"]}>
