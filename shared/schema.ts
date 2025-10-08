@@ -158,6 +158,11 @@ export const cases = pgTable("cases", {
     messageId?: string;
     hasAttachments?: boolean;
     attachmentCount?: number;
+    attachments?: Array<{
+      name: string;
+      size?: number;
+      contentType?: string;
+    }>;
     body?: string;
     bodyPreview?: string;
   }>(),

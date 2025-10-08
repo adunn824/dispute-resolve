@@ -49,6 +49,11 @@ interface EmailIntakeCase {
     messageId?: string;
     hasAttachments?: boolean;
     attachmentCount?: number;
+    attachments?: Array<{
+      name: string;
+      size?: number;
+      contentType?: string;
+    }>;
     body?: string;
     bodyPreview?: string;
   };
@@ -247,6 +252,37 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
               {caseItem.emailMetadata?.body || caseItem.emailMetadata?.bodyPreview || caseItem.details}
             </div>
           </div>
+
+          {caseItem.emailMetadata?.attachments && caseItem.emailMetadata.attachments.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Paperclip className="w-4 h-4" />
+                Attachments ({caseItem.emailMetadata.attachments.length})
+              </h4>
+              <div className="space-y-2">
+                {caseItem.emailMetadata.attachments.map((attachment, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 bg-muted/50 rounded-md p-3 text-sm"
+                    data-testid={`attachment-${index}`}
+                  >
+                    <Paperclip className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate" data-testid={`attachment-name-${index}`}>
+                        {attachment.name}
+                      </div>
+                      {attachment.size && (
+                        <div className="text-xs text-muted-foreground">
+                          {(attachment.size / 1024).toFixed(1)} KB
+                          {attachment.contentType && ` • ${attachment.contentType}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Separator />
 
