@@ -1041,7 +1041,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/lenders", requireAuth, async (req, res) => {
     try {
       const lenders = await storage.getLenders();
-      res.json({ data: lenders });
+      // Mask client secret for security - never expose secrets to the client
+      const sanitizedLenders = lenders.map(lender => ({
+        ...lender,
+        outlookClientSecret: lender.outlookClientSecret ? "***REDACTED***" : null
+      }));
+      res.json({ data: sanitizedLenders });
     } catch (error) {
       console.error("Failed to fetch lenders:", error);
       res.status(500).json({ error: "Failed to fetch lenders" });
@@ -1052,7 +1057,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertLenderSchema.parse(req.body);
       const lender = await storage.createLender(validatedData);
-      res.status(201).json(lender);
+      // Mask the secret in response
+      const sanitizedLender = {
+        ...lender,
+        outlookClientSecret: lender.outlookClientSecret ? "***REDACTED***" : null
+      };
+      res.status(201).json(sanitizedLender);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
@@ -1066,8 +1076,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const validatedData = insertLenderSchema.parse(req.body);
+      
+      // If outlookClientSecret is empty, preserve the existing one
+      if (validatedData.outlookClientSecret === "" || !validatedData.outlookClientSecret) {
+        const existingLender = await storage.getLenders();
+        const lender = existingLender.find(l => l.id === id);
+        if (lender && lender.outlookClientSecret) {
+          validatedData.outlookClientSecret = lender.outlookClientSecret;
+        }
+      }
+      
       const lender = await storage.updateLender(id, validatedData);
-      res.json(lender);
+      // Mask the secret in response
+      const sanitizedLender = {
+        ...lender,
+        outlookClientSecret: lender.outlookClientSecret ? "***REDACTED***" : null
+      };
+      res.json(sanitizedLender);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
