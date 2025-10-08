@@ -239,7 +239,7 @@ export interface IStorage {
   getCaseTypeWithOriginations(id: string): Promise<CaseType & { originations: CaseOrigination[] }>;
   
   // Config methods - Categories  
-  getCategories(caseTypeId?: string): Promise<Category[]>;
+  getCategories(caseTypeId?: string): Promise<(Category & { caseTypes?: CaseType[] })[]>;
   getCategory(id: string): Promise<Category | undefined>;
   createCategory(category: InsertCategory, caseTypeIds?: string[]): Promise<Category>;
   updateCategory(id: string, updates: Partial<InsertCategory>, caseTypeIds?: string[]): Promise<Category>;
@@ -1653,10 +1653,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Config methods - Categories
-  async getCategories(caseTypeId?: string): Promise<Category[]> {
+  async getCategories(caseTypeId?: string): Promise<(Category & { caseTypes?: CaseType[] })[]> {
+    let baseCategories: Category[];
+    
     if (caseTypeId) {
       // Get categories filtered by case type
-      const results = await db
+      baseCategories = await db
         .select({
           id: categories.id,
           name: categories.name,
@@ -1671,13 +1673,31 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(categoryCaseTypes, eq(categories.id, categoryCaseTypes.categoryId))
         .where(eq(categoryCaseTypes.caseTypeId, caseTypeId))
         .orderBy(asc(categories.sortOrder));
-      
-      return results;
+    } else {
+      // Get all categories
+      baseCategories = await db.select().from(categories)
+        .orderBy(asc(categories.sortOrder));
     }
     
-    // Get all categories
-    return await db.select().from(categories)
-      .orderBy(asc(categories.sortOrder));
+    // Fetch case types for each category
+    const categoriesWithCaseTypes = await Promise.all(
+      baseCategories.map(async (category) => {
+        const caseTypesData = await db
+          .select({
+            id: caseTypes.id,
+            name: caseTypes.name,
+            description: caseTypes.description,
+            color: caseTypes.color,
+          })
+          .from(caseTypes)
+          .innerJoin(categoryCaseTypes, eq(caseTypes.id, categoryCaseTypes.caseTypeId))
+          .where(eq(categoryCaseTypes.categoryId, category.id));
+        
+        return { ...category, caseTypes: caseTypesData };
+      })
+    );
+    
+    return categoriesWithCaseTypes;
   }
 
   async getCategory(id: string): Promise<Category | undefined> {
