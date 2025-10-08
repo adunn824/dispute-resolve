@@ -88,6 +88,27 @@ Preferred communication style: Simple, everyday language.
   - Toggle switches for view-only, resolve, delete, and assign permissions
   - Real-time validation and clear permission descriptions
 
+### User Email Configuration
+- **Purpose**: Allows individual users to connect their Outlook email accounts to send notices to clients and external parties
+- **OAuth Fields**: Each user can configure:
+  - **emailEnabled**: Toggle to enable email functionality for the user
+  - **outlookEmail**: User's Outlook email address
+  - **outlookClientId**: Azure app client ID for OAuth authentication
+  - **outlookTenantId**: Azure tenant ID for the organization
+  - **outlookClientSecret**: Azure app client secret (stored securely, never exposed)
+  - **outlookRedirectUri**: OAuth redirect URI for authentication callback
+- **Security Measures**:
+  - Client secret masked as "***REDACTED***" in all API responses (GET, POST, PUT)
+  - Empty secret field during update preserves existing value in database
+  - Password-type input field prevents secret visibility in UI
+  - Same security pattern as lender email configuration
+- **Admin Interface**: Located in Users Management page (/admin/users):
+  - Email configuration section appears when "Enable Email" toggle is activated
+  - Conditional display of all OAuth fields when email is enabled
+  - Clear placeholder text for secret field: "Leave empty to keep existing secret" when editing
+  - Visual separation with border and Mail icon for easy identification
+- **Per-User Setup**: Each user has independent email configuration, allowing different team members to use their own email accounts
+
 ### Email Intake System
 - **Webhook Endpoint**: POST /api/email-intake accepts emails from external services (Outlook, Gmail, etc.) and auto-creates cases
 - **Pending Intake Status**: New status type "pending_intake" for cases awaiting agent review and completion
