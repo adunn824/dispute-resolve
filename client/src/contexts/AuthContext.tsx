@@ -65,8 +65,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.location.href = "/api/login";
   };
 
-  const logout = () => {
-    window.location.href = "/api/logout";
+  const logout = async () => {
+    try {
+      await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      // Always redirect to login page, even if logout fails
+      window.location.href = "/";
+    }
   };
 
   const contextValue: AuthContextType = {
