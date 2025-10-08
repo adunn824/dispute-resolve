@@ -36,7 +36,7 @@ export const RULE_FIELDS = {
   'details': { type: 'text', label: 'Complaint Details', description: 'The complaint description text' },
   'loanId': { type: 'text', label: 'Loan ID', description: 'Loan identifier' },
   'state': { type: 'text', label: 'Customer State', description: 'Customer state abbreviation' },
-  'status': { type: 'enum', label: 'Case Status', description: 'Current case status', options: ['open', 'in_progress', 'resolved'] },
+  'status': { type: 'enum', label: 'Case Status', description: 'Current case status', options: ['pending_intake', 'open', 'in_progress', 'resolved'] },
   'hasRepresentative': { type: 'boolean', label: 'Has Representative', description: 'Whether customer has POA/Attorney' },
   'representativeCompanyName': { type: 'text', label: 'Representative Company', description: 'POA/Attorney company name' },
   
@@ -130,7 +130,24 @@ export const cases = pgTable("cases", {
   lenderId: varchar("lender_id").references(() => lenders.id),
   state: text("state").notNull(),
   details: text("details").notNull(),
-  status: text("status", { enum: ["open", "in_progress", "resolved"] }).notNull().default("open"),
+  status: text("status", { enum: ["pending_intake", "open", "in_progress", "resolved"] }).notNull().default("open"),
+  
+  // Email intake fields
+  emailMetadata: jsonb("email_metadata").$type<{
+    from: string;
+    to?: string;
+    subject?: string;
+    receivedDate?: string;
+    messageId?: string;
+    hasAttachments?: boolean;
+    attachmentCount?: number;
+    body?: string;
+    bodyPreview?: string;
+  }>(),
+  receivedAt: timestamp("received_at"), // When email was received
+  firstViewedAt: timestamp("first_viewed_at"), // When agent first opened the email case
+  intakeCompletedAt: timestamp("intake_completed_at"), // When agent completed intake form
+  
   hasRepresentative: boolean("has_representative").notNull().default(false),
   representativeCompanyName: text("representative_company_name"),
   representativePersonName: text("representative_person_name"),
