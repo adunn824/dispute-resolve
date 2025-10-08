@@ -112,7 +112,8 @@ Preferred communication style: Simple, everyday language.
 ### Email Intake System
 - **Webhook Endpoint**: POST /api/email-intake accepts emails from external services (Outlook, Gmail, etc.) and auto-creates cases
 - **Pending Intake Status**: New status type "pending_intake" for cases awaiting agent review and completion
-- **Email Metadata Storage**: JSONB field stores sender, subject, body preview, received timestamp, and attachment info
+- **Email Metadata Storage**: JSONB field stores sender, subject, body preview, received timestamp, and attachment details array
+- **Attachment Handling**: Full attachment metadata stored including file name, size, and content type
 - **Intake Workflow**:
   1. Email arrives at webhook → Case created with pending_intake status
   2. Agent reviews email in Email Intake Queue (/email-intake)
@@ -123,6 +124,7 @@ Preferred communication style: Simple, everyday language.
   - **firstViewedAt**: When agent first opens the intake case
   - **intakeCompletedAt**: When agent completes intake form
 - **Dashboard Integration**: Widget displays pending intake count and average processing time (in hours)
+- **Queue Display**: Shows email metadata including sender, subject, body preview, and list of attachments with file details
 - **Queue Management**: Dedicated page shows all pending intakes with age tracking and quick access
 - **Case Detail Integration**: For pending_intake cases, displays email preview and completion form instead of normal case tabs
 - **No External Integration Required**: User dismissed Outlook connector; webhook is generic and works with any email forwarding service
