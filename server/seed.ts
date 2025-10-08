@@ -26,13 +26,17 @@ import {
   kbArticles,
   kbArticleVersions,
   kbChangeEvents,
-  kbArticleLinks
+  kbArticleLinks,
+  reusableChecklistTemplates,
+  reusableChecklistItems,
+  checklistAssignmentRules,
+  lenders
 } from "@shared/schema";
 
 async function seed() {
   console.log("🌱 Starting database seeding...");
 
-  // Clear existing data
+  // Clear existing data (order matters for foreign key constraints)
   await db.delete(auditLogs);
   await db.delete(resolutions);
   await db.delete(documents);
@@ -53,11 +57,15 @@ async function seed() {
   await db.delete(tagRules);
   await db.delete(resolutionConfigs);
   await db.delete(slaPolicies);
+  await db.delete(checklistAssignmentRules);
+  await db.delete(reusableChecklistItems);
+  await db.delete(reusableChecklistTemplates);
   await db.delete(categoryCaseTypes);
   await db.delete(categories);
   await db.delete(caseTypes);
   await db.delete(valueSets);
   await db.delete(featureFlags);
+  await db.delete(lenders);
 
   // 1. Create Case Types
   console.log("Creating case types...");
