@@ -164,6 +164,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getNextAvailableUser(): Promise<User | null>;
+  updateUserAvailability(userId: string, availabilityStatus: "available" | "not_available"): Promise<User>;
   
   // Customer methods
   getCustomer(id: string): Promise<Customer | undefined>;
@@ -505,6 +507,32 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
+      .returning();
+    return user;
+  }
+
+  async getNextAvailableUser(): Promise<User | null> {
+    // Get all available users, ordered by:
+    // 1. lastAssignedAt (nulls first - never assigned users get priority)
+    // 2. createdAt (older users first for tie-breaking)
+    const availableUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.availabilityStatus, "available"))
+      .orderBy(sql`${users.lastAssignedAt} ASC NULLS FIRST`, asc(users.createdAt))
+      .limit(1);
+    
+    return availableUsers[0] || null;
+  }
+
+  async updateUserAvailability(userId: string, availabilityStatus: "available" | "not_available"): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        availabilityStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
       .returning();
     return user;
   }
