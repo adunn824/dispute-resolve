@@ -143,6 +143,7 @@ export const cases = pgTable("cases", {
   priorityRuleId: varchar("priority_rule_id").notNull().references(() => priorityRules.id),
   customerId: varchar("customer_id").notNull().references(() => customers.id),
   assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
+  secondaryAssignedToUserId: varchar("secondary_assigned_to_user_id").references(() => users.id),
   loanId: text("loan_id"),
   lenderId: varchar("lender_id").references(() => lenders.id),
   state: text("state").notNull(),
