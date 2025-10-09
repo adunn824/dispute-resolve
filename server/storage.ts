@@ -110,7 +110,8 @@ import {
   type InsertKbArticleLink
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ilike, or, sql, inArray, gte, alias } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { RuleEvaluator, findMatchingPriorityRule, findMatchingTagRules, type CaseData } from "./rule-engine";
 import session from "express-session";
 import ConnectPgSession from "connect-pg-simple";
