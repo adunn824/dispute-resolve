@@ -137,7 +137,7 @@ export const customers = pgTable("customers", {
 export const cases = pgTable("cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   caseNumber: serial("case_number").notNull().unique(), // 7-digit numerical display ID
-  caseOriginationId: varchar("case_origination_id").references(() => caseOriginations.id),
+  caseOriginationId: varchar("case_origination_id").notNull().references(() => caseOriginations.id),
   caseTypeId: varchar("case_type_id").notNull().references(() => caseTypes.id),
   categoryId: varchar("category_id").notNull().references(() => categories.id),
   priorityRuleId: varchar("priority_rule_id").notNull().references(() => priorityRules.id),
