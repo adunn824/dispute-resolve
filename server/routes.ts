@@ -253,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/cases/:id/assign", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { assignedToUserId } = req.body;
+      const { assignedToUserId, secondaryAssignedToUserId } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -261,8 +261,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate assignedToUserId if provided (can be null to unassign)
-      if (assignedToUserId !== null && typeof assignedToUserId !== 'string') {
+      if (assignedToUserId !== undefined && assignedToUserId !== null && typeof assignedToUserId !== 'string') {
         return res.status(400).json({ error: "Invalid assignedToUserId. Must be a string or null." });
+      }
+
+      // Validate secondaryAssignedToUserId if provided (can be null to unassign)
+      if (secondaryAssignedToUserId !== undefined && secondaryAssignedToUserId !== null && typeof secondaryAssignedToUserId !== 'string') {
+        return res.status(400).json({ error: "Invalid secondaryAssignedToUserId. Must be a string or null." });
       }
 
       // Get the case to check permissions
@@ -275,7 +280,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       checkUserPermissions.canAssign(req.user);
       checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
 
-      const updatedCase = await storage.assignCase(id, assignedToUserId, userId);
+      // If fields are undefined, preserve existing values
+      const primaryAssignee = assignedToUserId !== undefined ? assignedToUserId : existingCase.assignedToUserId;
+      const secondaryAssignee = secondaryAssignedToUserId !== undefined ? secondaryAssignedToUserId : existingCase.secondaryAssignedToUserId;
+
+      const updatedCase = await storage.assignCase(id, primaryAssignee, secondaryAssignee, userId);
       res.json({ data: updatedCase });
     } catch (error) {
       if (error instanceof AuthorizationError) {
