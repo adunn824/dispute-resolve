@@ -620,7 +620,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/cases/:id", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const updates = insertCaseSchema.partial().parse(req.body);
+      
+      // Handle customer name separately since it's not a case field
+      const { customerName, ...caseUpdates } = req.body;
+      const updates = insertCaseSchema.partial().parse(caseUpdates);
       
       // Check if case exists
       const existingCase = await storage.getCase(id);
@@ -632,6 +635,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       checkUserPermissions.canModify(req.user);
       checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
       
+      // Handle customer name update if provided
+      if (customerName) {
+        // Find or create customer with new name
+        const existingCustomers = await storage.findCustomerByName(customerName);
+        const matchingCustomer = existingCustomers.find(c => 
+          c.name === customerName && c.state === (updates.state || existingCase.state)
+        );
+        
+        if (matchingCustomer) {
+          updates.customerId = matchingCustomer.id;
+        } else {
+          const newCustomer = await storage.createCustomer({
+            name: customerName,
+            state: updates.state || existingCase.state,
+          });
+          updates.customerId = newCustomer.id;
+        }
+      }
+      
       const updatedCase = await storage.updateCase(id, updates);
       
       // Create audit log for case update
@@ -639,7 +661,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         caseId: id,
         actorUserId: req.dbUser.id,
         action: "case_updated", 
-        details: { updates, previousStatus: existingCase.status, newStatus: updatedCase.status }
+        details: { 
+          updates: { ...updates, customerName }, 
+          previousStatus: existingCase.status, 
+          newStatus: updatedCase.status
+        }
       });
       
       res.json({ data: updatedCase });

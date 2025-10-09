@@ -28,8 +28,12 @@ import { useAuth } from "@/contexts/AuthContext";
 
 // Form schema for editing case details
 const editCaseSchema = z.object({
+  caseOriginationId: z.string().min(1, "Case origination is required"),
+  caseTypeId: z.string().min(1, "Case type is required"),
+  categoryId: z.string().min(1, "Category is required"),
+  customerName: z.string().min(1, "Customer name is required"),
   loanId: z.string().optional(),
-  lenderName: z.string().optional(),
+  lenderId: z.string().optional(),
   state: z.string().min(2, "State is required"),
   details: z.string().min(10, "Details must be at least 10 characters"),
   hasRepresentative: z.boolean().optional().default(false),
@@ -165,6 +169,13 @@ interface Lender {
   dba?: string | null;
 }
 
+interface CaseOrigination {
+  id: string;
+  name: string;
+  description?: string;
+  externalKey?: string;
+}
+
 const usStates = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
   "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -178,6 +189,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [hasRepresentative, setHasRepresentative] = useState(false);
   const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
+  const [editSelectedCaseTypeId, setEditSelectedCaseTypeId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   
@@ -227,6 +239,36 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const categories = categoriesData?.data || [];
   const priorityRules = priorityRulesData?.data || [];
   const lenders = lendersData?.data || [];
+
+  // Queries for edit dialog
+  const { data: caseOriginationsData } = useQuery<{data: CaseOrigination[]}>({
+    queryKey: ["/api/case-originations"],
+    queryFn: () => apiRequest("GET", "/api/case-originations"),
+    enabled: isEditDialogOpen,
+  });
+
+  const { data: editCaseTypesData } = useQuery<{data: CaseType[]}>({
+    queryKey: ["/api/case-types"],
+    queryFn: () => apiRequest("GET", "/api/case-types"),
+    enabled: isEditDialogOpen,
+  });
+
+  const { data: editLendersData } = useQuery<{data: Lender[]}>({
+    queryKey: ["/api/lenders"],
+    queryFn: () => apiRequest("GET", "/api/lenders"),
+    enabled: isEditDialogOpen,
+  });
+
+  const { data: editCategoriesData } = useQuery<{data: Category[]}>({
+    queryKey: ["/api/categories", editSelectedCaseTypeId],
+    queryFn: () => apiRequest("GET", `/api/categories?caseTypeId=${editSelectedCaseTypeId}`),
+    enabled: isEditDialogOpen && !!editSelectedCaseTypeId,
+  });
+
+  const caseOriginations = caseOriginationsData?.data || [];
+  const editCaseTypes = editCaseTypesData?.data || [];
+  const editLenders = editLendersData?.data || [];
+  const editCategories = editCategoriesData?.data || [];
 
   // Mutation for updating case status
   const updateStatusMutation = useMutation({
@@ -352,8 +394,12 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const editForm = useForm<EditCaseFormValues>({
     resolver: zodResolver(editCaseSchema),
     defaultValues: {
+      caseOriginationId: caseDetails?.caseOriginationId || "",
+      caseTypeId: caseDetails?.caseTypeId || "",
+      categoryId: caseDetails?.categoryId || "",
+      customerName: caseDetails?.customerName || "",
       loanId: caseDetails?.loanId || "",
-      lenderName: caseDetails?.lenderName || "",
+      lenderId: caseDetails?.lenderId || "",
       state: caseDetails?.customerState || "",
       details: caseDetails?.details || "",
       hasRepresentative: caseDetails?.hasRepresentative || false,
@@ -404,8 +450,12 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     // Reset form with current case data when opening dialog
     if (caseDetails) {
       editForm.reset({
+        caseOriginationId: caseDetails.caseOriginationId || "",
+        caseTypeId: caseDetails.caseTypeId || "",
+        categoryId: caseDetails.categoryId || "",
+        customerName: caseDetails.customerName || "",
         loanId: caseDetails.loanId || "",
-        lenderName: caseDetails.lenderName || "",
+        lenderId: caseDetails.lenderId || "",
         state: caseDetails.customerState || "",
         details: caseDetails.details || "",
         hasRepresentative: caseDetails.hasRepresentative || false,
@@ -416,6 +466,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         representativePhone: caseDetails.representativePhone || "",
       });
       setHasRepresentative(caseDetails.hasRepresentative || false);
+      setEditSelectedCaseTypeId(caseDetails.caseTypeId || null);
     }
     setIsEditDialogOpen(true);
   };
@@ -976,6 +1027,103 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={editForm.control}
+                    name="caseOriginationId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Case Origination</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-case-origination">
+                              <SelectValue placeholder="Select case origination" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {caseOriginations.map((origination) => (
+                              <SelectItem key={origination.id} value={origination.id}>
+                                {origination.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="caseTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Case Type</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            setEditSelectedCaseTypeId(value);
+                          }} 
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-case-type">
+                              <SelectValue placeholder="Select case type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {editCaseTypes.map((type) => (
+                              <SelectItem key={type.id} value={type.id}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={editForm.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {editCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="customerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter customer name" {...field} data-testid="input-edit-customer-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
                     name="loanId"
                     render={({ field }) => (
                       <FormItem>
@@ -990,13 +1138,24 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
                   <FormField
                     control={editForm.control}
-                    name="lenderName"
+                    name="lenderId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Lender Name (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter lender name" {...field} data-testid="input-edit-lender-name" />
-                        </FormControl>
+                        <FormLabel>Lender (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-lender">
+                              <SelectValue placeholder="Select lender" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {editLenders.map((lender) => (
+                              <SelectItem key={lender.id} value={lender.id}>
+                                {lender.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1009,9 +1168,20 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Customer State</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter customer state" {...field} data-testid="input-edit-state" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-state">
+                            <SelectValue placeholder="Select state" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {usStates.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
