@@ -192,7 +192,7 @@ export interface IStorage {
   }): Promise<Case[]>;
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, updates: Partial<InsertCase>): Promise<Case>;
-  assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case>;
+  assignCase(id: string, assignedToUserId: string | null, secondaryAssignedToUserId: string | null, actorUserId: string): Promise<Case>;
   deleteCase(id: string): Promise<void>;
   getAvailableAssignees(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
@@ -1183,12 +1183,13 @@ export class DatabaseStorage implements IStorage {
     return caseRecord;
   }
 
-  async assignCase(id: string, assignedToUserId: string | null, actorUserId: string): Promise<Case> {
+  async assignCase(id: string, assignedToUserId: string | null, secondaryAssignedToUserId: string | null, actorUserId: string): Promise<Case> {
     // Update the case assignment
     const updatedCases = await db
       .update(cases)
       .set({ 
         assignedToUserId,
+        secondaryAssignedToUserId,
         updatedAt: new Date()
       })
       .where(eq(cases.id, id))
@@ -1205,6 +1206,7 @@ export class DatabaseStorage implements IStorage {
       action: "case_assigned",
       details: {
         assignedToUserId,
+        secondaryAssignedToUserId,
         timestamp: new Date().toISOString()
       }
     });
