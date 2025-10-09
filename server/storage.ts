@@ -812,6 +812,7 @@ export class DatabaseStorage implements IStorage {
     priorityRuleId?: string;
     caseTypeId?: string; 
     categoryId?: string;
+    caseOriginationId?: string;
     customerId?: string;
     assignedToUserId?: string;
     search?: string;
@@ -826,6 +827,7 @@ export class DatabaseStorage implements IStorage {
     if (filters?.priorityRuleId) conditions.push(eq(cases.priorityRuleId, filters.priorityRuleId));
     if (filters?.caseTypeId) conditions.push(eq(cases.caseTypeId, filters.caseTypeId));
     if (filters?.categoryId) conditions.push(eq(cases.categoryId, filters.categoryId));
+    if (filters?.caseOriginationId) conditions.push(eq(cases.caseOriginationId, filters.caseOriginationId));
     if (filters?.customerId) conditions.push(eq(cases.customerId, filters.customerId));
     if (filters?.assignedToUserId) conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
     
@@ -881,6 +883,10 @@ export class DatabaseStorage implements IStorage {
         caseTypeName: caseTypes.name,
         caseTypeColor: caseTypes.color,
         
+        // Case origination fields
+        caseOriginationId: cases.caseOriginationId,
+        caseOriginationName: caseOriginations.name,
+        
         // Category fields
         categoryName: categories.name,
         categoryCode: categories.code,
@@ -898,6 +904,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(customers, eq(cases.customerId, customers.id))
       .leftJoin(lenders, eq(cases.lenderId, lenders.id))
       .leftJoin(caseTypes, eq(cases.caseTypeId, caseTypes.id))
+      .leftJoin(caseOriginations, eq(cases.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
       .leftJoin(users, eq(cases.assignedToUserId, users.id));
