@@ -129,6 +129,19 @@ Preferred communication style: Simple, everyday language.
 - **Case Detail Integration**: For pending_intake cases, displays email preview and completion form instead of normal case tabs
 - **No External Integration Required**: User dismissed Outlook connector; webhook is generic and works with any email forwarding service
 
+### Case Edit Functionality
+- **Comprehensive Edit Dialog**: Full case detail editing supporting all case creation fields
+- **Editable Fields**: Case Origination, Case Type, Category, Customer Name, Customer State, Lender, Loan ID, Case Details
+- **Smart Form Behavior**:
+  - Category dropdown dynamically updates based on selected Case Type
+  - All dropdowns pre-populated with current values when dialog opens
+  - Form validation ensures data consistency
+- **Customer Management**: Automatically finds existing customers or creates new records when customer name changes
+- **Backend Logic**: PUT /api/cases/:id accepts all case fields and intelligently handles customer updates
+- **Audit Trail**: All edit changes logged with previous and new values for compliance tracking
+- **Permission Enforcement**: Edit functionality respects user permissions (view-only users cannot edit)
+- **Data Persistence**: Changes immediately reflected in UI and persisted across page refreshes
+
 ## External Dependencies
 
 ### Core Infrastructure
