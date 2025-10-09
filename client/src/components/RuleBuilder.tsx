@@ -60,6 +60,16 @@ interface RuleBuilderProps {
 export function RuleBuilder({ conditions, onChange, className, allowedFields }: RuleBuilderProps) {
   const [showJsonPreview, setShowJsonPreview] = useState(false);
   
+  // Safety check: ensure conditions is always an array
+  const safeConditions = Array.isArray(conditions) 
+    ? conditions 
+    : (typeof conditions === 'string' ? JSON.parse(conditions || '[]') : []);
+  
+  // If conditions is not an array, normalize it and update parent
+  if (!Array.isArray(conditions)) {
+    onChange(safeConditions);
+  }
+  
   // Filter RULE_FIELDS based on allowedFields prop
   const availableFields = allowedFields 
     ? Object.fromEntries(
@@ -120,18 +130,18 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
       operator: defaultOperators[0]?.value || 'contains',
       value: ''
     };
-    onChange([...conditions, newCondition]);
+    onChange([...safeConditions, newCondition]);
   };
 
   // Remove a condition
   const removeCondition = (index: number) => {
-    const newConditions = conditions.filter((_, i) => i !== index);
+    const newConditions = safeConditions.filter((_, i) => i !== index);
     onChange(newConditions);
   };
 
   // Update a specific condition
   const updateCondition = (index: number, updates: Partial<RuleCondition>) => {
-    const newConditions = [...conditions];
+    const newConditions = [...safeConditions];
     newConditions[index] = { ...newConditions[index], ...updates };
     
     // If field changed, reset operator and value to appropriate defaults
@@ -384,7 +394,7 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
         </div>
       </div>
 
-      {conditions.length === 0 && (
+      {safeConditions.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="flex items-center justify-center py-8">
             <div className="text-center">
@@ -405,7 +415,7 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
       )}
 
       <div className="space-y-3">
-        {conditions.map((condition, index) => (
+        {safeConditions.map((condition, index) => (
           <div key={index}>
             <div className="bg-card border rounded-md p-3">
               <div className="grid grid-cols-1 md:grid-cols-[2fr,1.5fr,2fr,auto] gap-3 items-end">
@@ -465,7 +475,7 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
                     variant="ghost"
                     size="icon"
                     onClick={() => removeCondition(index)}
-                    disabled={conditions.length === 1}
+                    disabled={safeConditions.length === 1}
                     data-testid={`button-remove-condition-${index}`}
                     className="h-9 w-9"
                   >
@@ -475,7 +485,7 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
               </div>
             </div>
 
-            {index < conditions.length - 1 && (
+            {index < safeConditions.length - 1 && (
               <div className="flex items-center justify-center py-2">
                 <Badge variant="outline" className="text-xs font-medium">AND</Badge>
               </div>
@@ -484,17 +494,17 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
         ))}
       </div>
 
-      {showJsonPreview && conditions.length > 0 && (
+      {showJsonPreview && safeConditions.length > 0 && (
         <Card className="mt-4">
           <CardHeader>
             <CardTitle className="text-sm">JSON Preview</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
-              value={JSON.stringify(conditions, null, 2)}
+              value={JSON.stringify(safeConditions, null, 2)}
               readOnly
               className="font-mono text-xs"
-              rows={Math.min(conditions.length * 4 + 2, 12)}
+              rows={Math.min(safeConditions.length * 4 + 2, 12)}
               data-testid="textarea-json-preview"
             />
             <p className="text-xs text-muted-foreground mt-2">
