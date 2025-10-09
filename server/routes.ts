@@ -15,6 +15,7 @@ import {
   insertKbArticleSchema,
   insertKbChangeEventSchema,
   insertKbArticleLinkSchema,
+  insertEmailTemplateSchema,
   type Case,
   type Customer 
 } from "@shared/schema";
@@ -3137,6 +3138,361 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting article link:", error);
       res.status(500).json({ message: "Failed to delete article link" });
+    }
+  });
+
+  // Email Templates API Endpoints
+
+  // GET /api/email-templates - Get all email templates with optional filters
+  app.get("/api/email-templates", requireAuth, async (req, res) => {
+    try {
+      const querySchema = z.object({
+        category: z.enum(["lender", "customer", "internal", "other"]).optional(),
+        isActive: z.coerce.boolean().optional(),
+      });
+
+      const filters = querySchema.parse(req.query);
+      const templates = await storage.getEmailTemplates(filters);
+      res.json({ data: templates });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to fetch email templates:", error);
+      res.status(500).json({ error: "Failed to fetch email templates" });
+    }
+  });
+
+  // GET /api/email-templates/:id - Get single email template by ID
+  app.get("/api/email-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getEmailTemplate(id);
+      
+      if (!template) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      
+      res.json({ data: template });
+    } catch (error) {
+      console.error("Failed to fetch email template:", error);
+      res.status(500).json({ error: "Failed to fetch email template" });
+    }
+  });
+
+  // POST /api/email-templates - Create new email template (admin only)
+  app.post("/api/email-templates", requireRole(['admin']), async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      console.log("Creating email template with data:", JSON.stringify(req.body, null, 2));
+      const validatedData = insertEmailTemplateSchema.parse(req.body);
+      console.log("Validated data:", JSON.stringify(validatedData, null, 2));
+      const templateData = {
+        ...validatedData,
+        createdBy: userId,
+        updatedBy: userId,
+      };
+      
+      const template = await storage.createEmailTemplate(templateData);
+      console.log("Template created successfully:", template.id);
+      res.status(201).json({ data: template });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error("Zod validation error:", JSON.stringify(error.errors, null, 2));
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      console.error("Failed to create email template - error type:", error?.constructor?.name);
+      console.error("Full error:", error);
+      res.status(500).json({ error: "Failed to create email template" });
+    }
+  });
+
+  // PUT /api/email-templates/:id - Update email template (admin only)
+  app.put("/api/email-templates/:id", requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Check if template exists
+      const existingTemplate = await storage.getEmailTemplate(id);
+      if (!existingTemplate) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+
+      const validatedData = insertEmailTemplateSchema.partial().parse(req.body);
+      const updates = {
+        ...validatedData,
+        updatedBy: userId,
+      };
+      
+      const template = await storage.updateEmailTemplate(id, updates);
+      res.json({ data: template });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      console.error("Failed to update email template:", error);
+      res.status(500).json({ error: "Failed to update email template" });
+    }
+  });
+
+  // DELETE /api/email-templates/:id - Delete email template (admin only)
+  app.delete("/api/email-templates/:id", requireRole(['admin']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if template exists
+      const existingTemplate = await storage.getEmailTemplate(id);
+      if (!existingTemplate) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+
+      await storage.deleteEmailTemplate(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Failed to delete email template:", error);
+      res.status(500).json({ error: "Failed to delete email template" });
+    }
+  });
+
+  // Helper function to render email template variables
+  const renderEmailTemplate = (template: string, caseData: any): string => {
+    let rendered = template;
+    
+    // Replace all template variables
+    const replacements: Record<string, string> = {
+      '{{caseNumber}}': caseData.caseNumber?.toString() || 'N/A',
+      '{{customerName}}': caseData.customerName || 'N/A',
+      '{{customerState}}': caseData.customerState || caseData.state || 'N/A',
+      '{{lenderName}}': caseData.lenderName || 'N/A',
+      '{{loanId}}': caseData.loanId || 'N/A',
+      '{{caseType}}': caseData.caseTypeName || 'N/A',
+      '{{category}}': caseData.categoryName || 'N/A',
+      '{{status}}': caseData.status || 'N/A',
+      '{{priority}}': caseData.priorityValue || 'N/A',
+      '{{assignedTo}}': caseData.assignedToName || 'Unassigned',
+      '{{secondaryAssignedTo}}': caseData.secondaryAssignedToName || 'Unassigned',
+      '{{caseDetails}}': caseData.details || 'N/A',
+      '{{createdDate}}': caseData.createdAt ? new Date(caseData.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }) : 'N/A'
+    };
+    
+    // Replace all variables in the template
+    for (const [variable, value] of Object.entries(replacements)) {
+      rendered = rendered.replace(new RegExp(variable, 'g'), value);
+    }
+    
+    return rendered;
+  };
+
+  // Helper function to get Microsoft Graph API access token
+  const getMicrosoftGraphToken = async (user: any): Promise<string> => {
+    // For now, we'll use the client credentials from the user's config
+    // In a production environment, you would implement OAuth token refresh logic
+    
+    if (!user.outlookClientId || !user.outlookTenantId || !user.outlookClientSecret) {
+      throw new Error("Outlook OAuth configuration is incomplete");
+    }
+    
+    // Get access token using client credentials flow
+    const tokenEndpoint = `https://login.microsoftonline.com/${user.outlookTenantId}/oauth2/v2.0/token`;
+    
+    const params = new URLSearchParams({
+      client_id: user.outlookClientId,
+      client_secret: user.outlookClientSecret,
+      scope: 'https://graph.microsoft.com/.default',
+      grant_type: 'client_credentials'
+    });
+    
+    const response = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Failed to get access token: ${errorData}`);
+    }
+    
+    const data = await response.json();
+    return data.access_token;
+  };
+
+  // POST /api/cases/:id/send-email - Send email using case data and template
+  app.post("/api/cases/:id/send-email", requireRole(['agent', 'admin']), async (req: any, res) => {
+    try {
+      const { id: caseId } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Validate request body
+      const sendEmailSchema = z.object({
+        templateId: z.string(),
+        toEmail: z.string().email(),
+        ccEmails: z.array(z.string().email()).optional(),
+        bccEmails: z.array(z.string().email()).optional(),
+        documentIds: z.array(z.string()).optional(),
+        customSubject: z.string().optional(),
+        customBody: z.string().optional(),
+      });
+
+      const emailData = sendEmailSchema.parse(req.body);
+
+      // Check if user has email enabled
+      if (!req.user.emailEnabled) {
+        return res.status(403).json({ error: "Email sending is not enabled for your account. Please contact your administrator." });
+      }
+
+      // Verify OAuth configuration
+      if (!req.user.outlookEmail || !req.user.outlookClientId || !req.user.outlookTenantId || !req.user.outlookClientSecret) {
+        return res.status(403).json({ error: "Outlook email configuration is incomplete. Please configure your email settings." });
+      }
+
+      // Get case with detailed information
+      const caseData = await storage.getCaseWithDetails(caseId);
+      
+      if (!caseData) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+
+      // Check user has permission to view this case
+      try {
+        checkUserPermissions.hasLenderAccess(req.user, caseData.lenderId);
+      } catch (error) {
+        if (error instanceof AuthorizationError) {
+          return res.status(403).json({ error: error.message });
+        }
+        throw error;
+      }
+
+      // Get email template
+      const template = await storage.getEmailTemplate(emailData.templateId);
+      
+      if (!template) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+
+      if (!template.isActive) {
+        return res.status(400).json({ error: "Email template is not active" });
+      }
+
+      // Render template or use custom content
+      const subject = emailData.customSubject || renderEmailTemplate(template.subject, caseData);
+      const body = emailData.customBody || renderEmailTemplate(template.body, caseData);
+
+      // Fetch documents for attachments if provided
+      const attachments: any[] = [];
+      if (emailData.documentIds && emailData.documentIds.length > 0) {
+        for (const docId of emailData.documentIds) {
+          const doc = await storage.getDocument(docId);
+          if (doc && doc.caseId === caseId) {
+            // Note: In a real implementation, you'd need to get the actual file URL from object storage
+            // For now, we'll include the metadata
+            attachments.push({
+              '@odata.type': '#microsoft.graph.fileAttachment',
+              name: doc.label,
+              contentType: doc.mime,
+              // You would need to fetch the actual file content from object storage here
+              // contentBytes: base64EncodedContent
+            });
+          }
+        }
+      }
+
+      // Get access token
+      let accessToken: string;
+      try {
+        accessToken = await getMicrosoftGraphToken(req.user);
+      } catch (error) {
+        console.error("Failed to get access token:", error);
+        return res.status(500).json({ error: "Failed to authenticate with email service. Please check your OAuth configuration." });
+      }
+
+      // Build email message
+      const message = {
+        message: {
+          subject: subject,
+          body: {
+            contentType: 'HTML',
+            content: body
+          },
+          toRecipients: [
+            {
+              emailAddress: {
+                address: emailData.toEmail
+              }
+            }
+          ],
+          ccRecipients: emailData.ccEmails?.map(email => ({
+            emailAddress: { address: email }
+          })) || [],
+          bccRecipients: emailData.bccEmails?.map(email => ({
+            emailAddress: { address: email }
+          })) || [],
+          attachments: attachments
+        },
+        saveToSentItems: true
+      };
+
+      // Send email via Microsoft Graph API using the user's email address
+      // Note: Using /users/{email}/sendMail instead of /me/sendMail because we're using client credentials flow
+      const graphResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${req.user.outlookEmail}/sendMail`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+
+      if (!graphResponse.ok) {
+        const errorData = await graphResponse.text();
+        console.error("Microsoft Graph API error:", errorData);
+        return res.status(500).json({ error: "Failed to send email. Please try again or contact support." });
+      }
+
+      // Log the email send action
+      await storage.createAuditLog({
+        caseId: caseId,
+        actorUserId: userId,
+        action: 'email_sent',
+        details: {
+          to: emailData.toEmail,
+          cc: emailData.ccEmails,
+          bcc: emailData.bccEmails,
+          subject: subject,
+          templateId: emailData.templateId
+        }
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Email sent successfully" 
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Failed to send email:", error);
+      res.status(500).json({ error: "Failed to send email" });
     }
   });
 

@@ -175,6 +175,7 @@ export function setupAuth(app: Express) {
       canResolve: user.canResolve,
       canDelete: user.canDelete,
       canAssign: user.canAssign,
+      emailEnabled: user.emailEnabled,
     });
   });
 }

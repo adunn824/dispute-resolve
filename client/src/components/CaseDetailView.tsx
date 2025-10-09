@@ -80,6 +80,39 @@ const intakeCompletionSchema = z.object({
 
 type IntakeCompletionFormValues = z.infer<typeof intakeCompletionSchema>;
 
+// Form schema for sending email
+const sendEmailSchema = z.object({
+  templateId: z.string().min(1, "Please select an email template"),
+  toEmail: z.string().email("Please enter a valid email address"),
+  ccEmails: z.string().optional(),
+  bccEmails: z.string().optional(),
+  customSubject: z.string().min(1, "Subject is required"),
+  customBody: z.string().min(1, "Email body is required"),
+  documentIds: z.array(z.string()).optional().default([]),
+}).refine((data) => {
+  // Validate CC emails if provided
+  if (data.ccEmails && data.ccEmails.trim()) {
+    const ccEmailArray = data.ccEmails.split(',').map(e => e.trim());
+    return ccEmailArray.every(email => z.string().email().safeParse(email).success);
+  }
+  return true;
+}, {
+  message: "Invalid CC email address(es)",
+  path: ["ccEmails"],
+}).refine((data) => {
+  // Validate BCC emails if provided
+  if (data.bccEmails && data.bccEmails.trim()) {
+    const bccEmailArray = data.bccEmails.split(',').map(e => e.trim());
+    return bccEmailArray.every(email => z.string().email().safeParse(email).success);
+  }
+  return true;
+}, {
+  message: "Invalid BCC email address(es)",
+  path: ["bccEmails"],
+});
+
+type SendEmailFormValues = z.infer<typeof sendEmailSchema>;
+
 interface CaseDetailViewProps {
   caseId: string;
   onBack: () => void;
@@ -176,6 +209,28 @@ interface CaseOrigination {
   externalKey?: string;
 }
 
+interface EmailTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: "lender" | "customer" | "internal" | "other";
+  subject: string;
+  body: string;
+  isActive: boolean;
+}
+
+interface Document {
+  id: string;
+  caseId: string;
+  key: string;
+  label: string;
+  fileType: string;
+  mime: string;
+  storageKey: string;
+  uploadedByUserId: string;
+  uploadedAt: string;
+}
+
 const usStates = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
   "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -187,9 +242,12 @@ const usStates = [
 export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState("checklist");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false);
   const [hasRepresentative, setHasRepresentative] = useState(false);
   const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
   const [editSelectedCaseTypeId, setEditSelectedCaseTypeId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   
@@ -269,6 +327,22 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
   const editCaseTypes = editCaseTypesData?.data || [];
   const editLenders = editLendersData?.data || [];
   const editCategories = editCategoriesData?.data || [];
+
+  // Queries for send email dialog
+  const { data: emailTemplatesData } = useQuery<{data: EmailTemplate[]}>({
+    queryKey: ["/api/email-templates"],
+    queryFn: () => apiRequest("GET", "/api/email-templates?isActive=true"),
+    enabled: isSendEmailDialogOpen,
+  });
+
+  const { data: documentsData } = useQuery<Document[]>({
+    queryKey: ["/api/cases", caseId, "documents"],
+    enabled: isSendEmailDialogOpen,
+  });
+
+  const emailTemplates = emailTemplatesData?.data || [];
+  const availableDocuments = documentsData || [];
+  const selectedTemplate = emailTemplates.find(t => t.id === selectedTemplateId);
 
   // Mutation for updating case status
   const updateStatusMutation = useMutation({
@@ -390,6 +464,40 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     },
   });
 
+  // Mutation for sending email
+  const sendEmailMutation = useMutation({
+    mutationFn: (data: SendEmailFormValues) => {
+      const payload = {
+        templateId: data.templateId,
+        toEmail: data.toEmail,
+        ccEmails: data.ccEmails ? data.ccEmails.split(',').map(e => e.trim()).filter(e => e) : undefined,
+        bccEmails: data.bccEmails ? data.bccEmails.split(',').map(e => e.trim()).filter(e => e) : undefined,
+        customSubject: data.customSubject,
+        customBody: data.customBody,
+        documentIds: data.documentIds,
+      };
+      return apiRequest("POST", `/api/cases/${caseId}/send-email`, payload);
+    },
+    onSuccess: () => {
+      // Invalidate audit log to show new email entry
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "audit"] });
+      
+      setIsSendEmailDialogOpen(false);
+      
+      toast({
+        title: "Email Sent",
+        description: "Email sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to send email",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Initialize form with current case data
   const editForm = useForm<EditCaseFormValues>({
     resolver: zodResolver(editCaseSchema),
@@ -423,6 +531,20 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       lenderId: "",
       loanId: "",
       details: caseDetails?.emailMetadata?.bodyPreview || "",
+    },
+  });
+
+  // Initialize send email form
+  const sendEmailForm = useForm<SendEmailFormValues>({
+    resolver: zodResolver(sendEmailSchema),
+    defaultValues: {
+      templateId: "",
+      toEmail: "",
+      ccEmails: "",
+      bccEmails: "",
+      customSubject: "",
+      customBody: "",
+      documentIds: [],
     },
   });
 
@@ -483,6 +605,75 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     if (confirm("Are you sure you want to delete this case? This action cannot be undone and will delete all related data including documents, notes, and checklist items.")) {
       deleteCaseMutation.mutate();
     }
+  };
+
+  const handleSendEmail = () => {
+    // Reset form when opening dialog
+    sendEmailForm.reset({
+      templateId: "",
+      toEmail: caseDetails?.representativeEmail || "",
+      ccEmails: "",
+      bccEmails: "",
+      customSubject: "",
+      customBody: "",
+      documentIds: [],
+    });
+    setSelectedTemplateId(null);
+    setSelectedDocumentIds([]);
+    setIsSendEmailDialogOpen(true);
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const template = emailTemplates.find(t => t.id === templateId);
+    if (template && caseDetails) {
+      // Render template with case data
+      const renderedSubject = renderTemplate(template.subject, caseDetails);
+      const renderedBody = renderTemplate(template.body, caseDetails);
+      
+      sendEmailForm.setValue("templateId", templateId);
+      sendEmailForm.setValue("customSubject", renderedSubject);
+      sendEmailForm.setValue("customBody", renderedBody);
+    }
+  };
+
+  const handleSendEmailSubmit = (data: SendEmailFormValues) => {
+    sendEmailMutation.mutate(data);
+  };
+
+  const handleDocumentToggle = (documentId: string) => {
+    const newSelection = selectedDocumentIds.includes(documentId)
+      ? selectedDocumentIds.filter(id => id !== documentId)
+      : [...selectedDocumentIds, documentId];
+    
+    setSelectedDocumentIds(newSelection);
+    sendEmailForm.setValue("documentIds", newSelection);
+  };
+
+  // Helper function to render template variables
+  const renderTemplate = (template: string, caseData: CaseDetailData): string => {
+    let rendered = template;
+    
+    // Replace common variables
+    const variables: Record<string, string> = {
+      '{{caseNumber}}': caseData.caseNumber?.toString() || '',
+      '{{customerName}}': caseData.customerName || '',
+      '{{caseType}}': caseData.caseTypeName || '',
+      '{{category}}': caseData.categoryName || '',
+      '{{state}}': caseData.customerState || '',
+      '{{loanId}}': caseData.loanId || 'N/A',
+      '{{lenderName}}': caseData.lenderName || 'N/A',
+      '{{details}}': caseData.details || '',
+      '{{priority}}': caseData.priorityValue || '',
+      '{{status}}': caseData.status || '',
+      '{{assignedTo}}': caseData.assignedUserName || 'Unassigned',
+    };
+    
+    Object.entries(variables).forEach(([key, value]) => {
+      rendered = rendered.replace(new RegExp(key, 'g'), value);
+    });
+    
+    return rendered;
   };
 
   if (isLoading) {
@@ -991,6 +1182,18 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       {/* Action Buttons (only when not pending intake) */}
       {!isPendingIntake && (
         <div className="flex justify-end gap-4">
+          {user && !user.isViewOnly && user.emailEnabled && (
+            <Button 
+              variant="outline" 
+              onClick={handleSendEmail} 
+              disabled={isAuthLoading}
+              data-testid="button-send-email"
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Send Email
+            </Button>
+          )}
+          
           {user && !user.isViewOnly && (
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
             <DialogTrigger asChild>
@@ -1354,6 +1557,250 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
               </form>
             </Form>
           </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Send Email Dialog */}
+        {user && !user.isViewOnly && user.emailEnabled && (
+          <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Send Email</DialogTitle>
+                <DialogDescription>
+                  Select a template and compose your email to the customer or their representative.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...sendEmailForm}>
+                <form onSubmit={sendEmailForm.handleSubmit(handleSendEmailSubmit)} className="space-y-4">
+                  {/* Template Selection */}
+                  <FormField
+                    control={sendEmailForm.control}
+                    name="templateId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Template *</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            handleTemplateSelect(value);
+                          }}
+                          value={field.value}
+                          data-testid="select-email-template"
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an email template" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {emailTemplates.map((template) => (
+                              <SelectItem key={template.id} value={template.id} data-testid={`option-template-${template.id}`}>
+                                <div className="flex items-center gap-2">
+                                  <span>{template.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {template.category}
+                                  </Badge>
+                                </div>
+                                {template.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">{template.description}</p>
+                                )}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Preview Section */}
+                  {selectedTemplate && caseDetails && (
+                    <div className="border rounded-lg p-4 bg-muted/30 space-y-3" data-testid="section-email-preview">
+                      <h4 className="text-sm font-medium">Preview (with case data)</h4>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Subject:</p>
+                          <p className="text-sm font-medium" data-testid="text-preview-subject">
+                            {renderTemplate(selectedTemplate.subject, caseDetails)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Body:</p>
+                          <div className="max-h-40 overflow-y-auto bg-background/50 p-3 rounded border">
+                            <p className="text-sm whitespace-pre-wrap" data-testid="text-preview-body">
+                              {renderTemplate(selectedTemplate.body, caseDetails)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recipient Fields */}
+                  <FormField
+                    control={sendEmailForm.control}
+                    name="toEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>To Email *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="email"
+                            placeholder="recipient@example.com" 
+                            {...field} 
+                            data-testid="input-to-email" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={sendEmailForm.control}
+                      name="ccEmails"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CC Emails (optional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="text"
+                              placeholder="email1@example.com, email2@example.com" 
+                              {...field} 
+                              data-testid="input-cc-emails" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Separate multiple emails with commas</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={sendEmailForm.control}
+                      name="bccEmails"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>BCC Emails (optional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="text"
+                              placeholder="email1@example.com, email2@example.com" 
+                              {...field} 
+                              data-testid="input-bcc-emails" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Separate multiple emails with commas</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Subject & Body */}
+                  <FormField
+                    control={sendEmailForm.control}
+                    name="customSubject"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subject *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Email subject" 
+                            {...field} 
+                            data-testid="input-email-subject" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={sendEmailForm.control}
+                    name="customBody"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Body *</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Compose your email message..."
+                            className="min-h-[300px]"
+                            {...field}
+                            data-testid="textarea-email-body"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Template variables will be replaced when sent</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Document Attachments */}
+                  {availableDocuments.length > 0 && (
+                    <div className="space-y-3" data-testid="section-attachments">
+                      <FormLabel>Attach Documents (optional)</FormLabel>
+                      <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                        {availableDocuments.map((doc) => (
+                          <div key={doc.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`doc-${doc.id}`}
+                              checked={selectedDocumentIds.includes(doc.id)}
+                              onCheckedChange={() => handleDocumentToggle(doc.id)}
+                              data-testid={`checkbox-document-${doc.id}`}
+                            />
+                            <label
+                              htmlFor={`doc-${doc.id}`}
+                              className="flex-1 flex items-center justify-between text-sm cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                <span>{doc.label}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">{doc.fileType}</Badge>
+                              </div>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedDocumentIds.length} document(s) selected
+                      </p>
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsSendEmailDialogOpen(false)}
+                      data-testid="button-send-email-cancel"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={sendEmailMutation.isPending}
+                      data-testid="button-send-email-submit"
+                    >
+                      {sendEmailMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="h-4 w-4 mr-2" />
+                          Send Email
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
           </Dialog>
         )}
 

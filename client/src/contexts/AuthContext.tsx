@@ -12,6 +12,7 @@ interface User {
   canResolve: boolean;
   canDelete: boolean;
   canAssign: boolean;
+  emailEnabled: boolean;
 }
 
 interface AuthContextType {

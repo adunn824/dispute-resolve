@@ -56,6 +56,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "Case Types", url: "/admin/case-types", icon: FileText },
     { title: "Categories", url: "/admin/categories", icon: FileText },
     { title: "Checklist Templates", url: "/admin/templates", icon: ListChecks },
+    { title: "Email Templates", url: "/admin/email-templates", icon: Mail },
     { title: "Rules", url: "/admin/rules", icon: Settings },
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "Case Assignment", url: "/admin/case-assignment", icon: UserCog },

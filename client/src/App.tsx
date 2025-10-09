@@ -28,6 +28,7 @@ import UsersManagement from "./pages/admin/users";
 import CaseAssignmentPage from "./pages/admin/case-assignment";
 import SystemManagement from "./pages/admin/system";
 import KnowledgeBaseManagement from "./pages/admin/KnowledgeBaseManagement";
+import EmailTemplatesManagement from "./pages/admin/email-templates";
 import ReportsPage from "./pages/compliance/reports";
 import NotFound from "@/pages/not-found";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -149,6 +150,11 @@ function Router() {
       <Route path="/admin/system">
         <ProtectedRoute requiredRole="admin">
           <SystemManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/email-templates">
+        <ProtectedRoute requiredRole="admin">
+          <EmailTemplatesManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/knowledge-base">

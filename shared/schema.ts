@@ -1125,3 +1125,29 @@ export type InsertKbChangeEvent = z.infer<typeof insertKbChangeEventSchema>;
 
 export type KbArticleLink = typeof kbArticleLinks.$inferSelect;
 export type InsertKbArticleLink = z.infer<typeof insertKbArticleLinkSchema>;
+
+// Email Templates Table
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  category: text("category", { enum: ["lender", "customer", "internal", "other"] }).notNull().default("other"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(), // Supports template variables like {{caseNumber}}, {{customerName}}, etc.
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Email Templates Insert Schema
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Email Templates Types
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;

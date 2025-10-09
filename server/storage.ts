@@ -35,6 +35,7 @@ import {
   kbChangeEvents,
   kbArticleLinks,
   lenders,
+  emailTemplates,
   type User, 
   type InsertUser,
   type UpsertUser,
@@ -107,7 +108,9 @@ import {
   type KbChangeEvent,
   type InsertKbChangeEvent,
   type KbArticleLink,
-  type InsertKbArticleLink
+  type InsertKbArticleLink,
+  type EmailTemplate,
+  type InsertEmailTemplate
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
@@ -442,6 +445,13 @@ export interface IStorage {
   getKbLinkedArticles(entityType: string, entityId: string): Promise<Array<KbArticleLink & { articleTitle: string; articleSlug: string }>>;
   createKbArticleLink(link: InsertKbArticleLink): Promise<KbArticleLink>;
   deleteKbArticleLink(id: string): Promise<void>;
+  
+  // Email Template methods
+  getEmailTemplates(filters?: { category?: string; isActive?: boolean }): Promise<EmailTemplate[]>;
+  getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate>;
+  deleteEmailTemplate(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3143,6 +3153,51 @@ export class DatabaseStorage implements IStorage {
 
   async deleteKbArticleLink(id: string): Promise<void> {
     await db.delete(kbArticleLinks).where(eq(kbArticleLinks.id, id));
+  }
+
+  // Email Template methods
+  async getEmailTemplates(filters?: { category?: string; isActive?: boolean }): Promise<EmailTemplate[]> {
+    const conditions = [];
+    
+    if (filters?.category) {
+      conditions.push(eq(emailTemplates.category, filters.category));
+    }
+    
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(emailTemplates.isActive, filters.isActive));
+    }
+    
+    return await db
+      .select()
+      .from(emailTemplates)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(emailTemplates.name));
+  }
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(emailTemplates)
+      .where(eq(emailTemplates.id, id));
+    return template;
+  }
+
+  async createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [newTemplate] = await db.insert(emailTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updateEmailTemplate(id: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate> {
+    const [updated] = await db
+      .update(emailTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmailTemplate(id: string): Promise<void> {
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
   }
 }
 
