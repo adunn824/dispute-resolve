@@ -25,7 +25,9 @@ import {
   kbArticles,
   kbArticleVersions,
   kbChangeEvents,
-  kbArticleLinks
+  kbArticleLinks,
+  emailTemplates,
+  caseOriginations
 } from "@shared/schema";
 
 async function seed() {
@@ -45,6 +47,7 @@ async function seed() {
   await db.delete(kbArticleVersions);
   await db.delete(kbArticles);
   await db.delete(kbCategories);
+  await db.delete(emailTemplates);
   await db.delete(users);
   await db.delete(checklistTemplates);
   await db.delete(documentRequirements);
@@ -54,6 +57,7 @@ async function seed() {
   await db.delete(slaPolicies);
   await db.delete(categories);
   await db.delete(caseTypes);
+  await db.delete(caseOriginations);
   await db.delete(valueSets);
   await db.delete(featureFlags);
 
@@ -101,7 +105,21 @@ async function seed() {
   const agentUser = userRecords.find(u => u.name === "Mike Johnson")!;
   const complianceUser = userRecords.find(u => u.name === "Jane Smith")!;
 
-  // 4. Create Customers
+  // 4. Create Case Originations
+  console.log("Creating case originations...");
+  const originationRecords = await db.insert(caseOriginations).values([
+    { name: "Phone", description: "Cases originated via phone call", externalKey: "PHONE" },
+    { name: "Email", description: "Cases originated via email", externalKey: "EMAIL" },
+    { name: "Web Portal", description: "Cases originated via web portal", externalKey: "WEB" },
+    { name: "Mail", description: "Cases originated via physical mail", externalKey: "MAIL" },
+    { name: "In Person", description: "Cases originated in person", externalKey: "IN_PERSON" },
+  ]).returning();
+
+  const phoneOrigination = originationRecords.find(o => o.externalKey === "PHONE")!;
+  const emailOrigination = originationRecords.find(o => o.externalKey === "EMAIL")!;
+  const webOrigination = originationRecords.find(o => o.externalKey === "WEB")!;
+
+  // 5. Create Customers
   console.log("Creating customers...");
   const customerRecords = await db.insert(customers).values([
     { externalId: "CUST001", name: "Acme Corporation", state: "CA" },
@@ -112,7 +130,7 @@ async function seed() {
     { externalId: "CUST006", name: "Digital Dynamics", state: "IL" },
   ]).returning();
 
-  // 5. Create Checklist Templates
+  // 6. Create Checklist Templates
   console.log("Creating checklist templates...");
   for (const category of categoryRecords) {
     const templates = [];
@@ -200,13 +218,29 @@ async function seed() {
   console.log("Creating SLA policies...");
   for (const category of categoryRecords) {
     let targetHours = 72; // Default 3 days
+    let priority = "medium";
     
-    if (category.code.startsWith("MAIL_")) targetHours = 24; // 1 day for mail
-    if (category.code.startsWith("COMP_")) targetHours = 48; // 2 days for complaints
-    if (category.code.startsWith("DISP_")) targetHours = 120; // 5 days for disputes
+    if (category.code.startsWith("MAIL_")) {
+      targetHours = 24; // 1 day for mail
+      priority = "high";
+    }
+    if (category.code.startsWith("COMP_")) {
+      targetHours = 48; // 2 days for complaints
+      priority = "high";
+    }
+    if (category.code.startsWith("DISP_")) {
+      targetHours = 120; // 5 days for disputes
+      priority = "medium";
+    }
     
     await db.insert(slaPolicies).values([{
       categoryId: category.id,
+      name: `${category.name} SLA Policy`,
+      description: `SLA policy for ${category.name} cases`,
+      priority: priority as "critical" | "high" | "medium" | "low",
+      responseTimeHours: Math.floor(targetHours / 3), // Response time is 1/3 of resolution time
+      resolutionTimeHours: targetHours,
+      conditions: { default: true },
       targetHours: targetHours,
       clockStartsOn: "case_created",
       pauseOnStatus: ["pending"]
@@ -260,6 +294,7 @@ async function seed() {
   console.log("Creating sample cases...");
   const sampleCases = await db.insert(cases).values([
     {
+      caseOriginationId: phoneOrigination.id,
       caseTypeId: complaintType.id,
       categoryId: categoryRecords.find(c => c.code === "COMP_SVC")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "COMP_SVC")!.id && pr.priorityValue === "Medium")!.id,
@@ -270,6 +305,7 @@ async function seed() {
       status: "open"
     },
     {
+      caseOriginationId: emailOrigination.id,
       caseTypeId: disputeType.id,
       categoryId: categoryRecords.find(c => c.code === "DISP_TXN")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "DISP_TXN")!.id && pr.priorityValue === "BK24")!.id,
@@ -280,6 +316,7 @@ async function seed() {
       status: "pending"
     },
     {
+      caseOriginationId: webOrigination.id,
       caseTypeId: mailType.id,
       categoryId: categoryRecords.find(c => c.code === "MAIL_GEN")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "MAIL_GEN")!.id && pr.priorityValue === "Medium")!.id,
@@ -289,6 +326,7 @@ async function seed() {
       status: "open"
     },
     {
+      caseOriginationId: phoneOrigination.id,
       caseTypeId: complaintType.id,
       categoryId: categoryRecords.find(c => c.code === "COMP_BILL")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "COMP_BILL")!.id && pr.priorityValue === "High")!.id,
@@ -299,6 +337,7 @@ async function seed() {
       status: "resolved"
     },
     {
+      caseOriginationId: emailOrigination.id,
       caseTypeId: disputeType.id,
       categoryId: categoryRecords.find(c => c.code === "DISP_BILL")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "DISP_BILL")!.id && pr.priorityValue === "High")!.id,
