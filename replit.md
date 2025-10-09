@@ -129,6 +129,40 @@ Preferred communication style: Simple, everyday language.
 - **Case Detail Integration**: For pending_intake cases, displays email preview and completion form instead of normal case tabs
 - **No External Integration Required**: User dismissed Outlook connector; webhook is generic and works with any email forwarding service
 
+### Email Template System
+- **Template Management**: Admin interface at `/admin/email-templates` for creating and managing reusable email templates
+- **Template Categories**: Four template types for different communication needs:
+  - **Lender**: Templates for communicating with lending institutions
+  - **Customer**: Templates for customer communications
+  - **Internal**: Templates for internal team notifications
+  - **Other**: General-purpose templates
+- **Variable Substitution**: Support for 13 dynamic case variables that auto-populate from case data:
+  - `{{caseNumber}}`, `{{customerName}}`, `{{customerState}}`, `{{lenderName}}`, `{{loanId}}`
+  - `{{caseType}}`, `{{category}}`, `{{status}}`, `{{priority}}`
+  - `{{assignedTo}}`, `{{secondaryAssignedTo}}`, `{{caseDetails}}`, `{{createdDate}}`
+- **Template Structure**: Each template includes name, description, category, subject, body, and active/inactive status
+- **Email Composition**: Templates selectable when sending emails from case detail view with real-time preview of rendered content
+- **Document Attachments**: Support for attaching case documents to outgoing emails
+- **Audit Logging**: All sent emails logged in audit trail with full details (recipients, subject, template used, attachments)
+
+### Email History & Communication Tracking
+- **Dedicated Email Tab**: New "Emails" tab in case detail view (positioned between Documents and Notes) provides complete email communication history
+- **Email List View**: Chronological display of all emails sent for a case with:
+  - Sender information (name, avatar, email address)
+  - Timestamp (relative and absolute formats)
+  - Recipients (To, CC, BCC fields)
+  - Email subject and body preview (first 150 characters)
+  - Template name badge (if template was used)
+- **Expandable Details**: Click to expand individual emails and view:
+  - Full email body in formatted display
+  - Complete recipient lists (To/CC/BCC)
+  - Attachment list with file names
+  - Full send timestamp
+- **Security**: Email history respects lender access restrictions - users can only view emails for cases they have permission to access
+- **Data Source**: Email history retrieved from audit log entries filtered by action='email_sent'
+- **Empty State**: Clear messaging when no emails have been sent for a case
+- **Backend API**: GET /api/cases/:id/emails endpoint with proper authorization checks
+
 ### Case Edit Functionality
 - **Comprehensive Edit Dialog**: Full case detail editing supporting all case creation fields
 - **Editable Fields**: Case Origination, Case Type, Category, Customer Name, Customer State, Lender, Loan ID, Case Details
