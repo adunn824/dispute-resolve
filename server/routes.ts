@@ -451,6 +451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Define intake schema
       const intakeSchema = z.object({
+        caseOriginationId: z.string().min(1, "Case origination is required"),
         caseTypeId: z.string().min(1, "Case type is required"),
         categoryId: z.string().min(1, "Category is required"),
         customerName: z.string().min(1, "Customer name is required"),
@@ -517,6 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Step 4: Create the case
       const caseData = {
+        caseOriginationId: intakeData.caseOriginationId,
         caseTypeId: intakeData.caseTypeId,
         categoryId: intakeData.categoryId,
         priorityRuleId: selectedPriorityRule.id,
@@ -2700,18 +2702,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const users = await storage.getAllUsers();
       
-      // Return user data with assignment-related fields
-      const assignmentData = users.map(user => ({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        availabilityStatus: user.availabilityStatus,
-        lastAssignedAt: user.lastAssignedAt,
-        createdAt: user.createdAt,
+      // Get assigned cases count for each user
+      const assignmentData = await Promise.all(users.map(async user => {
+        const assignedCases = await storage.getCases({ assignedToUserId: user.id });
+        return {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          availabilityStatus: user.availabilityStatus,
+          lastAssignedAt: user.lastAssignedAt,
+          assignedCasesCount: assignedCases.length,
+          createdAt: user.createdAt,
+        };
       }));
       
       res.json({ data: assignmentData });

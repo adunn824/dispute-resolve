@@ -26,6 +26,7 @@ export default function CaseAssignmentPage() {
   // Fetch assignment status for all users
   const { data: users = [], isLoading } = useQuery<UserAssignmentStatus[]>({
     queryKey: ["/api/users/assignment-status"],
+    select: (response: any) => response.data || [],
   });
 
   // Toggle availability mutation
