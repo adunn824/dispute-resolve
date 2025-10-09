@@ -2639,6 +2639,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users with assignment status (admin only)
+  app.get("/api/users/assignment-status", requireRole("admin"), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      
+      // Return user data with assignment-related fields
+      const assignmentData = users.map(user => ({
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        availabilityStatus: user.availabilityStatus,
+        lastAssignedAt: user.lastAssignedAt,
+        createdAt: user.createdAt,
+      }));
+      
+      res.json({ data: assignmentData });
+    } catch (error) {
+      console.error("Error fetching user assignment status:", error);
+      res.status(500).json({ message: "Failed to fetch user assignment status" });
+    }
+  });
+
+  // Update user availability status (admin only)
+  app.patch("/api/users/:id/availability", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const updateSchema = z.object({
+        availabilityStatus: z.enum(["available", "not_available"]),
+      });
+      
+      const { availabilityStatus } = updateSchema.parse(req.body);
+      
+      const updatedUser = await storage.updateUserAvailability(id, availabilityStatus);
+      
+      res.json({
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        availabilityStatus: updatedUser.availabilityStatus,
+        lastAssignedAt: updatedUser.lastAssignedAt,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid availability status", details: error.errors });
+      }
+      console.error("Error updating user availability:", error);
+      res.status(500).json({ message: "Failed to update user availability" });
+    }
+  });
+
   // Knowledge Base API Endpoints
   
   // Knowledge Base Categories
