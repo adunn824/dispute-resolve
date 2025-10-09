@@ -512,7 +512,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Step 3: Create the case
+      // Step 3: Auto-assign case to next available user
+      const nextUser = await storage.getNextAvailableUser();
+      
+      // Step 4: Create the case
       const caseData = {
         caseTypeId: intakeData.caseTypeId,
         categoryId: intakeData.categoryId,
@@ -523,6 +526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         state: intakeData.customerState,
         details: intakeData.details,
         status: "open" as const,
+        assignedToUserId: nextUser?.id || null,
         hasRepresentative: intakeData.hasRepresentative || false,
         representativeCompanyName: intakeData.representativeCompanyName || null,
         representativePersonName: intakeData.representativePersonName || null,
@@ -534,6 +538,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const newCase = await storage.createCase(caseData);
       
+      // Update user's lastAssignedAt only after successful case creation
+      if (nextUser) {
+        await storage.updateUser(nextUser.id, { lastAssignedAt: new Date() });
+      }
+      
       // Create audit log for case creation
       await storage.createAuditLog({
         caseId: newCase.id,
@@ -544,7 +553,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           initialStatus: newCase.status,
           customerName: intakeData.customerName,
           customerState: intakeData.customerState,
-          priority: selectedPriorityRule.priorityValue
+          priority: selectedPriorityRule.priorityValue,
+          autoAssigned: !!nextUser,
+          assignedToUserId: newCase.assignedToUserId
         }
       });
       
@@ -562,14 +573,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/cases", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {
       const caseData = insertCaseSchema.parse(req.body);
+      
+      // Auto-assign case if no assignee specified
+      let autoAssignedUser = null;
+      if (!caseData.assignedToUserId) {
+        const nextUser = await storage.getNextAvailableUser();
+        if (nextUser) {
+          caseData.assignedToUserId = nextUser.id;
+          autoAssignedUser = nextUser;
+        }
+      }
+      
       const newCase = await storage.createCase(caseData);
+      
+      // Update user's lastAssignedAt only after successful case creation
+      if (autoAssignedUser) {
+        await storage.updateUser(autoAssignedUser.id, { lastAssignedAt: new Date() });
+      }
       
       // Create audit log for case creation
       await storage.createAuditLog({
         caseId: newCase.id,
         actorUserId: req.dbUser.id,
         action: "case_created",
-        details: { caseId: newCase.id, initialStatus: newCase.status }
+        details: { 
+          caseId: newCase.id, 
+          initialStatus: newCase.status,
+          autoAssigned: !!autoAssignedUser,
+          assignedToUserId: newCase.assignedToUserId
+        }
       });
       
       res.status(201).json({ data: newCase });
@@ -720,6 +752,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priorityRuleId = newRule.id;
       }
 
+      // Auto-assign case to next available user
+      const nextUser = await storage.getNextAvailableUser();
+      
       // Complete the intake with updated case data
       const caseData = {
         caseOriginationId: intakeData.caseOriginationId,
@@ -731,9 +766,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         loanId: intakeData.loanId || existingCase.loanId,
         state: intakeData.customerState,
         details: intakeData.details || existingCase.details,
+        assignedToUserId: nextUser?.id || existingCase.assignedToUserId,
       };
 
       const updatedCase = await storage.completeIntake(id, caseData, req.dbUser.id);
+      
+      // Update user's lastAssignedAt only after successful completion
+      if (nextUser) {
+        await storage.updateUser(nextUser.id, { lastAssignedAt: new Date() });
+      }
+      
+      // Log auto-assignment if it occurred
+      if (nextUser) {
+        await storage.createAuditLog({
+          caseId: id,
+          actorUserId: req.dbUser.id,
+          action: "case_auto_assigned",
+          details: {
+            previousAssignedToUserId: existingCase.assignedToUserId,
+            assignedToUserId: nextUser.id,
+            assignedToUserName: nextUser.name,
+            autoAssigned: true
+          }
+        });
+      }
       
       res.json({ data: updatedCase, message: "Intake completed successfully" });
     } catch (error) {
