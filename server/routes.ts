@@ -361,6 +361,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/cases/:id/emails - Get email history for a case (agents and above)
+  app.get("/api/cases/:id/emails", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get the case to check lender access permission
+      const caseRecord = await storage.getCase(id);
+      if (!caseRecord) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+      
+      // Check lender access permission
+      checkUserPermissions.hasLenderAccess(req.user, caseRecord.lenderId);
+      
+      const emailHistory = await storage.getEmailHistory(id);
+      res.json({ data: emailHistory });
+    } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("Failed to get email history:", error);
+      res.status(500).json({ error: "Failed to get email history" });
+    }
+  });
+
   // POST /api/cases/:id/notes - Create a new note for a case (agents and above)
   app.post("/api/cases/:id/notes", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
     try {

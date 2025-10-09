@@ -247,6 +247,7 @@ export interface IStorage {
   // Audit methods
   getAuditLogs(caseId?: string, limit?: number): Promise<AuditLog[]>;
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
+  getEmailHistory(caseId: string): Promise<Array<AuditLog & { actorUser: { name: string; email: string } }>>;
   
   // Config methods - Case Originations
   getCaseOriginations(): Promise<CaseOrigination[]>;
@@ -1706,6 +1707,31 @@ export class DatabaseStorage implements IStorage {
       .values(insertAuditLog)
       .returning();
     return auditLog;
+  }
+
+  async getEmailHistory(caseId: string): Promise<Array<AuditLog & { actorUser: { name: string; email: string } }>> {
+    const emailLogs = await db
+      .select({
+        id: auditLogs.id,
+        caseId: auditLogs.caseId,
+        actorUserId: auditLogs.actorUserId,
+        action: auditLogs.action,
+        details: auditLogs.details,
+        createdAt: auditLogs.createdAt,
+        actorUser: {
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.actorUserId, users.id))
+      .where(and(
+        eq(auditLogs.caseId, caseId),
+        eq(auditLogs.action, 'email_sent')
+      ))
+      .orderBy(desc(auditLogs.createdAt));
+
+    return emailLogs as Array<AuditLog & { actorUser: { name: string; email: string } }>;
   }
 
   // Config methods - Case Originations
