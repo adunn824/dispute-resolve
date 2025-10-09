@@ -121,6 +121,10 @@ export const users = pgTable("users", {
   outlookClientSecret: text("outlook_client_secret"), // Azure app client secret
   outlookRedirectUri: text("outlook_redirect_uri"), // OAuth redirect URI
   
+  // Case assignment availability
+  availabilityStatus: text("availability_status", { enum: ["available", "not_available"] }).notNull().default("available"),
+  lastAssignedAt: timestamp("last_assigned_at"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -750,6 +754,9 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  availabilityStatus: z.enum(["available", "not_available"]).optional(),
+  lastAssignedAt: z.date().nullable().optional(),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
