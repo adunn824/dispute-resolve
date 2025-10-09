@@ -97,6 +97,7 @@ interface CaseDetailData {
   categoryId: string;
   customerId: string;
   assignedToUserId?: string;
+  secondaryAssignedToUserId?: string;
   loanId?: string;
   lenderName?: string;
   lenderId?: string;
@@ -125,6 +126,9 @@ interface CaseDetailData {
   assignedUserName?: string;
   assignedUserEmail?: string;
   assignedUserRole?: string;
+  secondaryAssignedUserName?: string;
+  secondaryAssignedUserEmail?: string;
+  secondaryAssignedUserRole?: string;
   emailMetadata?: EmailMetadata;
 }
 
@@ -249,8 +253,8 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
   // Mutation for assigning case
   const assignCaseMutation = useMutation({
-    mutationFn: (assignedToUserId: string | null) =>
-      apiRequest("PATCH", `/api/cases/${caseId}/assign`, { assignedToUserId }),
+    mutationFn: (data: { assignedToUserId?: string | null; secondaryAssignedToUserId?: string | null }) =>
+      apiRequest("PATCH", `/api/cases/${caseId}/assign`, data),
     onSuccess: () => {
       // Invalidate and refetch case details
       queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
@@ -380,10 +384,16 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
     updateStatusMutation.mutate(newStatus);
   };
 
-  const handleAssignmentChange = (assignedToUserId: string) => {
+  const handlePrimaryAssignmentChange = (assignedToUserId: string) => {
     // If "unassigned" is selected, pass null, otherwise pass the user ID
     const actualUserId = assignedToUserId === "unassigned" ? null : assignedToUserId;
-    assignCaseMutation.mutate(actualUserId);
+    assignCaseMutation.mutate({ assignedToUserId: actualUserId });
+  };
+
+  const handleSecondaryAssignmentChange = (secondaryAssignedToUserId: string) => {
+    // If "unassigned" is selected, pass null, otherwise pass the user ID
+    const actualUserId = secondaryAssignedToUserId === "unassigned" ? null : secondaryAssignedToUserId;
+    assignCaseMutation.mutate({ secondaryAssignedToUserId: actualUserId });
   };
   
   const handleResolveCase = () => {
@@ -819,23 +829,24 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                 <span className="text-sm font-medium">Assignment</span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground mb-2">Assigned to:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Primary Assignment */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Primary Assignee:</p>
                 {user && user.canAssign && !user.isViewOnly ? (
                   <Select
                     value={caseDetails.assignedToUserId || "unassigned"}
-                    onValueChange={handleAssignmentChange}
+                    onValueChange={handlePrimaryAssignmentChange}
                     disabled={assignCaseMutation.isPending || isAuthLoading}
-                    data-testid="select-case-assignment"
+                    data-testid="select-primary-assignment"
                   >
-                    <SelectTrigger className="w-full" data-testid="trigger-assignment-dropdown">
-                      <SelectValue placeholder="Select assignee" />
+                    <SelectTrigger className="w-full" data-testid="trigger-primary-assignment-dropdown">
+                      <SelectValue placeholder="Select primary assignee" />
                     </SelectTrigger>
-                    <SelectContent data-testid="content-assignment-options">
-                      <SelectItem value="unassigned" data-testid="option-unassigned">Unassigned</SelectItem>
+                    <SelectContent data-testid="content-primary-assignment-options">
+                      <SelectItem value="unassigned" data-testid="option-primary-unassigned">Unassigned</SelectItem>
                       {assignees.map((assignee) => (
-                        <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-assignee-${assignee.id}`}>
+                        <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-primary-assignee-${assignee.id}`}>
                           <div className="flex items-center gap-2">
                             <span>{assignee.name}</span>
                             <Badge variant="outline" className="text-xs">
@@ -847,29 +858,51 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm" data-testid="text-assignment-readonly">
+                  <p className="text-sm" data-testid="text-primary-assignment-readonly">
                     {caseDetails.assignedUserName || "Unassigned"}
                   </p>
                 )}
               </div>
-              {caseDetails.assignedUserName && (
-                <div className="flex-1" data-testid="section-current-assignee">
-                  <p className="text-xs text-muted-foreground mb-1">Current assignee:</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" data-testid="text-assignee-name">{caseDetails.assignedUserName}</span>
-                    <Badge variant="secondary" className="text-xs" data-testid="badge-assignee-role">
-                      {caseDetails.assignedUserRole}
-                    </Badge>
-                  </div>
-                  {caseDetails.assignedUserEmail && (
-                    <p className="text-xs text-muted-foreground" data-testid="text-assignee-email">{caseDetails.assignedUserEmail}</p>
-                  )}
-                </div>
-              )}
-              {assignCaseMutation.isPending && (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              )}
+
+              {/* Secondary Assignment */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Secondary Assignee:</p>
+                {user && user.canAssign && !user.isViewOnly ? (
+                  <Select
+                    value={caseDetails.secondaryAssignedToUserId || "unassigned"}
+                    onValueChange={handleSecondaryAssignmentChange}
+                    disabled={assignCaseMutation.isPending || isAuthLoading}
+                    data-testid="select-secondary-assignment"
+                  >
+                    <SelectTrigger className="w-full" data-testid="trigger-secondary-assignment-dropdown">
+                      <SelectValue placeholder="Select secondary assignee" />
+                    </SelectTrigger>
+                    <SelectContent data-testid="content-secondary-assignment-options">
+                      <SelectItem value="unassigned" data-testid="option-secondary-unassigned">Unassigned</SelectItem>
+                      {assignees.map((assignee) => (
+                        <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-secondary-assignee-${assignee.id}`}>
+                          <div className="flex items-center gap-2">
+                            <span>{assignee.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {assignee.role}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm" data-testid="text-secondary-assignment-readonly">
+                    {caseDetails.secondaryAssignedUserName || "Unassigned"}
+                  </p>
+                )}
+              </div>
             </div>
+            {assignCaseMutation.isPending && (
+              <div className="flex items-center justify-center mt-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
           </div>
           <div className="mt-4">
             <p className="text-sm text-muted-foreground">Case Details</p>

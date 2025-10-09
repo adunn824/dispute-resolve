@@ -110,7 +110,7 @@ import {
   type InsertKbArticleLink
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, inArray, gte, alias } from "drizzle-orm";
 import { RuleEvaluator, findMatchingPriorityRule, findMatchingTagRules, type CaseData } from "./rule-engine";
 import session from "express-session";
 import ConnectPgSession from "connect-pg-simple";
@@ -587,6 +587,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCaseWithDetails(id: string): Promise<any | undefined> {
+    const primaryUser = alias(users, 'primaryUser');
+    const secondaryUser = alias(users, 'secondaryUser');
+    
     const result = await db
       .select({
         // Case fields
@@ -597,6 +600,7 @@ export class DatabaseStorage implements IStorage {
         priorityRuleId: cases.priorityRuleId,
         customerId: cases.customerId,
         assignedToUserId: cases.assignedToUserId,
+        secondaryAssignedToUserId: cases.secondaryAssignedToUserId,
         loanId: cases.loanId,
         lenderId: cases.lenderId,
         state: cases.state,
@@ -637,10 +641,15 @@ export class DatabaseStorage implements IStorage {
         priorityValue: priorityRules.priorityValue,
         priorityDescription: priorityRules.description,
         
-        // Assigned user fields
-        assignedUserName: users.name,
-        assignedUserEmail: users.email,
-        assignedUserRole: users.role,
+        // Primary assigned user fields
+        assignedUserName: primaryUser.name,
+        assignedUserEmail: primaryUser.email,
+        assignedUserRole: primaryUser.role,
+        
+        // Secondary assigned user fields
+        secondaryAssignedUserName: secondaryUser.name,
+        secondaryAssignedUserEmail: secondaryUser.email,
+        secondaryAssignedUserRole: secondaryUser.role,
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
@@ -649,7 +658,8 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(caseOriginations, eq(cases.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
-      .leftJoin(users, eq(cases.assignedToUserId, users.id))
+      .leftJoin(primaryUser, eq(cases.assignedToUserId, primaryUser.id))
+      .leftJoin(secondaryUser, eq(cases.secondaryAssignedToUserId, secondaryUser.id))
       .where(eq(cases.id, id))
       .limit(1);
 
