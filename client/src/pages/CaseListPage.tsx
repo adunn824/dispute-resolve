@@ -75,6 +75,12 @@ interface Assignee {
   role: string;
 }
 
+interface CaseOrigination {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 interface CaseListPageProps {
   userRole?: "agent" | "compliance" | "admin";
 }
@@ -86,6 +92,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [caseTypeFilter, setCaseTypeFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [caseOriginationFilter, setCaseOriginationFilter] = useState<string>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("");
   const [sortField, setSortField] = useState<string>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -106,6 +113,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   if (priorityFilter && priorityFilter !== "all") queryParams.set("priorityValue", priorityFilter);
   if (caseTypeFilter && caseTypeFilter !== "all") queryParams.set("caseTypeId", caseTypeFilter);
   if (categoryFilter && categoryFilter !== "all") queryParams.set("categoryId", categoryFilter);
+  if (caseOriginationFilter && caseOriginationFilter !== "all") queryParams.set("caseOriginationId", caseOriginationFilter);
   if (assigneeFilter && assigneeFilter !== "all") queryParams.set("assignedToUserId", assigneeFilter);
 
   // Fetch cases with filters
@@ -133,11 +141,17 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
     queryFn: () => apiRequest("GET", "/api/assignees")
   });
 
+  const { data: caseOriginationsData } = useQuery<{data: CaseOrigination[]}>({
+    queryKey: ["/api/case-originations"],
+    queryFn: () => apiRequest("GET", "/api/case-originations")
+  });
+
   const cases = casesData?.data || [];
   const pagination = casesData?.pagination;
   const caseTypes = caseTypesData?.data || [];
   const categories = categoriesData?.data || [];
   const assignees = assigneesData?.data || [];
+  const caseOriginations = caseOriginationsData?.data || [];
 
   // Filter categories based on selected case type
   const filteredCategories = caseTypeFilter
@@ -158,6 +172,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
     setPriorityFilter("all");
     setCaseTypeFilter("all");
     setCategoryFilter("all");
+    setCaseOriginationFilter("all");
     setAssigneeFilter("all");
     setCurrentPage(1);
   };
@@ -268,7 +283,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
           </div>
 
           {/* Filter Row */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger data-testid="select-status-filter">
                 <SelectValue placeholder="All Statuses" />
@@ -326,6 +341,22 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
               </SelectContent>
             </Select>
 
+            <Select value={caseOriginationFilter} onValueChange={setCaseOriginationFilter}>
+              <SelectTrigger data-testid="select-origination-filter">
+                <SelectValue placeholder="All Originations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Originations</SelectItem>
+                {caseOriginations
+                  .filter((origination) => origination.id && origination.id.trim() !== "")
+                  .map((origination) => (
+                    <SelectItem key={origination.id} value={origination.id}>
+                      {origination.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
             <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
               <SelectTrigger data-testid="select-assignee-filter">
                 <SelectValue placeholder="All Assignees" />
@@ -376,7 +407,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Cases Found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter || priorityFilter || caseTypeFilter || categoryFilter || assigneeFilter
+                {searchTerm || statusFilter || priorityFilter || caseTypeFilter || categoryFilter || caseOriginationFilter || assigneeFilter
                   ? "No cases match your current filters."
                   : "No cases have been created yet."
                 }
