@@ -131,6 +131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priorityRuleId: z.string().optional(), 
         caseTypeId: z.string().optional(),
         categoryId: z.string().optional(),
+        caseOriginationId: z.string().optional(),
         customerId: z.string().optional(),
         assignedToUserId: z.string().optional(),
         search: z.string().optional(),
