@@ -436,6 +436,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                         )}
                       </div>
                     </TableHead>
+                    <TableHead>Case Origination</TableHead>
                     <TableHead>Type & Category</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
@@ -472,12 +473,12 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <div className="text-sm" data-testid={`text-origination-${caseItem.id}`}>
+                          {caseItem.caseOriginationName || <span className="text-muted-foreground">—</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div>
-                          {caseItem.caseOriginationName && (
-                            <div className="text-xs text-muted-foreground mb-1 font-medium">
-                              {caseItem.caseOriginationName}
-                            </div>
-                          )}
                           <Badge 
                             variant="outline" 
                             style={{ borderColor: caseItem.caseTypeColor }}
