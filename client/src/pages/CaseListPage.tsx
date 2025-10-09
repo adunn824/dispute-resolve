@@ -189,7 +189,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   // Reset page when filters or sorting change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, priorityFilter, caseTypeFilter, categoryFilter, assigneeFilter, sortField, sortDirection]);
+  }, [searchTerm, statusFilter, priorityFilter, caseTypeFilter, categoryFilter, caseOriginationFilter, assigneeFilter, sortField, sortDirection]);
 
   const getPageTitle = () => {
     switch (userRole) {
