@@ -25,6 +25,7 @@ import BusinessRulesManagement from "./pages/admin/business-rules";
 import ReusableTemplatesManagement from "./pages/admin/reusable-templates";
 import CategoriesManagement from "./pages/admin/categories";
 import UsersManagement from "./pages/admin/users";
+import CaseAssignmentPage from "./pages/admin/case-assignment";
 import SystemManagement from "./pages/admin/system";
 import KnowledgeBaseManagement from "./pages/admin/KnowledgeBaseManagement";
 import ReportsPage from "./pages/compliance/reports";
@@ -138,6 +139,11 @@ function Router() {
       <Route path="/admin/users">
         <ProtectedRoute requiredRole="admin">
           <UsersManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/case-assignment">
+        <ProtectedRoute requiredRole="admin">
+          <CaseAssignmentPage />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/system">
