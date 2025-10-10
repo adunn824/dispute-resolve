@@ -1,4 +1,4 @@
-import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen, Building, ListChecks, CheckCircle, Mail, UserCog } from "lucide-react";
+import { Home, Plus, Search, Settings, FileText, Users, AlertTriangle, BarChart3, Shield, Cog, BookOpen, Building, ListChecks, CheckCircle, Mail, UserCog, Database } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -63,6 +63,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "Lenders", url: "/admin/lenders", icon: Building },
     { title: "Resolution Options", url: "/admin/resolution-options", icon: CheckCircle },
     { title: "System", url: "/admin/system", icon: Cog },
+    { title: "Database Sync", url: "/admin/database-sync", icon: Database },
     { title: "Knowledge Base", url: "/knowledge-base/admin", icon: BookOpen },
   ];
 

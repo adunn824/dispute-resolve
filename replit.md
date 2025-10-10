@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a comprehensive Complaint & Dispute Management platform designed to streamline the intake, processing, and resolution of customer cases across Mail, Complaint, and Dispute categories. The platform provides role-based access for agents, compliance officers, and administrators, with automated priority assignment, branching checklists, document management, and configurable business rules. It aims to be a single-repository full-stack application optimized for enterprise use, focusing on regulatory compliance, audit trails, and efficient case resolution workflows. The system supports enterprise-grade case processing with real-time updates, proper data management, intelligent workflow automation through reusable templates and rule-based checklist assignment, and centralized lender administration.
+This platform is a comprehensive solution for managing customer complaints and disputes across various categories (Mail, Complaint, Dispute). It provides role-based access for agents, compliance officers, and administrators, featuring automated priority assignment, branching checklists, document management, and configurable business rules. The system is designed as a single-repository, full-stack application focused on regulatory compliance, audit trails, and efficient case resolution. It supports enterprise-grade case processing with real-time updates, intelligent workflow automation via reusable templates, and centralized lender administration, aiming to streamline operations and enhance resolution efficiency.
 
 ## User Preferences
 
@@ -10,176 +10,43 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React with TypeScript using Vite.
-- **UI Framework**: shadcn/ui components built on Radix UI.
+### UI/UX Decisions
+- **Frontend Framework**: React with TypeScript (Vite).
+- **UI Components**: shadcn/ui built on Radix UI.
 - **Styling**: Tailwind CSS with a custom design system.
+- **Theming**: Custom light/dark mode.
+
+### Technical Implementations
+- **Backend**: Node.js with Express.js and TypeScript.
+- **API**: RESTful with structured error handling.
+- **Authentication**: Replit OAuth for user authentication, with session-based management using `connect-pg-simple`.
+- **Database ORM**: Drizzle ORM with PostgreSQL.
 - **State Management**: TanStack React Query for server state.
 - **Routing**: Wouter.
 - **Forms**: React Hook Form with Zod validation.
-- **Theme System**: Custom light/dark mode implementation.
-
-### Backend Architecture
-- **Runtime**: Node.js with Express.js server.
-- **Language**: TypeScript.
-- **API Design**: RESTful endpoints with structured error handling.
-- **Authentication**: Replit OAuth integration with session-based auth.
-- **Session Storage**: PostgreSQL-backed sessions using connect-pg-simple.
 - **Business Logic**: Service layer pattern with storage abstraction.
+- **User Permission System**: Granular, role-based access control with configurable fields (restrictedLenderId, isViewOnly, canResolve, canDelete, canAssign) enforced at both backend and frontend levels.
+- **User Email Configuration**: Per-user Outlook email integration for sending notices, secured with OAuth and client secret redaction.
+- **Email Intake System**: Webhook-based email ingestion (`POST /api/email-intake`) automatically creates cases with a "pending_intake" status, storing email metadata and attachments for agent review and completion.
+- **Email Template System**: Admin-managed, reusable email templates with variable substitution for dynamic case data, categorized for different communication types (Lender, Customer, Internal, Other).
+- **Email History**: Dedicated "Emails" tab in case details displaying chronological communication history, including sender, recipients, subject, body preview, template usage, and attachments, sourced from audit logs.
+- **Case Editing**: Comprehensive dialog for editing all case creation fields, with dynamic dropdowns, customer management (find/create), and audit trail logging.
+- **Database Sync System**: Admin interface (`/admin/database-sync`) to sync development database data to production, handling foreign key constraints, ensuring data integrity, and providing progress feedback.
 
-### Database Design
-- **ORM**: Drizzle ORM with PostgreSQL.
-- **Schema**: Comprehensive relational model for user management (role-based access), customer/case entities, dynamic checklists (case-specific and reusable templates), document management, resolution tracking, audit logging, and configurable business rules (priority, tags, checklist assignment, SLA policies).
+### Feature Specifications
+- **Dynamic Checklists**: Single, unified `reusableChecklistTemplates` system for all templates, automatically assigned based on category or business rules. Supports six field types (Checkbox, Dropdown, Text, Number, Date, File) with dynamic configuration.
+- **Admin Panel**: Dynamic system for runtime configuration of case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations, SLA policies, value sets, and feature flags, including audit trails with rollback.
+- **Resolution Options**: Fully configurable disposition, sub-disposition, and policy violation options managed via the admin interface.
 
-### Configuration Management
-- **Admin Panel**: Dynamic system for runtime updates to case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations (dispositions, sub-dispositions, policy violations), SLA policies, value sets, and feature flags.
-- **Audit Trail**: Tracking of configuration changes with rollback capability.
-- **Rule-Based Automation**: Intelligent workflow automation using configurable business rules.
-- **Resolution Options**: Fully configurable disposition options, hierarchical sub-dispositions linked to parent dispositions, and policy violation options - all manageable through the admin interface at /admin/resolution-options.
-
-### Unified Checklist Template System
-- **Single Template System**: The platform uses **reusableChecklistTemplates** as the single source of truth for all checklist templates. The legacy `checklistTemplates` system has been deprecated and consolidated.
-- **Automatic Assignment**: Templates are automatically assigned to cases through two mechanisms:
-  - **Category-specific**: Templates with a `categoryId` are automatically applied to all cases in that category
-  - **Rule-based**: Templates can be conditionally assigned via business rules (checklistAssignmentRules)
-- **Dynamic Evaluation**: The system evaluates which templates apply to each case on-demand using the `/api/cases/:id/dynamic-checklist` endpoint
-- **Six Field Types**: Each checklist item supports multiple field types:
-  - **Checkbox**: Traditional toggle-based completion (default)
-  - **Dropdown**: Select from pre-configured options
-  - **Text**: Free-form text input
-  - **Number**: Numeric input with validation
-  - **Date**: Date picker for deadline/date fields
-  - **File**: Text input for file references (URLs or file IDs from object storage)
-- **Dynamic Configuration**: Field options (dropdown choices) and default values are configurable per item
-- **Case Detail Rendering**: Each field type renders appropriately in the case detail view with type-specific inputs
-- **Admin Interface**: Single unified templates page at `/admin/templates` for managing all reusable templates
-- **Legacy System**: The old `checklistTemplates` API routes and storage methods have been removed. The database schema remains for historical data but is no longer actively used.
-
-### File Management
-- **Strategy**: Prepared for S3 integration with presigned URL patterns.
-- **Document Types**: Support for various file types (PDF, images, archives).
-
-### Security & Compliance
-- **Authentication**: OAuth-based with Replit integration.
-- **Authorization**: Role-based access control with granular user permissions.
-- **Audit Logging**: Comprehensive tracking of user actions and system changes.
-- **Data Validation**: Zod schemas for type safety and validation.
-
-### User Permission System
-- **Permission Model**: Granular permission system with five configurable fields per user:
-  - **restrictedLenderId**: Restricts user access to cases from a specific lender (null = access all lenders)
-  - **isViewOnly**: Prevents user from making any modifications to cases
-  - **canResolve**: Allows user to mark cases as resolved
-  - **canDelete**: Allows user to delete cases and related entities
-  - **canAssign**: Allows user to assign/reassign cases to other users
-- **Default Permissions**: New users are created with all permissions enabled (non-restricted) except restrictedLenderId (null)
-- **Backend Enforcement**: 
-  - Custom `AuthorizationError` class returns 403 Forbidden responses for permission violations
-  - Permission checks in all case management routes (GET, PATCH status, PATCH assign, PUT)
-  - Lender filtering automatically applied to case lists for restricted users
-  - View-only users blocked from all modification operations
-- **Frontend Enforcement**:
-  - Conditional rendering of action buttons based on user permissions
-  - Status/assignment dropdowns replaced with read-only text for restricted users
-  - Loading state protection prevents permission bypass during auth fetch
-  - Buttons disabled during authentication loading
-- **Admin Interface**: Permission configuration available in Users Management (/admin/users) with:
-  - Lender restriction dropdown
-  - Toggle switches for view-only, resolve, delete, and assign permissions
-  - Real-time validation and clear permission descriptions
-
-### User Email Configuration
-- **Purpose**: Allows individual users to connect their Outlook email accounts to send notices to clients and external parties
-- **OAuth Fields**: Each user can configure:
-  - **emailEnabled**: Toggle to enable email functionality for the user
-  - **outlookEmail**: User's Outlook email address
-  - **outlookClientId**: Azure app client ID for OAuth authentication
-  - **outlookTenantId**: Azure tenant ID for the organization
-  - **outlookClientSecret**: Azure app client secret (stored securely, never exposed)
-  - **outlookRedirectUri**: OAuth redirect URI for authentication callback
-- **Security Measures**:
-  - Client secret masked as "***REDACTED***" in all API responses (GET, POST, PUT)
-  - Empty secret field during update preserves existing value in database
-  - Password-type input field prevents secret visibility in UI
-  - Same security pattern as lender email configuration
-- **Admin Interface**: Located in Users Management page (/admin/users):
-  - Email configuration section appears when "Enable Email" toggle is activated
-  - Conditional display of all OAuth fields when email is enabled
-  - Clear placeholder text for secret field: "Leave empty to keep existing secret" when editing
-  - Visual separation with border and Mail icon for easy identification
-- **Per-User Setup**: Each user has independent email configuration, allowing different team members to use their own email accounts
-
-### Email Intake System
-- **Webhook Endpoint**: POST /api/email-intake accepts emails from external services (Outlook, Gmail, etc.) and auto-creates cases
-- **Pending Intake Status**: New status type "pending_intake" for cases awaiting agent review and completion
-- **Email Metadata Storage**: JSONB field stores sender, subject, body preview, received timestamp, and attachment details array
-- **Attachment Handling**: Full attachment metadata stored including file name, size, and content type
-- **Intake Workflow**:
-  1. Email arrives at webhook → Case created with pending_intake status
-  2. Agent reviews email in Email Intake Queue (/email-intake)
-  3. Agent fills in customer details, case type/category, priority, lender info
-  4. On completion → Case transitions to "open" status with full case metadata
-- **Intake Tracking**:
-  - **receivedAt**: Email receipt timestamp
-  - **firstViewedAt**: When agent first opens the intake case
-  - **intakeCompletedAt**: When agent completes intake form
-- **Dashboard Integration**: Widget displays pending intake count and average processing time (in hours)
-- **Queue Display**: Shows email metadata including sender, subject, body preview, and list of attachments with file details
-- **Queue Management**: Dedicated page shows all pending intakes with age tracking and quick access
-- **Case Detail Integration**: For pending_intake cases, displays email preview and completion form instead of normal case tabs
-- **No External Integration Required**: User dismissed Outlook connector; webhook is generic and works with any email forwarding service
-
-### Email Template System
-- **Template Management**: Admin interface at `/admin/email-templates` for creating and managing reusable email templates
-- **Template Categories**: Four template types for different communication needs:
-  - **Lender**: Templates for communicating with lending institutions
-  - **Customer**: Templates for customer communications
-  - **Internal**: Templates for internal team notifications
-  - **Other**: General-purpose templates
-- **Variable Substitution**: Support for 13 dynamic case variables that auto-populate from case data:
-  - `{{caseNumber}}`, `{{customerName}}`, `{{customerState}}`, `{{lenderName}}`, `{{loanId}}`
-  - `{{caseType}}`, `{{category}}`, `{{status}}`, `{{priority}}`
-  - `{{assignedTo}}`, `{{secondaryAssignedTo}}`, `{{caseDetails}}`, `{{createdDate}}`
-- **Template Structure**: Each template includes name, description, category, subject, body, and active/inactive status
-- **Email Composition**: Templates selectable when sending emails from case detail view with real-time preview of rendered content
-- **Document Attachments**: Support for attaching case documents to outgoing emails
-- **Audit Logging**: All sent emails logged in audit trail with full details (recipients, subject, template used, attachments)
-
-### Email History & Communication Tracking
-- **Dedicated Email Tab**: New "Emails" tab in case detail view (positioned between Documents and Notes) provides complete email communication history
-- **Email List View**: Chronological display of all emails sent for a case with:
-  - Sender information (name, avatar, email address)
-  - Timestamp (relative and absolute formats)
-  - Recipients (To, CC, BCC fields)
-  - Email subject and body preview (first 150 characters)
-  - Template name badge (if template was used)
-- **Expandable Details**: Click to expand individual emails and view:
-  - Full email body in formatted display
-  - Complete recipient lists (To/CC/BCC)
-  - Attachment list with file names
-  - Full send timestamp
-- **Security**: Email history respects lender access restrictions - users can only view emails for cases they have permission to access
-- **Data Source**: Email history retrieved from audit log entries filtered by action='email_sent'
-- **Empty State**: Clear messaging when no emails have been sent for a case
-- **Backend API**: GET /api/cases/:id/emails endpoint with proper authorization checks
-
-### Case Edit Functionality
-- **Comprehensive Edit Dialog**: Full case detail editing supporting all case creation fields
-- **Editable Fields**: Case Origination, Case Type, Category, Customer Name, Customer State, Lender, Loan ID, Case Details
-- **Smart Form Behavior**:
-  - Category dropdown dynamically updates based on selected Case Type
-  - All dropdowns pre-populated with current values when dialog opens
-  - Form validation ensures data consistency
-- **Customer Management**: Automatically finds existing customers or creates new records when customer name changes
-- **Backend Logic**: PUT /api/cases/:id accepts all case fields and intelligently handles customer updates
-- **Audit Trail**: All edit changes logged with previous and new values for compliance tracking
-- **Permission Enforcement**: Edit functionality respects user permissions (view-only users cannot edit)
-- **Data Persistence**: Changes immediately reflected in UI and persisted across page refreshes
+### System Design Choices
+- **File Management**: Designed for S3 integration using presigned URLs.
+- **Audit Logging**: Comprehensive tracking of user actions and system changes for compliance.
+- **Data Validation**: Zod schemas used for type safety and validation across the platform.
 
 ## External Dependencies
 
 ### Core Infrastructure
-- **Database**: PostgreSQL (Neon serverless in production).
+- **Database**: PostgreSQL (Neon serverless for production).
 - **Authentication Provider**: Replit OAuth service.
 - **Session Store**: PostgreSQL-backed sessions.
 
@@ -191,7 +58,6 @@ Preferred communication style: Simple, everyday language.
 
 ### Development Services
 - **Build Tools**: Vite (frontend), ESBuild (server).
-- **Development**: Replit-specific plugins.
 
 ### Planned Integrations
 - **File Storage**: AWS S3.
