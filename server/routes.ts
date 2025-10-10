@@ -3532,7 +3532,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Import required modules
       const { drizzle } = await import('drizzle-orm/neon-serverless');
-      const { neon } = await import('@neondatabase/serverless');
+      const { Pool, neonConfig } = await import('@neondatabase/serverless');
+      const ws = await import('ws');
       const { db: devDb } = await import('./db');
       const { 
         users, lenders, caseOriginations, caseTypes, categories, 
@@ -3590,99 +3591,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Connect to production database
-      const prodSql = neon(productionDatabaseUrl);
-      const prodDb = drizzle(prodSql);
+      neonConfig.webSocketConstructor = ws.default;
+      const prodPool = new Pool({ connectionString: productionDatabaseUrl });
+      const prodDb = drizzle({ client: prodPool });
 
-      // Clear production tables in correct order (respecting foreign keys)
-      await prodDb.delete(auditLogs);
-      await prodDb.delete(resolutions);
-      await prodDb.delete(documents);
-      await prodDb.delete(checklistItems);
-      await prodDb.delete(flags);
-      await prodDb.delete(caseNotes);
-      await prodDb.delete(cases);
-      await prodDb.delete(customers);
-      await prodDb.delete(kbChangeEvents);
-      await prodDb.delete(kbArticleLinks);
-      await prodDb.delete(kbArticleVersions);
-      await prodDb.delete(kbArticles);
-      await prodDb.delete(kbCategories);
-      await prodDb.delete(emailTemplates);
-      await prodDb.delete(users);
-      await prodDb.delete(checklistAssignmentRules);
-      await prodDb.delete(reusableChecklistItems);
-      await prodDb.delete(reusableChecklistTemplates);
-      await prodDb.delete(checklistTemplates);
-      await prodDb.delete(documentRequirements);
-      await prodDb.delete(priorityRules);
-      await prodDb.delete(tagRules);
-      await prodDb.delete(resolutionConfigs);
-      await prodDb.delete(slaPolicies);
-      await prodDb.delete(categoryCaseTypes);
-      await prodDb.delete(caseTypeOriginations);
-      await prodDb.delete(categories);
-      await prodDb.delete(caseTypes);
-      await prodDb.delete(caseOriginations);
-      await prodDb.delete(lenders);
-      await prodDb.delete(subDispositions);
-      await prodDb.delete(dispositions);
-      await prodDb.delete(policyViolationOptions);
-      await prodDb.delete(valueSets);
-      await prodDb.delete(featureFlags);
-      await prodDb.delete(configAudits);
-      await prodDb.delete(webhooks);
-      await prodDb.delete(integrations);
+      try {
+        // Clear production tables in correct order (respecting foreign keys)
+        await prodDb.delete(auditLogs);
+        await prodDb.delete(resolutions);
+        await prodDb.delete(documents);
+        await prodDb.delete(checklistItems);
+        await prodDb.delete(flags);
+        await prodDb.delete(caseNotes);
+        await prodDb.delete(cases);
+        await prodDb.delete(customers);
+        await prodDb.delete(kbChangeEvents);
+        await prodDb.delete(kbArticleLinks);
+        await prodDb.delete(kbArticleVersions);
+        await prodDb.delete(kbArticles);
+        await prodDb.delete(kbCategories);
+        await prodDb.delete(emailTemplates);
+        await prodDb.delete(users);
+        await prodDb.delete(checklistAssignmentRules);
+        await prodDb.delete(reusableChecklistItems);
+        await prodDb.delete(reusableChecklistTemplates);
+        await prodDb.delete(checklistTemplates);
+        await prodDb.delete(documentRequirements);
+        await prodDb.delete(priorityRules);
+        await prodDb.delete(tagRules);
+        await prodDb.delete(resolutionConfigs);
+        await prodDb.delete(slaPolicies);
+        await prodDb.delete(categoryCaseTypes);
+        await prodDb.delete(caseTypeOriginations);
+        await prodDb.delete(categories);
+        await prodDb.delete(caseTypes);
+        await prodDb.delete(caseOriginations);
+        await prodDb.delete(lenders);
+        await prodDb.delete(subDispositions);
+        await prodDb.delete(dispositions);
+        await prodDb.delete(policyViolationOptions);
+        await prodDb.delete(valueSets);
+        await prodDb.delete(featureFlags);
+        await prodDb.delete(configAudits);
+        await prodDb.delete(webhooks);
+        await prodDb.delete(integrations);
 
-      // Import data to production in correct order
-      if (devData.lenders.length > 0) await prodDb.insert(lenders).values(devData.lenders);
-      if (devData.caseOriginations.length > 0) await prodDb.insert(caseOriginations).values(devData.caseOriginations);
-      if (devData.caseTypes.length > 0) await prodDb.insert(caseTypes).values(devData.caseTypes);
-      if (devData.categories.length > 0) await prodDb.insert(categories).values(devData.categories);
-      if (devData.users.length > 0) await prodDb.insert(users).values(devData.users);
-      if (devData.customers.length > 0) await prodDb.insert(customers).values(devData.customers);
-      if (devData.valueSets.length > 0) await prodDb.insert(valueSets).values(devData.valueSets);
-      if (devData.featureFlags.length > 0) await prodDb.insert(featureFlags).values(devData.featureFlags);
-      if (devData.dispositions.length > 0) await prodDb.insert(dispositions).values(devData.dispositions);
-      if (devData.subDispositions.length > 0) await prodDb.insert(subDispositions).values(devData.subDispositions);
-      if (devData.policyViolationOptions.length > 0) await prodDb.insert(policyViolationOptions).values(devData.policyViolationOptions);
-      if (devData.kbCategories.length > 0) await prodDb.insert(kbCategories).values(devData.kbCategories);
-      if (devData.kbArticles.length > 0) await prodDb.insert(kbArticles).values(devData.kbArticles);
-      if (devData.kbArticleVersions.length > 0) await prodDb.insert(kbArticleVersions).values(devData.kbArticleVersions);
-      if (devData.kbChangeEvents.length > 0) await prodDb.insert(kbChangeEvents).values(devData.kbChangeEvents);
-      if (devData.kbArticleLinks.length > 0) await prodDb.insert(kbArticleLinks).values(devData.kbArticleLinks);
-      if (devData.emailTemplates.length > 0) await prodDb.insert(emailTemplates).values(devData.emailTemplates);
-      if (devData.checklistTemplates.length > 0) await prodDb.insert(checklistTemplates).values(devData.checklistTemplates);
-      if (devData.reusableChecklistTemplates.length > 0) await prodDb.insert(reusableChecklistTemplates).values(devData.reusableChecklistTemplates);
-      if (devData.reusableChecklistItems.length > 0) await prodDb.insert(reusableChecklistItems).values(devData.reusableChecklistItems);
-      if (devData.documentRequirements.length > 0) await prodDb.insert(documentRequirements).values(devData.documentRequirements);
-      if (devData.priorityRules.length > 0) await prodDb.insert(priorityRules).values(devData.priorityRules);
-      if (devData.tagRules.length > 0) await prodDb.insert(tagRules).values(devData.tagRules);
-      if (devData.checklistAssignmentRules.length > 0) await prodDb.insert(checklistAssignmentRules).values(devData.checklistAssignmentRules);
-      if (devData.slaPolicies.length > 0) await prodDb.insert(slaPolicies).values(devData.slaPolicies);
-      if (devData.resolutionConfigs.length > 0) await prodDb.insert(resolutionConfigs).values(devData.resolutionConfigs);
-      if (devData.caseTypeOriginations.length > 0) await prodDb.insert(caseTypeOriginations).values(devData.caseTypeOriginations);
-      if (devData.categoryCaseTypes.length > 0) await prodDb.insert(categoryCaseTypes).values(devData.categoryCaseTypes);
-      if (devData.configAudits.length > 0) await prodDb.insert(configAudits).values(devData.configAudits);
-      if (devData.webhooks.length > 0) await prodDb.insert(webhooks).values(devData.webhooks);
-      if (devData.integrations.length > 0) await prodDb.insert(integrations).values(devData.integrations);
-      if (devData.cases.length > 0) await prodDb.insert(cases).values(devData.cases);
-      if (devData.checklistItems.length > 0) await prodDb.insert(checklistItems).values(devData.checklistItems);
-      if (devData.documents.length > 0) await prodDb.insert(documents).values(devData.documents);
-      if (devData.resolutions.length > 0) await prodDb.insert(resolutions).values(devData.resolutions);
-      if (devData.flags.length > 0) await prodDb.insert(flags).values(devData.flags);
-      if (devData.caseNotes.length > 0) await prodDb.insert(caseNotes).values(devData.caseNotes);
-      if (devData.auditLogs.length > 0) await prodDb.insert(auditLogs).values(devData.auditLogs);
+        // Import data to production in correct order
+        if (devData.lenders.length > 0) await prodDb.insert(lenders).values(devData.lenders);
+        if (devData.caseOriginations.length > 0) await prodDb.insert(caseOriginations).values(devData.caseOriginations);
+        if (devData.caseTypes.length > 0) await prodDb.insert(caseTypes).values(devData.caseTypes);
+        if (devData.categories.length > 0) await prodDb.insert(categories).values(devData.categories);
+        if (devData.users.length > 0) await prodDb.insert(users).values(devData.users);
+        if (devData.customers.length > 0) await prodDb.insert(customers).values(devData.customers);
+        if (devData.valueSets.length > 0) await prodDb.insert(valueSets).values(devData.valueSets);
+        if (devData.featureFlags.length > 0) await prodDb.insert(featureFlags).values(devData.featureFlags);
+        if (devData.dispositions.length > 0) await prodDb.insert(dispositions).values(devData.dispositions);
+        if (devData.subDispositions.length > 0) await prodDb.insert(subDispositions).values(devData.subDispositions);
+        if (devData.policyViolationOptions.length > 0) await prodDb.insert(policyViolationOptions).values(devData.policyViolationOptions);
+        if (devData.kbCategories.length > 0) await prodDb.insert(kbCategories).values(devData.kbCategories);
+        if (devData.kbArticles.length > 0) await prodDb.insert(kbArticles).values(devData.kbArticles);
+        if (devData.kbArticleVersions.length > 0) await prodDb.insert(kbArticleVersions).values(devData.kbArticleVersions);
+        if (devData.kbChangeEvents.length > 0) await prodDb.insert(kbChangeEvents).values(devData.kbChangeEvents);
+        if (devData.kbArticleLinks.length > 0) await prodDb.insert(kbArticleLinks).values(devData.kbArticleLinks);
+        if (devData.emailTemplates.length > 0) await prodDb.insert(emailTemplates).values(devData.emailTemplates);
+        if (devData.checklistTemplates.length > 0) await prodDb.insert(checklistTemplates).values(devData.checklistTemplates);
+        if (devData.reusableChecklistTemplates.length > 0) await prodDb.insert(reusableChecklistTemplates).values(devData.reusableChecklistTemplates);
+        if (devData.reusableChecklistItems.length > 0) await prodDb.insert(reusableChecklistItems).values(devData.reusableChecklistItems);
+        if (devData.documentRequirements.length > 0) await prodDb.insert(documentRequirements).values(devData.documentRequirements);
+        if (devData.priorityRules.length > 0) await prodDb.insert(priorityRules).values(devData.priorityRules);
+        if (devData.tagRules.length > 0) await prodDb.insert(tagRules).values(devData.tagRules);
+        if (devData.checklistAssignmentRules.length > 0) await prodDb.insert(checklistAssignmentRules).values(devData.checklistAssignmentRules);
+        if (devData.slaPolicies.length > 0) await prodDb.insert(slaPolicies).values(devData.slaPolicies);
+        if (devData.resolutionConfigs.length > 0) await prodDb.insert(resolutionConfigs).values(devData.resolutionConfigs);
+        if (devData.caseTypeOriginations.length > 0) await prodDb.insert(caseTypeOriginations).values(devData.caseTypeOriginations);
+        if (devData.categoryCaseTypes.length > 0) await prodDb.insert(categoryCaseTypes).values(devData.categoryCaseTypes);
+        if (devData.configAudits.length > 0) await prodDb.insert(configAudits).values(devData.configAudits);
+        if (devData.webhooks.length > 0) await prodDb.insert(webhooks).values(devData.webhooks);
+        if (devData.integrations.length > 0) await prodDb.insert(integrations).values(devData.integrations);
+        if (devData.cases.length > 0) await prodDb.insert(cases).values(devData.cases);
+        if (devData.checklistItems.length > 0) await prodDb.insert(checklistItems).values(devData.checklistItems);
+        if (devData.documents.length > 0) await prodDb.insert(documents).values(devData.documents);
+        if (devData.resolutions.length > 0) await prodDb.insert(resolutions).values(devData.resolutions);
+        if (devData.flags.length > 0) await prodDb.insert(flags).values(devData.flags);
+        if (devData.caseNotes.length > 0) await prodDb.insert(caseNotes).values(devData.caseNotes);
+        if (devData.auditLogs.length > 0) await prodDb.insert(auditLogs).values(devData.auditLogs);
 
-      res.json({ 
-        success: true, 
-        message: "Database synced successfully",
-        stats: {
-          users: devData.users.length,
-          cases: devData.cases.length,
-          customers: devData.customers.length,
-          categories: devData.categories.length
-        }
-      });
+        res.json({ 
+          success: true, 
+          message: "Database synced successfully",
+          stats: {
+            users: devData.users.length,
+            cases: devData.cases.length,
+            customers: devData.customers.length,
+            categories: devData.categories.length
+          }
+        });
+      } finally {
+        // Always close the production pool connection
+        await prodPool.end();
+      }
     } catch (error) {
       console.error("Database sync error:", error);
       res.status(500).json({ error: "Failed to sync database", details: error instanceof Error ? error.message : "Unknown error" });

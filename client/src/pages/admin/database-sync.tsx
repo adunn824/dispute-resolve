@@ -34,12 +34,14 @@ export default function DatabaseSync() {
     },
     onSuccess: (data: any) => {
       setSyncStats(data.stats);
+      setProductionDbUrl(""); // Clear URL for security
       toast({
         title: "Sync Complete!",
         description: `Successfully synced ${data.stats.cases} cases, ${data.stats.users} users, and ${data.stats.customers} customers to production.`,
       });
     },
     onError: (error: any) => {
+      setProductionDbUrl(""); // Clear URL for security
       toast({
         variant: "destructive",
         title: "Sync Failed",
