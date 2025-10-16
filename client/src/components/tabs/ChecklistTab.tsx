@@ -31,6 +31,19 @@ interface ChecklistItem {
   completedAt?: Date | null;
   assignedToUserId?: string | null;
   checklistItemId?: string | null;
+  // Rule match information
+  matchSource?: string;
+  matchedRuleName?: string;
+  ruleMatchDetails?: {
+    logic: 'AND' | 'OR';
+    conditionResults: {
+      field: string;
+      operator: string;
+      value: any;
+      fieldValue: any;
+      result: boolean;
+    }[];
+  };
 }
 
 interface ChecklistTabProps {
@@ -281,6 +294,90 @@ export function ChecklistTab({ caseId }: ChecklistTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Rule Match Information */}
+      {checklistItems.length > 0 && (() => {
+        // Get unique templates with their match information
+        const templateMatches = new Map<string, ChecklistItem>();
+        checklistItems.forEach(item => {
+          if (!templateMatches.has(item.templateId)) {
+            templateMatches.set(item.templateId, item);
+          }
+        });
+
+        return (
+          <Card data-testid="card-rule-matches">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Applied Checklist Templates
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Array.from(templateMatches.values()).map((item) => (
+                <Alert key={item.templateId} className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900">
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-blue-900 dark:text-blue-100">
+                          {item.templateName}
+                        </span>
+                        {item.matchSource === 'category' && (
+                          <Badge variant="outline" className="bg-green-50 dark:bg-green-950/20 border-green-600 text-green-700 dark:text-green-400">
+                            Category Auto-Assigned
+                          </Badge>
+                        )}
+                        {item.matchSource === 'rule' && (
+                          <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20 border-blue-600 text-blue-700 dark:text-blue-400">
+                            Business Rule
+                          </Badge>
+                        )}
+                      </div>
+
+                      {item.matchedRuleName && (
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Rule: </span>
+                          <span className="font-medium">{item.matchedRuleName}</span>
+                        </div>
+                      )}
+
+                      {item.ruleMatchDetails && item.ruleMatchDetails.conditionResults.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <div className="text-xs text-muted-foreground">
+                            Conditions ({item.ruleMatchDetails.logic}):
+                          </div>
+                          <div className="space-y-1">
+                            {item.ruleMatchDetails.conditionResults.map((condition, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`text-xs flex items-center gap-2 p-1 rounded ${
+                                  condition.result 
+                                    ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400' 
+                                    : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400'
+                                }`}
+                              >
+                                <span className="font-mono">
+                                  {condition.result ? '✓' : '✗'}
+                                </span>
+                                <span>
+                                  <strong>{condition.field}</strong> {condition.operator} <code className="px-1 rounded bg-black/10 dark:bg-white/10">{JSON.stringify(condition.value)}</code>
+                                </span>
+                                <span className="text-muted-foreground">
+                                  (actual: <code className="px-1 rounded bg-black/10 dark:bg-white/10">{JSON.stringify(condition.fieldValue)}</code>)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ))}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Checklist Items */}
       {checklistItems.length > 0 && (
