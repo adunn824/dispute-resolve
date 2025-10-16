@@ -2661,6 +2661,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user (admin only)
+  app.delete("/api/users/:id", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Check if user exists
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Prevent self-deletion
+      if (req.user && req.user.id === id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      // Attempt deletion - storage will handle foreign key checks
+      await storage.deleteUser(id);
+
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      
+      // Check if error is about foreign key constraints
+      if (error instanceof Error && error.message.includes("Cannot delete user")) {
+        return res.status(400).json({ error: error.message });
+      }
+      
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Create new user (admin only)
   app.post("/api/users", requireRole("admin"), async (req, res) => {
     try {
