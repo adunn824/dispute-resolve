@@ -8,10 +8,23 @@ async function throwIfResNotOk(res: Response) {
     try {
       const errorData = JSON.parse(text);
       const errorMessage = errorData.error || errorData.message || text;
-      throw new Error(errorMessage);
-    } catch {
-      // If not JSON, throw the raw text
-      throw new Error(text);
+      
+      // Create error object with details if available
+      const error: any = new Error(errorMessage);
+      if (errorData.details) {
+        error.details = errorData.details;
+      }
+      if (errorData.error) {
+        error.error = errorData.error;
+      }
+      throw error;
+    } catch (parseError) {
+      // If JSON parsing failed, throw the raw text
+      if (parseError instanceof SyntaxError) {
+        throw new Error(text);
+      }
+      // If it's our own error, re-throw it
+      throw parseError;
     }
   }
 }
