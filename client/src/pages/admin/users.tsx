@@ -149,7 +149,7 @@ export default function UsersManagement() {
       toast({ title: "Success", description: "User deleted successfully" });
     },
     onError: (error: any) => {
-      const errorMessage = error?.error || error?.message || "Failed to delete user";
+      const errorMessage = error?.message || "Failed to delete user";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
