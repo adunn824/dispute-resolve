@@ -2267,10 +2267,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'OTHER';
       };
 
-      // TODO: In a real implementation, upload file.buffer to object storage
-      // For now, we'll simulate storage by logging file info
-      console.log(`Uploading file: ${file.originalname}, Size: ${file.size} bytes, Type: ${file.mimetype}`);
-      console.log(`Storage path: ${process.env.PRIVATE_OBJECT_DIR}/${storageKey}`);
+      // Upload file to object storage
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      
+      try {
+        await objectStorageService.uploadFile(storageKey, file.buffer, file.mimetype);
+        
+        // Set ACL policy for the uploaded file (private, owned by uploader)
+        await objectStorageService.setFileAclPolicy(storageKey, {
+          owner: userId,
+          visibility: 'private',
+        });
+        
+        console.log(`File uploaded successfully: ${file.originalname}, Size: ${file.size} bytes`);
+      } catch (uploadError) {
+        console.error('Error uploading file to object storage:', uploadError);
+        return res.status(500).json({ message: "Failed to upload file to storage" });
+      }
 
       // Create document record in database
       const document = await storage.createDocument({
