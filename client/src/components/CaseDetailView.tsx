@@ -735,7 +735,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                 data-testid="select-primary-assignment"
               >
                 <SelectTrigger className="w-[180px] h-9" data-testid="trigger-primary-assignment-dropdown">
-                  <SelectValue placeholder="Primary: Unassigned" />
+                  <SelectValue placeholder="Assignee 1" />
                 </SelectTrigger>
                 <SelectContent data-testid="content-primary-assignment-options">
                   <SelectItem value="unassigned" data-testid="option-primary-unassigned">Unassigned</SelectItem>
@@ -753,7 +753,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
               </Select>
             ) : (
               <div className="text-sm px-3 py-1.5 bg-muted rounded-md" data-testid="text-primary-assignment-readonly">
-                Primary: {caseDetails.assignedUserName || "Unassigned"}
+                Assignee 1: {caseDetails.assignedUserName || "Unassigned"}
               </div>
             )}
             
@@ -766,7 +766,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                 data-testid="select-secondary-assignment"
               >
                 <SelectTrigger className="w-[180px] h-9" data-testid="trigger-secondary-assignment-dropdown">
-                  <SelectValue placeholder="Secondary: Unassigned" />
+                  <SelectValue placeholder="Assignee 2" />
                 </SelectTrigger>
                 <SelectContent data-testid="content-secondary-assignment-options">
                   <SelectItem value="unassigned" data-testid="option-secondary-unassigned">Unassigned</SelectItem>
@@ -784,7 +784,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
               </Select>
             ) : (
               <div className="text-sm px-3 py-1.5 bg-muted rounded-md" data-testid="text-secondary-assignment-readonly">
-                Secondary: {caseDetails.secondaryAssignedUserName || "Unassigned"}
+                Assignee 2: {caseDetails.secondaryAssignedUserName || "Unassigned"}
               </div>
             )}
             
