@@ -820,7 +820,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             )}
           </div>
-          {user?.canDelete && !isPendingIntake && (
+          {user?.role === 'admin' && !isPendingIntake && (
             <Button
               variant="ghost"
               size="icon"
