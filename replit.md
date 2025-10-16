@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Database Sync System**: Admin interface (`/admin/database-sync`) to sync development database data to production, handling foreign key constraints, ensuring data integrity, and providing progress feedback.
 
 ### Feature Specifications
-- **Dynamic Checklists**: Single, unified `reusableChecklistTemplates` system for all templates, automatically assigned based on category or business rules. Supports six field types (Checkbox, Dropdown, Text, Number, Date, File) with dynamic configuration.
+- **Dynamic Checklists**: Single, unified `reusableChecklistTemplates` system for all templates, automatically assigned based on category or business rules. Supports six field types (Checkbox, Dropdown, Text, Number, Date, File) with dynamic configuration. Rules require at least one condition to match (empty conditions do not auto-apply). Visual rule match display shows which templates are active and why, including per-condition evaluation results.
 - **Admin Panel**: Dynamic system for runtime configuration of case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations, SLA policies, value sets, and feature flags, including audit trails with rollback.
 - **Resolution Options**: Fully configurable disposition, sub-disposition, and policy violation options managed via the admin interface.
 
