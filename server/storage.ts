@@ -166,6 +166,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   upsertUser(user: UpsertUser): Promise<User>;
   getNextAvailableUser(): Promise<User | null>;
   updateUserAvailability(userId: string, availabilityStatus: "available" | "not_available"): Promise<User>;
@@ -505,6 +506,97 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    // Check for NOT NULL foreign key references that would prevent deletion
+    const [documentsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(documents)
+      .where(eq(documents.uploadedByUserId, id));
+
+    const [flagsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(flags)
+      .where(eq(flags.appliedByUserId, id));
+
+    const [notesCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(caseNotes)
+      .where(eq(caseNotes.authorUserId, id));
+
+    const [configAuditsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(configAudits)
+      .where(eq(configAudits.userId, id));
+
+    // If user has created any of these records, prevent deletion
+    if (documentsCount.count > 0 || flagsCount.count > 0 || notesCount.count > 0 || configAuditsCount.count > 0) {
+      throw new Error(
+        `Cannot delete user: User has ${documentsCount.count} documents, ${flagsCount.count} flags, ${notesCount.count} notes, and ${configAuditsCount.count} config changes. Please reassign or delete these records first.`
+      );
+    }
+
+    // Set nullable foreign key references to NULL before deleting user
+    // Cases: assignedToUserId and secondaryAssignedToUserId
+    await db
+      .update(cases)
+      .set({ assignedToUserId: null })
+      .where(eq(cases.assignedToUserId, id));
+
+    await db
+      .update(cases)
+      .set({ secondaryAssignedToUserId: null })
+      .where(eq(cases.secondaryAssignedToUserId, id));
+
+    // Checklist items: assignedToUserId
+    await db
+      .update(checklistItems)
+      .set({ assignedToUserId: null })
+      .where(eq(checklistItems.assignedToUserId, id));
+
+    // Audit logs: keep them for compliance, just set actorUserId to null
+    await db
+      .update(auditLogs)
+      .set({ actorUserId: null })
+      .where(eq(auditLogs.actorUserId, id));
+
+    // Knowledge base articles
+    await db
+      .update(kbArticles)
+      .set({ authorId: null })
+      .where(eq(kbArticles.authorId, id));
+
+    await db
+      .update(kbArticles)
+      .set({ lastModifiedBy: null })
+      .where(eq(kbArticles.lastModifiedBy, id));
+
+    // KB article versions
+    await db
+      .update(kbArticleVersions)
+      .set({ authorId: null })
+      .where(eq(kbArticleVersions.authorId, id));
+
+    // KB change events
+    await db
+      .update(kbChangeEvents)
+      .set({ userId: null })
+      .where(eq(kbChangeEvents.userId, id));
+
+    // Email templates
+    await db
+      .update(emailTemplates)
+      .set({ createdBy: null })
+      .where(eq(emailTemplates.createdBy, id));
+
+    await db
+      .update(emailTemplates)
+      .set({ updatedBy: null })
+      .where(eq(emailTemplates.updatedBy, id));
+
+    // Finally, delete the user
+    await db.delete(users).where(eq(users.id, id));
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
