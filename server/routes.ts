@@ -50,7 +50,19 @@ const roleHierarchy = {
 // Role-based authorization middleware with proper hierarchy (admin can access agent-level endpoints)
 const requireRole = (roles: string | string[]) => (req: any, res: any, next: any) => {
   if (!req.isAuthenticated()) {
+    console.error("requireRole: User not authenticated");
     return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  // Log user object structure for debugging
+  if (!req.user || !req.user.role) {
+    console.error("requireRole: User object missing or invalid:", {
+      hasUser: !!req.user,
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userKeys: req.user ? Object.keys(req.user) : []
+    });
+    return res.status(401).json({ message: "Unauthorized - invalid user session" });
   }
   
   const roleArray = Array.isArray(roles) ? roles : [roles];
@@ -63,6 +75,11 @@ const requireRole = (roles: string | string[]) => (req: any, res: any, next: any
   });
   
   if (!hasPermission) {
+    console.error("requireRole: Insufficient permissions:", {
+      userRole: req.user.role,
+      userRoleLevel,
+      requiredRoles: roleArray
+    });
     return res.status(403).json({ message: "Forbidden" });
   }
   
@@ -633,6 +650,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
+      // Validate user object is properly populated
+      if (!req.user || !req.user.id) {
+        console.error("PUT /api/cases/:id - User object not properly populated:", { 
+          hasUser: !!req.user,
+          userId: req.user?.id,
+          userRole: req.user?.role 
+        });
+        return res.status(401).json({ error: "Unauthorized - user session invalid" });
+      }
+
       // Handle customer name separately since it's not a case field
       const { customerName, ...caseUpdates } = req.body;
       const updates = insertCaseSchema.partial().parse(caseUpdates);
