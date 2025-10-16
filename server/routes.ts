@@ -716,7 +716,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid update data", details: error.errors });
       }
       console.error("Failed to update case:", error);
-      res.status(500).json({ error: "Failed to update case" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to update case";
+      res.status(500).json({ error: "Failed to update case", details: errorMessage });
     }
   });
 

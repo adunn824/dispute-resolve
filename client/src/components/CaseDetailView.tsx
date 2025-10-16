@@ -405,9 +405,10 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       });
     },
     onError: (error: any) => {
+      const errorDetails = error?.details ? ` - ${error.details}` : "";
       toast({
         title: "Error",
-        description: error?.message || "Failed to update case details",
+        description: (error?.error || error?.message || "Failed to update case details") + errorDetails,
         variant: "destructive",
       });
     },
