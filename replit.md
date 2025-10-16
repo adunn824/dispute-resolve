@@ -39,7 +39,7 @@ Preferred communication style: Simple, everyday language.
 - **Resolution Options**: Fully configurable disposition, sub-disposition, and policy violation options managed via the admin interface.
 
 ### System Design Choices
-- **File Management**: Designed for S3 integration using presigned URLs.
+- **File Management**: Integrated with Replit Object Storage (Google Cloud Storage backed) for document uploads/downloads with ACL-based access control. Files are stored privately with owner-based permissions, enforcing authorization at both case-level and object-level.
 - **Audit Logging**: Comprehensive tracking of user actions and system changes for compliance.
 - **Data Validation**: Zod schemas used for type safety and validation across the platform.
 
@@ -49,6 +49,7 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL (Neon serverless for production).
 - **Authentication Provider**: Replit OAuth service.
 - **Session Store**: PostgreSQL-backed sessions.
+- **Object Storage**: Replit Object Storage (Google Cloud Storage) for document management with ACL policies.
 
 ### UI Libraries
 - **Component System**: Radix UI.
@@ -60,7 +61,6 @@ Preferred communication style: Simple, everyday language.
 - **Build Tools**: Vite (frontend), ESBuild (server).
 
 ### Planned Integrations
-- **File Storage**: AWS S3.
 - **Email Services**: For automated notifications.
 - **External APIs**: Webhook system.
 - **Reporting**: Dashboard analytics and compliance.
