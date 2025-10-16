@@ -2383,15 +2383,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      // Delete from object storage
+      // Get object storage service and check ACL
       const { ObjectStorageService } = await import('./objectStorage');
+      const { ObjectPermission } = await import('./objectAcl');
       const objectStorageService = new ObjectStorageService();
       
       try {
+        const file = await objectStorageService.getFile(document.storageKey);
+        
+        // Check ACL permissions - user must be owner or have write permission
+        const canDelete = await objectStorageService.canAccessObjectEntity({
+          userId,
+          objectFile: file,
+          requestedPermission: ObjectPermission.WRITE,
+        });
+
+        if (!canDelete) {
+          return res.status(403).json({ message: "Access denied: you must be the document owner to delete it" });
+        }
+
+        // Delete from object storage
         await objectStorageService.deleteFile(document.storageKey);
-      } catch (storageError) {
-        console.error("Error deleting file from object storage:", storageError);
-        // Continue with database deletion even if storage deletion fails
+      } catch (storageError: any) {
+        if (storageError.name === 'ObjectNotFoundError') {
+          console.warn("File not found in storage, continuing with database deletion");
+        } else {
+          console.error("Error deleting file from object storage:", storageError);
+          return res.status(500).json({ message: "Failed to delete file from storage" });
+        }
       }
 
       // Delete from database
