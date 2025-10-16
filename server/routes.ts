@@ -2307,9 +2307,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
+  app.get("/api/documents/:id/download", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const userId = req.user?.id;
       
       // Get document from database to retrieve storage key
       const document = await storage.getDocument(id);
@@ -2318,15 +2319,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      // Return download info (in a real implementation, this would generate presigned URL)
-      res.json({
-        downloadUrl: `${process.env.PRIVATE_OBJECT_DIR}/${document.storageKey}`,
-        fileName: document.label,
-        mimeType: document.mime,
-      });
+      // Get the associated case to check access
+      const caseData = await storage.getCase(document.caseId);
+      if (!caseData) {
+        return res.status(404).json({ message: "Associated case not found" });
+      }
+
+      // Check user permissions for the case
+      if (req.user.restrictedLenderId && caseData.lenderId !== req.user.restrictedLenderId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Download file from object storage
+      const { ObjectStorageService } = await import('./objectStorage');
+      const { ObjectPermission } = await import('./objectAcl');
+      const objectStorageService = new ObjectStorageService();
+      
+      try {
+        const file = await objectStorageService.getFile(document.storageKey);
+        
+        // Check ACL permissions
+        const canAccess = await objectStorageService.canAccessObjectEntity({
+          userId,
+          objectFile: file,
+          requestedPermission: ObjectPermission.READ,
+        });
+
+        if (!canAccess) {
+          return res.status(403).json({ message: "Access denied to document" });
+        }
+
+        // Set download header to prompt download with original filename
+        res.set({
+          'Content-Disposition': `attachment; filename="${document.label}"`,
+        });
+
+        // Stream the file to response
+        await objectStorageService.downloadObject(file, res);
+      } catch (storageError: any) {
+        console.error("Error downloading from object storage:", storageError);
+        if (storageError.name === 'ObjectNotFoundError') {
+          return res.status(404).json({ message: "File not found in storage" });
+        }
+        return res.status(500).json({ message: "Failed to download file" });
+      }
     } catch (error) {
-      console.error("Error generating download URL:", error);
-      res.status(500).json({ message: "Failed to generate download URL" });
+      console.error("Error downloading document:", error);
+      res.status(500).json({ message: "Failed to download document" });
     }
   });
 
@@ -2338,7 +2377,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user has permission to delete
       checkUserPermissions.canDelete(req.user);
 
-      // TODO: In real implementation, also delete from object storage
+      // Get document to retrieve storage key before deleting from DB
+      const document = await storage.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Delete from object storage
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      
+      try {
+        await objectStorageService.deleteFile(document.storageKey);
+      } catch (storageError) {
+        console.error("Error deleting file from object storage:", storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+
+      // Delete from database
       await storage.deleteDocument(id);
       
       res.json({ message: "Document deleted successfully" });
