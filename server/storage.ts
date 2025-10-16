@@ -154,6 +154,10 @@ export interface DynamicChecklistItem {
   assignedToUserId?: string | null;
   checklistItemId?: string | null; // ID from checklistItems table if exists
   value?: string | null; // The actual value stored for this field
+  // Rule match information
+  matchSource?: string; // 'category' or 'rule'
+  matchedRuleName?: string; // Name of the rule that matched
+  ruleMatchDetails?: any; // Details about how the rule matched
 }
 
 export interface IStorage {
@@ -1635,8 +1639,8 @@ export class DatabaseStorage implements IStorage {
       const dynamicItems: DynamicChecklistItem[] = [];
       const seenKeys = new Set<string>();
 
-      // Helper function to add template items
-      const addTemplateItems = (template: any) => {
+      // Helper function to add template items with rule match info
+      const addTemplateItems = (template: any, matchInfo?: { source: string; ruleName?: string; ruleDetails?: any }) => {
         if (!template || !template.isActive || !template.items || template.items.length === 0) {
           return;
         }
@@ -1668,7 +1672,11 @@ export class DatabaseStorage implements IStorage {
             completedAt: completion?.completedAt ?? null,
             assignedToUserId: completion?.assignedToUserId ?? null,
             checklistItemId: completion?.checklistItemId ?? null,
-            value: completion?.fieldValue ?? null
+            value: completion?.fieldValue ?? null,
+            // Rule match information
+            matchSource: matchInfo?.source,
+            matchedRuleName: matchInfo?.ruleName,
+            ruleMatchDetails: matchInfo?.ruleDetails
           });
 
           seenKeys.add(templateItem.key);
@@ -1692,7 +1700,10 @@ export class DatabaseStorage implements IStorage {
 
         try {
           const template = await this.getReusableChecklistTemplateWithItems(categoryTemplate.id);
-          addTemplateItems(template);
+          addTemplateItems(template, {
+            source: 'category',
+            ruleName: `Auto-assigned to category: ${caseData.categoryName}`
+          });
         } catch (error) {
           console.error(`Error loading category template "${categoryTemplate.name}":`, error);
         }
@@ -1708,12 +1719,16 @@ export class DatabaseStorage implements IStorage {
         }
 
         try {
-          // Evaluate the rule conditions
-          const matches = RuleEvaluator.evaluate(rule.conditions, caseData);
+          // Evaluate the rule conditions with details
+          const evaluation = RuleEvaluator.evaluateWithDetails(rule.conditions, caseData);
 
-          if (matches) {
+          if (evaluation.matches) {
             const template = await this.getReusableChecklistTemplateWithItems(rule.reusableTemplateId);
-            addTemplateItems(template);
+            addTemplateItems(template, {
+              source: 'rule',
+              ruleName: rule.name,
+              ruleDetails: evaluation.details
+            });
           }
         } catch (error) {
           console.error(`Error evaluating checklist rule "${rule.name}":`, error);

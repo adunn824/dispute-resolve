@@ -41,7 +41,7 @@ export class RuleEvaluator {
    */
   static evaluate(conditions: RuleConditions, caseData: CaseData): boolean {
     if (!conditions.conditions || conditions.conditions.length === 0) {
-      return true; // Empty conditions always match (default rule)
+      return false; // Empty conditions DO NOT match - rules must have at least one condition
     }
 
     const results = conditions.conditions.map(condition => 
@@ -54,6 +54,59 @@ export class RuleEvaluator {
     } else {
       return results.every(result => result);
     }
+  }
+
+  /**
+   * Evaluates conditions and returns detailed match information
+   */
+  static evaluateWithDetails(conditions: RuleConditions, caseData: CaseData): {
+    matches: boolean;
+    details: {
+      logic: 'AND' | 'OR';
+      conditionResults: {
+        field: string;
+        operator: string;
+        value: any;
+        fieldValue: any;
+        result: boolean;
+      }[];
+    };
+  } {
+    if (!conditions.conditions || conditions.conditions.length === 0) {
+      return {
+        matches: false,
+        details: {
+          logic: conditions.logic || 'AND',
+          conditionResults: []
+        }
+      };
+    }
+
+    const conditionResults = conditions.conditions.map(condition => {
+      const fieldValue = this.getFieldValueInternal(condition.field, caseData);
+      const result = this.evaluateCondition(condition, caseData);
+      
+      return {
+        field: condition.field,
+        operator: condition.operator,
+        value: condition.value,
+        fieldValue,
+        result
+      };
+    });
+
+    // Apply logic operator
+    const matches = conditions.logic === 'OR' 
+      ? conditionResults.some(r => r.result)
+      : conditionResults.every(r => r.result);
+
+    return {
+      matches,
+      details: {
+        logic: conditions.logic || 'AND',
+        conditionResults
+      }
+    };
   }
 
   /**
