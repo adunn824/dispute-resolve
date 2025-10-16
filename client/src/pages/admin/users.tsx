@@ -148,8 +148,9 @@ export default function UsersManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "Success", description: "User deleted successfully" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
+    onError: (error: any) => {
+      const errorMessage = error?.error || error?.message || "Failed to delete user";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
