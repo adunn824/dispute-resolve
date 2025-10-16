@@ -300,36 +300,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/cases/:id - Delete a case (requires canDelete permission)
-  app.delete("/api/cases/:id", requireAuth, async (req: any, res) => {
+  // DELETE /api/cases/:id - Delete a case (admin only)
+  app.delete("/api/cases/:id", requireRole("admin"), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user?.id;
 
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
-
-      // Check if user has permission to delete
-      checkUserPermissions.canDelete(req.user);
-
-      // Get the case to check permissions
+      // Get the case to verify it exists
       const existingCase = await storage.getCase(id);
       if (!existingCase) {
         return res.status(404).json({ error: "Case not found" });
       }
-
-      // Check lender access permission
-      checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
 
       // Delete the case (cascade deletes related data)
       await storage.deleteCase(id);
       
       res.json({ message: "Case deleted successfully" });
     } catch (error) {
-      if (error instanceof AuthorizationError) {
-        return res.status(403).json({ error: error.message });
-      }
       console.error("Failed to delete case:", error);
       if (error instanceof Error && error.message === "Case not found") {
         return res.status(404).json({ error: "Case not found" });
