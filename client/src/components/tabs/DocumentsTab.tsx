@@ -81,15 +81,46 @@ export function DocumentsTab({ caseId }: DocumentsTabProps) {
   // Download document mutation
   const downloadMutation = useMutation({
     mutationFn: async (documentId: string) => {
-      const response = await apiRequest(`/api/documents/${documentId}/download`, "GET");
-      return response;
+      const response = await fetch(`/api/documents/${documentId}/download`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Download failed' }));
+        throw new Error(errorData.message || 'Failed to download document');
+      }
+
+      // Get filename from Content-Disposition header if available
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'download';
+      if (contentDisposition) {
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a download link and trigger it
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      return { filename };
     },
-    onSuccess: (data: any) => {
-      toast({ title: "Download", description: `Download prepared for ${data.fileName || 'file'}` });
-      // In a real implementation, we would handle the actual file download
+    onSuccess: (data) => {
+      toast({ title: "Success", description: `Downloaded ${data.filename}` });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to prepare download", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to download document", variant: "destructive" });
     },
   });
 
