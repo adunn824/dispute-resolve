@@ -355,7 +355,10 @@ export default function BusinessRulesManagement() {
     mutationFn: (data: ChecklistAssignmentRuleForm) => 
       apiRequest("POST", "/api/checklist-assignment-rules", {
         ...data,
-        conditions: JSON.stringify(data.conditions)
+        conditions: JSON.stringify({
+          logic: "AND",
+          conditions: data.conditions
+        })
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/checklist-assignment-rules"] });
@@ -372,7 +375,10 @@ export default function BusinessRulesManagement() {
     mutationFn: ({ id, data }: { id: string; data: ChecklistAssignmentRuleForm }) => 
       apiRequest("PUT", `/api/checklist-assignment-rules/${id}`, {
         ...data,
-        conditions: JSON.stringify(data.conditions)
+        conditions: JSON.stringify({
+          logic: "AND",
+          conditions: data.conditions
+        })
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/checklist-assignment-rules"] });
@@ -476,12 +482,22 @@ export default function BusinessRulesManagement() {
   const handleEditChecklistRule = (rule: any) => {
     setEditingChecklistRule(rule);
     
-    // Parse conditions from JSON string to array
+    // Parse conditions from JSON string and extract conditions array from RuleConditions format
     let parsedConditions;
     try {
-      parsedConditions = typeof rule.conditions === 'string' 
+      const rawConditions = typeof rule.conditions === 'string' 
         ? JSON.parse(rule.conditions) 
-        : rule.conditions || [{ field: "details", operator: "contains", value: "" }];
+        : rule.conditions;
+      
+      // Check if it's the new RuleConditions format {logic, conditions}
+      if (rawConditions && typeof rawConditions === 'object' && 'conditions' in rawConditions) {
+        parsedConditions = rawConditions.conditions;
+      } else if (Array.isArray(rawConditions)) {
+        // Old format: plain array
+        parsedConditions = rawConditions;
+      } else {
+        parsedConditions = [{ field: "details", operator: "contains", value: "" }];
+      }
     } catch (error) {
       console.error("Error parsing rule conditions:", error);
       parsedConditions = [{ field: "details", operator: "contains", value: "" }];
