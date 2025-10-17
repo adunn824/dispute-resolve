@@ -156,8 +156,14 @@ export const cases = pgTable("cases", {
   
   // Email intake fields
   emailMetadata: jsonb("email_metadata").$type<{
-    from: string;
-    to?: string;
+    from?: {
+      name?: string;
+      email: string;
+    };
+    to?: Array<{
+      name?: string;
+      email: string;
+    }>;
     subject?: string;
     receivedDate?: string;
     messageId?: string;

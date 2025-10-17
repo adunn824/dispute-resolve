@@ -113,7 +113,7 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
       caseOriginationId: "",
       caseTypeId: "",
       categoryId: "",
-      customerName: caseItem.emailMetadata?.from || "",
+      customerName: caseItem.emailMetadata?.from?.name || "",
       customerState: "",
       loanId: "",
       lenderId: "",
@@ -206,12 +206,18 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
             <div className="text-sm space-y-1">
               <div className="flex gap-2">
                 <span className="text-muted-foreground">From:</span>
-                <span className="font-medium">{caseItem.emailMetadata?.from || "Unknown"}</span>
+                <span className="font-medium">
+                  {caseItem.emailMetadata?.from?.name || caseItem.emailMetadata?.from?.email || "Unknown"}
+                </span>
               </div>
               {caseItem.emailMetadata?.to && (
                 <div className="flex gap-2">
                   <span className="text-muted-foreground">To:</span>
-                  <span className="font-medium">{caseItem.emailMetadata.to}</span>
+                  <span className="font-medium">
+                    {Array.isArray(caseItem.emailMetadata.to) 
+                      ? caseItem.emailMetadata.to.map(t => t.name || t.email).join(', ')
+                      : caseItem.emailMetadata.to}
+                  </span>
                 </div>
               )}
             </div>
