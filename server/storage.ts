@@ -113,7 +113,7 @@ import {
   type InsertEmailTemplate
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ilike, or, sql, inArray, gte } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, inArray, gte, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { RuleEvaluator, findMatchingPriorityRule, findMatchingTagRules, type CaseData } from "./rule-engine";
 import session from "express-session";
@@ -915,7 +915,13 @@ export class DatabaseStorage implements IStorage {
     if (filters?.caseTypeId) conditions.push(eq(cases.caseTypeId, filters.caseTypeId));
     if (filters?.categoryId) conditions.push(eq(cases.categoryId, filters.categoryId));
     if (filters?.customerId) conditions.push(eq(cases.customerId, filters.customerId));
-    if (filters?.assignedToUserId) conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
+    if (filters?.assignedToUserId) {
+      if (filters.assignedToUserId === 'unassigned') {
+        conditions.push(isNull(cases.assignedToUserId));
+      } else {
+        conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
+      }
+    }
     
     // If filtering by priority value, add condition using inArray with subquery
     if (filters?.priorityValue) {
@@ -967,7 +973,13 @@ export class DatabaseStorage implements IStorage {
     if (filters?.categoryId) conditions.push(eq(cases.categoryId, filters.categoryId));
     if (filters?.caseOriginationId) conditions.push(eq(cases.caseOriginationId, filters.caseOriginationId));
     if (filters?.customerId) conditions.push(eq(cases.customerId, filters.customerId));
-    if (filters?.assignedToUserId) conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
+    if (filters?.assignedToUserId) {
+      if (filters.assignedToUserId === 'unassigned') {
+        conditions.push(isNull(cases.assignedToUserId));
+      } else {
+        conditions.push(eq(cases.assignedToUserId, filters.assignedToUserId));
+      }
+    }
     
     // If filtering by priority value, add condition using inArray with subquery
     if (filters?.priorityValue) {
