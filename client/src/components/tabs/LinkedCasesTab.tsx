@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Link2, Link2Off, Search, ExternalLink, Sparkles, ArrowRight } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Link2, Link2Off, Search, ExternalLink, Sparkles, ArrowRight, Check, ChevronsUpDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { Case } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
 interface LinkedCasesTabProps {
   caseId: string;
@@ -21,8 +23,15 @@ interface LinkedCase extends Case {
   linkedAt: Date;
 }
 
+interface SearchResult extends Case {
+  customerName?: string;
+  lenderName?: string;
+}
+
 export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
-  const [searchCaseId, setSearchCaseId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCase, setSelectedCase] = useState<SearchResult | null>(null);
+  const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -36,8 +45,15 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
     queryKey: ["/api/cases", caseId, "potential-matches"],
   });
 
+  // Search for cases as user types
+  const { data: searchResultsData, isLoading: isSearching } = useQuery<{data: SearchResult[]}>({
+    queryKey: ["/api/cases/search", searchQuery],
+    enabled: searchQuery.trim().length > 0,
+  });
+
   const linkedCases = linkedCasesData?.data || [];
   const potentialMatches = potentialMatchesData?.data || [];
+  const searchResults = searchResultsData?.data || [];
 
   // Mutation for linking cases
   const linkCasesMutation = useMutation({
@@ -46,7 +62,8 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "linked-cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "potential-matches"] });
-      setSearchCaseId("");
+      setSelectedCase(null);
+      setSearchQuery("");
       toast({
         title: "Cases Linked",
         description: "The cases have been successfully linked.",
@@ -82,18 +99,18 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
     },
   });
 
-  const handleLinkBySearch = () => {
-    if (!searchCaseId.trim()) {
+  const handleLinkCase = () => {
+    if (!selectedCase) {
       toast({
         title: "Error",
-        description: "Please enter a case ID",
+        description: "Please select a case",
         variant: "destructive",
       });
       return;
     }
 
     // Prevent self-linking (normalize for comparison)
-    if (searchCaseId.trim().toLowerCase() === caseId.trim().toLowerCase()) {
+    if (selectedCase.id.trim().toLowerCase() === caseId.trim().toLowerCase()) {
       toast({
         title: "Error",
         description: "Cannot link a case to itself",
@@ -102,7 +119,13 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
       return;
     }
 
-    linkCasesMutation.mutate(searchCaseId.trim());
+    linkCasesMutation.mutate(selectedCase.id);
+  };
+
+  const handleSelectCase = (searchCase: SearchResult) => {
+    setSelectedCase(searchCase);
+    setOpen(false);
+    setSearchQuery("");
   };
 
   const handleLinkMatch = (matchCaseId: string) => {
@@ -140,7 +163,7 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Link by Case ID Search */}
+      {/* Link by Case Search */}
       <Card data-testid="card-link-case">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -148,21 +171,84 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
             Link a Case
           </CardTitle>
           <CardDescription>
-            Enter a case ID to create a link between this case and another case
+            Search for a case by case number, customer name, or loan ID
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
-            <Input
-              placeholder="Enter case ID..."
-              value={searchCaseId}
-              onChange={(e) => setSearchCaseId(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLinkBySearch()}
-              data-testid="input-search-case-id"
-            />
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="flex-1 justify-between"
+                  data-testid="button-search-cases"
+                >
+                  {selectedCase ? (
+                    <span className="truncate">
+                      Case #{selectedCase.caseNumber} - {selectedCase.customerName || 'Unknown Customer'}
+                    </span>
+                  ) : (
+                    "Search by case number, name, or loan ID..."
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[500px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Type case number, customer name, or loan ID..."
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                    data-testid="input-search-cases"
+                  />
+                  <CommandList>
+                    {searchQuery.trim().length === 0 ? (
+                      <CommandEmpty>Start typing to search for cases...</CommandEmpty>
+                    ) : isSearching ? (
+                      <CommandEmpty>Searching...</CommandEmpty>
+                    ) : searchResults.length === 0 ? (
+                      <CommandEmpty>No cases found.</CommandEmpty>
+                    ) : (
+                      <CommandGroup>
+                        {searchResults.map((result) => (
+                          <CommandItem
+                            key={result.id}
+                            value={result.id}
+                            onSelect={() => handleSelectCase(result)}
+                            data-testid={`search-result-${result.id}`}
+                            className="flex flex-col items-start gap-1 py-3"
+                          >
+                            <div className="flex items-center gap-2 w-full">
+                              <Check
+                                className={cn(
+                                  "h-4 w-4 shrink-0",
+                                  selectedCase?.id === result.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="font-medium">Case #{result.caseNumber}</span>
+                                <Badge variant={getStatusBadgeVariant(result.status)}>
+                                  {result.status}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="ml-6 text-sm text-muted-foreground">
+                              {result.customerName && <div>Customer: {result.customerName}</div>}
+                              {result.loanId && <div>Loan: {result.loanId}</div>}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <Button 
-              onClick={handleLinkBySearch}
-              disabled={linkCasesMutation.isPending || !searchCaseId.trim()}
+              onClick={handleLinkCase}
+              disabled={linkCasesMutation.isPending || !selectedCase}
               data-testid="button-link-case"
             >
               {linkCasesMutation.isPending ? (
