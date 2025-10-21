@@ -197,6 +197,7 @@ export const caseRelationships = pgTable("case_relationships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   caseId: varchar("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
   linkedCaseId: varchar("linked_case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+  linkType: text("link_type").notNull().default("related"),
   createdByUserId: varchar("created_by_user_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

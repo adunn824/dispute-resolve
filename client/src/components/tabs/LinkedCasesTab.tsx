@@ -92,6 +92,16 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
       return;
     }
 
+    // Prevent self-linking (normalize for comparison)
+    if (searchCaseId.trim().toLowerCase() === caseId.trim().toLowerCase()) {
+      toast({
+        title: "Error",
+        description: "Cannot link a case to itself",
+        variant: "destructive",
+      });
+      return;
+    }
+
     linkCasesMutation.mutate(searchCaseId.trim());
   };
 

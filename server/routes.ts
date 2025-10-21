@@ -356,6 +356,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "linkedCaseId is required" });
       }
 
+      // Prevent self-linking (normalize both IDs for comparison)
+      const normalizedId = id.trim().toLowerCase();
+      const normalizedLinkedId = linkedCaseId.trim().toLowerCase();
+      if (normalizedId === normalizedLinkedId) {
+        return res.status(400).json({ error: "Cannot link a case to itself" });
+      }
+
       // Verify both cases exist
       const currentCase = await storage.getCase(id);
       const targetCase = await storage.getCase(linkedCaseId);
@@ -678,11 +685,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 2: Find appropriate priority rule for the category
       const priorityRules = await storage.getPriorityRules(intakeData.categoryId);
       let selectedPriorityRule = priorityRules.find(rule => {
-        const conditions = typeof rule.conditions === 'string' 
-          ? JSON.parse(rule.conditions) 
-          : rule.conditions;
+        const conditions = rule.conditions;
         return conditions && typeof conditions === 'object' && 
-          'default' in conditions && conditions.default === true;
+          'default' in conditions && (conditions as any).default === true;
       });
       
       // If no default rule found, use the first available rule
