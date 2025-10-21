@@ -193,6 +193,14 @@ export const cases = pgTable("cases", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const caseRelationships = pgTable("case_relationships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+  linkedCaseId: varchar("linked_case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+  createdByUserId: varchar("created_by_user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const checklistItems = pgTable("checklist_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   caseId: varchar("case_id").notNull().references(() => cases.id),
@@ -558,6 +566,22 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
   flags: many(flags),
   auditLogs: many(auditLogs),
   caseNotes: many(caseNotes),
+  caseRelationships: many(caseRelationships),
+}));
+
+export const caseRelationshipsRelations = relations(caseRelationships, ({ one }) => ({
+  case: one(cases, {
+    fields: [caseRelationships.caseId],
+    references: [cases.id],
+  }),
+  linkedCase: one(cases, {
+    fields: [caseRelationships.linkedCaseId],
+    references: [cases.id],
+  }),
+  createdByUser: one(users, {
+    fields: [caseRelationships.createdByUserId],
+    references: [users.id],
+  }),
 }));
 
 export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
@@ -777,6 +801,11 @@ export const insertCaseSchema = createInsertSchema(cases).omit({
   updatedAt: true,
 });
 
+export const insertCaseRelationshipSchema = createInsertSchema(caseRelationships).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({
   id: true,
 });
@@ -923,6 +952,9 @@ export type InsertLender = z.infer<typeof insertLenderSchema>;
 
 export type Case = typeof cases.$inferSelect;
 export type InsertCase = z.infer<typeof insertCaseSchema>;
+
+export type CaseRelationship = typeof caseRelationships.$inferSelect;
+export type InsertCaseRelationship = z.infer<typeof insertCaseRelationshipSchema>;
 
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
