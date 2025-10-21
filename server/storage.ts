@@ -1,7 +1,8 @@
 import { 
   users, 
   customers, 
-  cases, 
+  cases,
+  caseRelationships,
   checklistItems, 
   documents, 
   resolutions, 
@@ -45,6 +46,8 @@ import {
   type InsertLender,
   type Case,
   type InsertCase,
+  type CaseRelationship,
+  type InsertCaseRelationship,
   type ChecklistItem,
   type InsertChecklistItem,
   type Document,
@@ -207,6 +210,12 @@ export interface IStorage {
   deleteCase(id: string): Promise<void>;
   getAvailableAssignees(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
+  
+  // Case relationship methods
+  createCaseRelationship(relationship: InsertCaseRelationship): Promise<CaseRelationship>;
+  deleteCaseRelationship(caseId: string, linkedCaseId: string): Promise<void>;
+  getLinkedCases(caseId: string): Promise<(Case & { linkType: string; linkedAt: Date })[]>;
+  findPotentialMatches(caseId: string): Promise<Case[]>;
   
   // Email intake methods
   createEmailIntakeCase(emailData: {
@@ -1404,6 +1413,14 @@ export class DatabaseStorage implements IStorage {
     // Delete audit logs
     await db.delete(auditLogs).where(eq(auditLogs.caseId, id));
     
+    // Delete case relationships (bidirectional)
+    await db.delete(caseRelationships).where(
+      or(
+        eq(caseRelationships.caseId, id),
+        eq(caseRelationships.linkedCaseId, id)
+      )
+    );
+    
     // Finally, delete the case itself
     const result = await db.delete(cases).where(eq(cases.id, id)).returning();
     
@@ -1426,6 +1443,122 @@ export class DatabaseStorage implements IStorage {
     // Return all users regardless of role or status
     return await db.select().from(users)
       .orderBy(asc(users.name));
+  }
+
+  // Case relationship methods
+  async createCaseRelationship(relationship: InsertCaseRelationship): Promise<CaseRelationship> {
+    const [newRelationship] = await db
+      .insert(caseRelationships)
+      .values(relationship)
+      .returning();
+    
+    return newRelationship;
+  }
+
+  async deleteCaseRelationship(caseId: string, linkedCaseId: string): Promise<void> {
+    // Delete the bidirectional relationship
+    await db
+      .delete(caseRelationships)
+      .where(
+        or(
+          and(
+            eq(caseRelationships.caseId, caseId),
+            eq(caseRelationships.linkedCaseId, linkedCaseId)
+          ),
+          and(
+            eq(caseRelationships.caseId, linkedCaseId),
+            eq(caseRelationships.linkedCaseId, caseId)
+          )
+        )
+      );
+  }
+
+  async getLinkedCases(caseId: string): Promise<(Case & { linkType: string; linkedAt: Date })[]> {
+    // Find all relationships where this case is involved (bidirectional)
+    const relationships = await db
+      .select()
+      .from(caseRelationships)
+      .where(
+        or(
+          eq(caseRelationships.caseId, caseId),
+          eq(caseRelationships.linkedCaseId, caseId)
+        )
+      );
+
+    if (relationships.length === 0) {
+      return [];
+    }
+
+    // Extract linked case IDs
+    const linkedCaseIds = relationships.map(rel => 
+      rel.caseId === caseId ? rel.linkedCaseId : rel.caseId
+    );
+
+    // Fetch the linked cases
+    const linkedCases = await db
+      .select()
+      .from(cases)
+      .where(inArray(cases.id, linkedCaseIds));
+
+    // Map cases with their relationship info
+    return linkedCases.map(linkedCase => {
+      const relationship = relationships.find(rel => 
+        rel.caseId === linkedCase.id || rel.linkedCaseId === linkedCase.id
+      )!;
+      
+      return {
+        ...linkedCase,
+        linkType: relationship.linkType,
+        linkedAt: relationship.createdAt
+      };
+    });
+  }
+
+  async findPotentialMatches(caseId: string): Promise<Case[]> {
+    // Get the current case
+    const currentCase = await this.getCase(caseId);
+    if (!currentCase) {
+      return [];
+    }
+
+    // Get the customer info for the current case
+    const customer = await this.getCustomer(currentCase.customerId);
+    if (!customer) {
+      return [];
+    }
+
+    // Find potential matching cases based on:
+    // 1. Same customer
+    // 2. Same loan ID (if exists)
+    // 3. Similar contact information (email/phone from customer or case)
+    const conditions = [];
+
+    // Same customer
+    conditions.push(eq(cases.customerId, currentCase.customerId));
+
+    // Same loan ID (if it exists)
+    if (currentCase.loanId) {
+      conditions.push(eq(cases.loanId, currentCase.loanId));
+    }
+
+    // Exclude the current case
+    const potentialMatches = await db
+      .select()
+      .from(cases)
+      .where(
+        and(
+          or(...conditions),
+          sql`${cases.id} != ${caseId}`
+        )
+      )
+      .orderBy(desc(cases.createdAt))
+      .limit(50); // Limit to 50 potential matches
+
+    // Filter out already linked cases
+    const alreadyLinked = await this.getLinkedCases(caseId);
+    const linkedIds = new Set(alreadyLinked.map(c => c.id));
+
+    return potentialMatches.filter(c => !linkedIds.has(c.id));
   }
 
   // Email intake methods
