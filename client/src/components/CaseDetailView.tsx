@@ -11,6 +11,7 @@ import { ResolutionTab } from "./tabs/ResolutionTab";
 import { AuditTab } from "./tabs/AuditTab";
 import { CaseNotesTab } from "./tabs/CaseNotesTab";
 import { EmailHistoryTab } from "./tabs/EmailHistoryTab";
+import { LinkedCasesTab } from "./tabs/LinkedCasesTab";
 import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit, Mail, Paperclip, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1148,9 +1149,10 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       {/* Tabs (only when not pending intake) */}
       {!isPendingIntake && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="checklist" data-testid="tab-checklist">Checklist</TabsTrigger>
             <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+            <TabsTrigger value="linked" data-testid="tab-linked">Linked Cases</TabsTrigger>
             <TabsTrigger value="emails" data-testid="tab-emails">
               <Mail className="h-4 w-4 mr-2" />
               Emails
@@ -1169,6 +1171,10 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
           <TabsContent value="documents" className="mt-6">
             <DocumentsTab caseId={caseId} />
+          </TabsContent>
+
+          <TabsContent value="linked" className="mt-6">
+            <LinkedCasesTab caseId={caseId} />
           </TabsContent>
 
           <TabsContent value="emails" className="mt-6">
