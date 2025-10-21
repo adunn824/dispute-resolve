@@ -32,6 +32,7 @@ Preferred communication style: Simple, everyday language.
 - **Email History**: Dedicated "Emails" tab in case details displaying chronological communication history, including sender, recipients, subject, body preview, template usage, and attachments, sourced from audit logs.
 - **Case Editing**: Comprehensive dialog for editing all case creation fields, with dynamic dropdowns, customer management (find/create), and audit trail logging.
 - **Database Sync System**: Admin interface (`/admin/database-sync`) to sync development database data to production, handling foreign key constraints, ensuring data integrity, and providing progress feedback.
+- **Case Linking**: Bidirectional relationship tracking between related cases with manual search linking and automatic potential match detection. Features normalized self-linking prevention, permission-based access control, audit trail logging, and navigation between linked cases via dedicated "Linked Cases" tab.
 
 ### Feature Specifications
 - **Dynamic Checklists**: Single, unified `reusableChecklistTemplates` system for all templates, automatically assigned based on category or business rules. Supports six field types (Checkbox, Dropdown, Text, Number, Date, File) with dynamic configuration. Rules require at least one condition to match (empty conditions do not auto-apply). Visual rule match display shows which templates are active and why, including per-condition evaluation results.
