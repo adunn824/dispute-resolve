@@ -341,6 +341,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/cases/:id/link - Link a case to another case
+  app.post("/api/cases/:id/link", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { linkedCaseId, linkType } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      if (!linkedCaseId) {
+        return res.status(400).json({ error: "linkedCaseId is required" });
+      }
+
+      // Verify both cases exist
+      const currentCase = await storage.getCase(id);
+      const targetCase = await storage.getCase(linkedCaseId);
+
+      if (!currentCase) {
+        return res.status(404).json({ error: "Current case not found" });
+      }
+
+      if (!targetCase) {
+        return res.status(404).json({ error: "Target case not found" });
+      }
+
+      // Check permissions for both cases
+      checkUserPermissions.hasLenderAccess(req.user, currentCase.lenderId);
+      checkUserPermissions.hasLenderAccess(req.user, targetCase.lenderId);
+
+      // Create the relationship
+      const relationship = await storage.createCaseRelationship({
+        caseId: id,
+        linkedCaseId,
+        linkType: linkType || 'related',
+        createdByUserId: userId
+      });
+
+      // Log the action in audit log
+      await storage.createAuditLog({
+        caseId: id,
+        actorUserId: userId,
+        action: 'case_linked',
+        details: {
+          linkedCaseId,
+          linkType: linkType || 'related',
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      res.json({ data: relationship });
+    } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("Failed to link cases:", error);
+      res.status(500).json({ error: "Failed to link cases" });
+    }
+  });
+
+  // DELETE /api/cases/:id/link/:linkedCaseId - Unlink two cases
+  app.delete("/api/cases/:id/link/:linkedCaseId", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id, linkedCaseId } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Verify both cases exist
+      const currentCase = await storage.getCase(id);
+      const targetCase = await storage.getCase(linkedCaseId);
+
+      if (!currentCase) {
+        return res.status(404).json({ error: "Current case not found" });
+      }
+
+      if (!targetCase) {
+        return res.status(404).json({ error: "Target case not found" });
+      }
+
+      // Check permissions for both cases
+      checkUserPermissions.hasLenderAccess(req.user, currentCase.lenderId);
+      checkUserPermissions.hasLenderAccess(req.user, targetCase.lenderId);
+
+      // Delete the relationship
+      await storage.deleteCaseRelationship(id, linkedCaseId);
+
+      // Log the action in audit log
+      await storage.createAuditLog({
+        caseId: id,
+        actorUserId: userId,
+        action: 'case_unlinked',
+        details: {
+          linkedCaseId,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      res.json({ message: "Cases unlinked successfully" });
+    } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("Failed to unlink cases:", error);
+      res.status(500).json({ error: "Failed to unlink cases" });
+    }
+  });
+
+  // GET /api/cases/:id/linked-cases - Get all cases linked to this case
+  app.get("/api/cases/:id/linked-cases", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get the case to check lender access permission
+      const caseRecord = await storage.getCase(id);
+      if (!caseRecord) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+
+      // Check lender access permission
+      checkUserPermissions.hasLenderAccess(req.user, caseRecord.lenderId);
+
+      const linkedCases = await storage.getLinkedCases(id);
+      res.json({ data: linkedCases });
+    } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("Failed to get linked cases:", error);
+      res.status(500).json({ error: "Failed to get linked cases" });
+    }
+  });
+
+  // GET /api/cases/:id/potential-matches - Find potential matching cases
+  app.get("/api/cases/:id/potential-matches", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get the case to check lender access permission
+      const caseRecord = await storage.getCase(id);
+      if (!caseRecord) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+
+      // Check lender access permission
+      checkUserPermissions.hasLenderAccess(req.user, caseRecord.lenderId);
+
+      const potentialMatches = await storage.findPotentialMatches(id);
+      res.json({ data: potentialMatches });
+    } catch (error) {
+      if (error instanceof AuthorizationError) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("Failed to find potential matches:", error);
+      res.status(500).json({ error: "Failed to find potential matches" });
+    }
+  });
+
   // GET /api/assignees - Get available users for case assignment
   app.get("/api/assignees", requireRole(['agent', 'compliance', 'admin']), async (req: any, res) => {
     try {
