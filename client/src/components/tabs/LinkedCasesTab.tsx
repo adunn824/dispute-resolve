@@ -47,7 +47,16 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
 
   // Search for cases as user types
   const { data: searchResultsData, isLoading: isSearching } = useQuery<{data: SearchResult[]}>({
-    queryKey: ["/api/cases/search", searchQuery],
+    queryKey: ["/api/cases/search", { q: searchQuery }],
+    queryFn: async () => {
+      const response = await fetch(`/api/cases/search?q=${encodeURIComponent(searchQuery)}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      return response.json();
+    },
     enabled: searchQuery.trim().length > 0,
   });
 
