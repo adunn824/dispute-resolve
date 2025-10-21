@@ -216,6 +216,7 @@ export interface IStorage {
   deleteCaseRelationship(caseId: string, linkedCaseId: string): Promise<void>;
   getLinkedCases(caseId: string): Promise<(Case & { linkType: string; linkedAt: Date })[]>;
   findPotentialMatches(caseId: string): Promise<Case[]>;
+  searchCases(query: string, limit?: number): Promise<(Case & { customerName?: string; lenderName?: string })[]>;
   
   // Email intake methods
   createEmailIntakeCase(emailData: {
@@ -1559,6 +1560,62 @@ export class DatabaseStorage implements IStorage {
     const linkedIds = new Set(alreadyLinked.map(c => c.id));
 
     return potentialMatches.filter(c => !linkedIds.has(c.id));
+  }
+
+  async searchCases(query: string, limit: number = 10): Promise<(Case & { customerName?: string; lenderName?: string })[]> {
+    // Search by case number (exact or partial match), customer name, or loan ID
+    const trimmedQuery = query.trim();
+    
+    if (!trimmedQuery) {
+      return [];
+    }
+
+    // Try to parse as a case number (integer)
+    const caseNumber = parseInt(trimmedQuery, 10);
+    const isCaseNumber = !isNaN(caseNumber) && trimmedQuery === caseNumber.toString();
+
+    let results;
+    
+    if (isCaseNumber) {
+      // Search by case number
+      results = await db
+        .select({
+          case: cases,
+          customerName: customers.name,
+          lenderName: lenders.name,
+        })
+        .from(cases)
+        .leftJoin(customers, eq(cases.customerId, customers.id))
+        .leftJoin(lenders, eq(cases.lenderId, lenders.id))
+        .where(eq(cases.caseNumber, caseNumber))
+        .limit(limit);
+    } else {
+      // Search by customer name or loan ID (partial match)
+      results = await db
+        .select({
+          case: cases,
+          customerName: customers.name,
+          lenderName: lenders.name,
+        })
+        .from(cases)
+        .leftJoin(customers, eq(cases.customerId, customers.id))
+        .leftJoin(lenders, eq(cases.lenderId, lenders.id))
+        .where(
+          or(
+            sql`${customers.name} ILIKE ${`%${trimmedQuery}%`}`,
+            sql`${cases.loanId} ILIKE ${`%${trimmedQuery}%`}`
+          )
+        )
+        .orderBy(desc(cases.createdAt))
+        .limit(limit);
+    }
+
+    // Transform results to include customer and lender names
+    return results.map(r => ({
+      ...r.case,
+      customerName: r.customerName || undefined,
+      lenderName: r.lenderName || undefined,
+    }));
   }
 
   // Email intake methods

@@ -201,6 +201,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/cases/search - Search cases by case number, customer name, or loan ID (must come before :id route)
+  app.get("/api/cases/search", requireAuth, async (req: any, res) => {
+    try {
+      const { q } = req.query;
+      
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: "Query parameter 'q' is required" });
+      }
+
+      const results = await storage.searchCases(q, 10);
+      
+      // Filter results based on user's lender access
+      const filteredResults = req.user.restrictedLenderId
+        ? results.filter(c => c.lenderId === req.user.restrictedLenderId)
+        : results;
+      
+      res.json({ data: filteredResults });
+    } catch (error) {
+      console.error("Failed to search cases:", error);
+      res.status(500).json({ error: "Failed to search cases" });
+    }
+  });
+
   // GET /api/cases/:id - Get single case by ID with detailed information
   app.get("/api/cases/:id", requireAuth, async (req: any, res) => {
     try {
