@@ -8,6 +8,7 @@ import {
   insertCaseNoteSchema,
   insertCaseOriginationSchema,
   insertLenderSchema,
+  insertStatusSchema,
   insertDispositionSchema,
   insertSubDispositionSchema,
   insertPolicyViolationOptionSchema,
@@ -1640,6 +1641,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting policy violation option:", error);
       res.status(500).json({ message: "Failed to delete policy violation option" });
+    }
+  });
+
+  // Statuses Admin Management
+  app.get("/api/statuses", requireAuth, async (req, res) => {
+    try {
+      const statuses = await storage.getStatuses();
+      res.json({ data: statuses });
+    } catch (error) {
+      console.error("Error fetching statuses:", error);
+      res.status(500).json({ message: "Failed to fetch statuses" });
+    }
+  });
+
+  app.post("/api/statuses", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const validatedData = insertStatusSchema.parse(req.body);
+      const status = await storage.createStatus(validatedData);
+      res.status(201).json(status);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating status:", error);
+      res.status(500).json({ message: "Failed to create status" });
+    }
+  });
+
+  app.get("/api/statuses/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const status = await storage.getStatus(id);
+      if (!status) {
+        return res.status(404).json({ message: "Status not found" });
+      }
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching status:", error);
+      res.status(404).json({ message: "Status not found" });
+    }
+  });
+
+  app.patch("/api/statuses/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertStatusSchema.partial().parse(req.body);
+      const status = await storage.updateStatus(id, validatedData);
+      res.json(status);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating status:", error);
+      res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
+  app.delete("/api/statuses/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteStatus(id);
+      res.json({ message: "Status deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting status:", error);
+      
+      // Check if it's a foreign key constraint error
+      if ((error as any).code === '23503' || (error as any).message?.includes('foreign key')) {
+        return res.status(400).json({ 
+          message: "Cannot delete status because it is being referenced by existing cases. Please update or remove all references first.",
+          code: 'FOREIGN_KEY_CONSTRAINT'
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to delete status" });
     }
   });
 
