@@ -30,6 +30,7 @@ import { formatDistanceToNow } from "date-fns";
 
 interface CaseListItem {
   id: string;
+  caseNumber: number;
   caseTypeId: string;
   categoryId: string;
   customerId: string;
@@ -54,6 +55,7 @@ interface CaseListItem {
   assignedUserName?: string;
   assignedUserEmail?: string;
   assignedUserRole?: string;
+  linkedCaseNumbers?: number[];
 }
 
 interface CaseType {
@@ -441,6 +443,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Assignee</TableHead>
+                    <TableHead>Linked Cases</TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => handleSort("createdAt")}
@@ -507,6 +510,19 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-sm">Unassigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {caseItem.linkedCaseNumbers && caseItem.linkedCaseNumbers.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {caseItem.linkedCaseNumbers.map((caseNum, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs font-mono">
+                                #{caseNum}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
                       <TableCell>
