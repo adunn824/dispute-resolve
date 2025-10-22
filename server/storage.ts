@@ -10,6 +10,7 @@ import {
   auditLogs,
   caseNotes,
   caseOriginations,
+  statuses,
   caseTypes,
   caseTypeOriginations,
   categories,
@@ -62,6 +63,8 @@ import {
   type InsertCaseNote,
   type CaseOrigination,
   type InsertCaseOrigination,
+  type Status,
+  type InsertStatus,
   type CaseType,
   type InsertCaseType,
   type CaseTypeOrigination,
@@ -278,6 +281,13 @@ export interface IStorage {
   updateCaseType(id: string, updates: Partial<InsertCaseType>, originationIds?: string[]): Promise<CaseType>;
   deleteCaseType(id: string): Promise<void>;
   getCaseTypeWithOriginations(id: string): Promise<CaseType & { originations: CaseOrigination[] }>;
+  
+  // Config methods - Statuses
+  getStatuses(): Promise<Status[]>;
+  getStatus(id: string): Promise<Status | undefined>;
+  createStatus(status: InsertStatus): Promise<Status>;
+  updateStatus(id: string, updates: Partial<InsertStatus>): Promise<Status>;
+  deleteStatus(id: string): Promise<void>;
   
   // Config methods - Categories  
   getCategories(caseTypeId?: string): Promise<(Category & { caseTypes?: CaseType[] })[]>;
@@ -2233,6 +2243,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCaseType(id: string): Promise<void> {
     await db.delete(caseTypes).where(eq(caseTypes.id, id));
+  }
+
+  // Config methods - Statuses
+  async getStatuses(): Promise<Status[]> {
+    return await db.select().from(statuses).orderBy(asc(statuses.sortOrder));
+  }
+
+  async getStatus(id: string): Promise<Status | undefined> {
+    const [status] = await db.select().from(statuses).where(eq(statuses.id, id));
+    return status || undefined;
+  }
+
+  async createStatus(insertStatus: InsertStatus): Promise<Status> {
+    const [status] = await db
+      .insert(statuses)
+      .values(insertStatus)
+      .returning();
+    return status;
+  }
+
+  async updateStatus(id: string, updates: Partial<InsertStatus>): Promise<Status> {
+    const [status] = await db
+      .update(statuses)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(statuses.id, id))
+      .returning();
+    return status;
+  }
+
+  async deleteStatus(id: string): Promise<void> {
+    await db.delete(statuses).where(eq(statuses.id, id));
   }
 
   // Config methods - Categories
