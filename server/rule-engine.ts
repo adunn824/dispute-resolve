@@ -7,7 +7,7 @@ export interface CaseData {
   loanId?: string | null;
   lenderName?: string | null;
   state: string;
-  status: 'open' | 'in_progress' | 'resolved';
+  status: string; // Status code from statuses table (e.g., 'open', 'in_progress', 'resolved', 'pending_intake')
   hasRepresentative: boolean;
   representativeCompanyName?: string | null;
   representativePersonName?: string | null;
