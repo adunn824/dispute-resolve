@@ -1059,6 +1059,17 @@ export class DatabaseStorage implements IStorage {
         assignedUserName: users.name,
         assignedUserEmail: users.email,
         assignedUserRole: users.role,
+        
+        // Linked cases - get case numbers as JSON array
+        linkedCaseNumbers: sql<string[]>`
+          COALESCE(
+            (SELECT json_agg(linked_cases.case_number)
+             FROM ${caseRelationships}
+             LEFT JOIN ${cases} AS linked_cases ON ${caseRelationships.linkedCaseId} = linked_cases.id
+             WHERE ${caseRelationships.caseId} = ${cases.id}),
+            '[]'::json
+          )
+        `,
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
