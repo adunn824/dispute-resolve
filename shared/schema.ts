@@ -153,6 +153,7 @@ export const cases = pgTable("cases", {
   state: text("state").notNull(),
   details: text("details").notNull(),
   status: text("status", { enum: ["pending_intake", "open", "in_progress", "resolved"] }).notNull().default("open"),
+  statusId: varchar("status_id").references(() => statuses.id), // New reference-based status
   
   // Email intake fields
   emailMetadata: jsonb("email_metadata").$type<{
@@ -278,6 +279,19 @@ export const caseOriginations = pgTable("case_originations", {
   name: text("name").notNull().unique(),
   description: text("description"),
   externalKey: text("external_key"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const statuses = pgTable("statuses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  code: text("code").notNull().unique(), // Internal identifier like 'open', 'in_progress'
+  color: text("color").notNull().default("#3b82f6"), // Badge color
+  icon: text("icon"), // Lucide icon name (optional)
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -849,6 +863,12 @@ export const insertLenderSchema = createInsertSchema(lenders).omit({
   updatedAt: true,
 });
 
+export const insertStatusSchema = createInsertSchema(statuses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCaseTypeSchema = createInsertSchema(caseTypes).omit({
   id: true,
 });
@@ -974,6 +994,9 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type CaseNote = typeof caseNotes.$inferSelect;
 export type InsertCaseNote = z.infer<typeof insertCaseNoteSchema>;
+
+export type Status = typeof statuses.$inferSelect;
+export type InsertStatus = z.infer<typeof insertStatusSchema>;
 
 export type CaseType = typeof caseTypes.$inferSelect;
 export type InsertCaseType = z.infer<typeof insertCaseTypeSchema>;
