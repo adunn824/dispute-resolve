@@ -102,6 +102,12 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
     staleTime: 60000,
   });
 
+  const { data: statuses = [] } = useQuery({
+    queryKey: ['/api/statuses'],
+    select: (response: any) => response.data?.filter((s: any) => s.isActive) || [],
+    staleTime: 60000,
+  });
+
   // Build a map of field key to options based on endpoint
   const referenceOptions: Record<string, any[]> = {};
   Object.entries(availableFields).forEach(([fieldKey, field]: [string, any]) => {
@@ -114,6 +120,8 @@ export function RuleBuilder({ conditions, onChange, className, allowedFields }: 
         referenceOptions[fieldKey] = caseOriginations;
       } else if (field.endpoint === '/api/lenders') {
         referenceOptions[fieldKey] = lenders;
+      } else if (field.endpoint === '/api/statuses') {
+        referenceOptions[fieldKey] = statuses;
       }
     }
   });
