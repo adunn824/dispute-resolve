@@ -24,11 +24,27 @@ interface CaseSearchResult {
   assignedUserName: string | null;
 }
 
+interface Status {
+  id: string;
+  name: string;
+  code: string;
+  color?: string;
+  icon?: string;
+  isActive: boolean;
+}
+
 export default function SearchPage({ userRole = "agent" }: SearchPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Fetch statuses for filter
+  const { data: statusesData } = useQuery<{data: Status[]}>({
+    queryKey: ["/api/statuses"],
+  });
+
+  const statuses = statusesData?.data?.filter(s => s.isActive) || [];
 
   // Fetch search results when user searches
   const { data: searchResults, isLoading, error } = useQuery<{
@@ -149,9 +165,13 @@ export default function SearchPage({ userRole = "agent" }: SearchPageProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
+                  {statuses
+                    .filter((status) => status.id && status.id.trim() !== "")
+                    .map((status) => (
+                      <SelectItem key={status.id} value={status.code}>
+                        {status.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

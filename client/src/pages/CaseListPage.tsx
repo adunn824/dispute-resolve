@@ -38,7 +38,7 @@ interface CaseListItem {
   loanId?: string;
   state: string;
   details: string;
-  status: "open" | "in_progress" | "resolved";
+  status: string;
   createdAt: string;
   updatedAt: string;
   customerName: string;
@@ -81,6 +81,15 @@ interface CaseOrigination {
   id: string;
   name: string;
   description?: string;
+}
+
+interface Status {
+  id: string;
+  name: string;
+  code: string;
+  color?: string;
+  icon?: string;
+  isActive: boolean;
 }
 
 interface CaseListPageProps {
@@ -143,6 +152,11 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
     queryFn: () => apiRequest("GET", "/api/assignees")
   });
 
+  const { data: statusesData } = useQuery<{data: Status[]}>({
+    queryKey: ["/api/statuses"],
+    queryFn: () => apiRequest("GET", "/api/statuses")
+  });
+
   const { data: caseOriginationsData } = useQuery<{data: CaseOrigination[]}>({
     queryKey: ["/api/case-originations"],
     queryFn: () => apiRequest("GET", "/api/case-originations")
@@ -153,6 +167,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   const caseTypes = caseTypesData?.data || [];
   const categories = categoriesData?.data || [];
   const assignees = assigneesData?.data || [];
+  const statuses = statusesData?.data?.filter(s => s.isActive) || [];
   const caseOriginations = caseOriginationsData?.data || [];
 
   // Filter categories based on selected case type
@@ -292,9 +307,13 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
+                {statuses
+                  .filter((status) => status.id && status.id.trim() !== "")
+                  .map((status) => (
+                    <SelectItem key={status.id} value={status.code}>
+                      {status.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
 
