@@ -20,6 +20,7 @@ import KnowledgeBaseArticlePage from "./pages/KnowledgeBaseArticlePage";
 import CaseTypesManagement from "./pages/admin/case-types";
 import CaseOriginationsManagement from "./pages/admin/case-originations";
 import LendersManagement from "./pages/admin/lenders";
+import StatusesManagement from "./pages/admin/statuses";
 import ResolutionOptionsManagement from "./pages/admin/resolution-options";
 import BusinessRulesManagement from "./pages/admin/business-rules";
 import ReusableTemplatesManagement from "./pages/admin/reusable-templates";
@@ -111,6 +112,11 @@ function Router() {
       <Route path="/admin/lenders">
         <ProtectedRoute requiredRole="admin">
           <LendersManagement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/statuses">
+        <ProtectedRoute requiredRole="admin">
+          <StatusesManagement />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/resolution-options">

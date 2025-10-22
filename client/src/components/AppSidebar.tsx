@@ -61,6 +61,7 @@ export function AppSidebar({ userRole = "agent" }: AppSidebarProps) {
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "Case Assignment", url: "/admin/case-assignment", icon: UserCog },
     { title: "Lenders", url: "/admin/lenders", icon: Building },
+    { title: "Statuses", url: "/admin/statuses", icon: CheckCircle },
     { title: "Resolution Options", url: "/admin/resolution-options", icon: CheckCircle },
     { title: "System", url: "/admin/system", icon: Cog },
     { title: "Database Sync", url: "/admin/database-sync", icon: Database },

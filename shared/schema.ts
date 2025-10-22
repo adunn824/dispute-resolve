@@ -36,7 +36,7 @@ export const RULE_FIELDS = {
   'details': { type: 'text', label: 'Complaint Details', description: 'The complaint description text' },
   'loanId': { type: 'text', label: 'Loan ID', description: 'Loan identifier' },
   'state': { type: 'text', label: 'Customer State', description: 'Customer state abbreviation' },
-  'status': { type: 'enum', label: 'Case Status', description: 'Current case status', options: ['pending_intake', 'open', 'in_progress', 'resolved'] },
+  'status': { type: 'reference', label: 'Case Status', description: 'Current case status', endpoint: '/api/statuses', labelField: 'name', valueField: 'code' },
   'hasRepresentative': { type: 'boolean', label: 'Has Representative', description: 'Whether customer has POA/Attorney' },
   'representativeCompanyName': { type: 'text', label: 'Representative Company', description: 'POA/Attorney company name' },
   
