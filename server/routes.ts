@@ -947,6 +947,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/admin/seed-email-intake - Generate test email intake cases (admin only)
+  app.post("/api/admin/seed-email-intake", requireRole('admin'), async (req, res) => {
+    try {
+      const sampleEmails = [
+        {
+          from: "customer1@example.com",
+          to: "support@lender.com",
+          subject: "Complaint about recent transaction",
+          receivedDate: new Date().toISOString(),
+          messageId: `test-${Date.now()}-1@example.com`,
+          body: "I am writing to file a complaint about a recent transaction on my account. The charge of $450 was unauthorized and I would like it reversed immediately. I have contacted my bank and they advised me to reach out to you directly. Please investigate this matter urgently.",
+          bodyPreview: "I am writing to file a complaint about a recent transaction...",
+          hasAttachments: false,
+          attachmentCount: 0,
+        },
+        {
+          from: "john.smith@email.com",
+          to: "disputes@lender.com",
+          subject: "Dispute - Incorrect Interest Calculation",
+          receivedDate: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+          messageId: `test-${Date.now()}-2@example.com`,
+          body: "Dear Sir/Madam,\n\nI am disputing the interest charges applied to my loan account #12345. According to my calculations and the terms agreed upon, the interest rate should be 4.5% but I am being charged 6.2%. This appears to be an error in your system. Please review my account and provide a corrected statement.\n\nAttached are copies of my original loan documents for your reference.\n\nBest regards,\nJohn Smith",
+          bodyPreview: "I am disputing the interest charges applied to my loan account...",
+          hasAttachments: true,
+          attachmentCount: 2,
+        },
+        {
+          from: "support.request@company.org",
+          to: "complaints@lender.com",
+          subject: "RE: Account Access Issues - Case #789",
+          receivedDate: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+          messageId: `test-${Date.now()}-3@example.com`,
+          body: "Hello,\n\nI have been unable to access my online account for the past 3 days. Every time I try to log in, I receive an error message saying 'Account temporarily locked'. I have tried resetting my password multiple times but the issue persists.\n\nThis is preventing me from making my monthly payment which is due in 2 days. Please unlock my account or provide an alternative method to make my payment.\n\nThank you,\nSarah Johnson\nAccount: ****5678",
+          bodyPreview: "I have been unable to access my online account for the past 3 days...",
+          hasAttachments: false,
+          attachmentCount: 0,
+        },
+      ];
+
+      const createdCases = [];
+      for (const emailData of sampleEmails) {
+        const newCase = await storage.createEmailIntakeCase(emailData);
+        createdCases.push(newCase);
+      }
+
+      res.json({ 
+        success: true, 
+        data: createdCases,
+        message: `Successfully created ${createdCases.length} test email intake cases`
+      });
+    } catch (error) {
+      console.error("Failed to seed email intake cases:", error);
+      res.status(500).json({ error: "Failed to seed email intake cases" });
+    }
+  });
+
   // POST /api/cases/:id/complete-intake - Complete intake and activate case
   app.post("/api/cases/:id/complete-intake", requireRole(['agent', 'admin']), async (req: any, res) => {
     try {
