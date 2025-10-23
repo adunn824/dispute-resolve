@@ -168,6 +168,11 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
     queryFn: () => apiRequest("GET", "/api/case-originations")
   });
 
+  const { data: tagsData } = useQuery<{data: string[]}>({
+    queryKey: ["/api/tags"],
+    queryFn: () => apiRequest("GET", "/api/tags")
+  });
+
   const cases = casesData?.data || [];
   const pagination = casesData?.pagination;
   const caseTypes = caseTypesData?.data || [];
@@ -175,15 +180,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   const assignees = assigneesData?.data || [];
   const statuses = statusesData?.data?.filter(s => s.isActive) || [];
   const caseOriginations = caseOriginationsData?.data || [];
-
-  // Extract unique tags from all cases
-  const uniqueTags = Array.from(
-    new Set(
-      cases
-        .flatMap(c => c.tags || [])
-        .filter(tag => tag && tag.trim() !== "")
-    )
-  ).sort();
+  const uniqueTags = tagsData?.data || [];
 
   // Filter categories based on selected case type
   const filteredCategories = caseTypeFilter

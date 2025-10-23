@@ -1296,6 +1296,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/tags - Get all unique tags across all cases
+  app.get("/api/tags", requireAuth, async (req, res) => {
+    try {
+      const tags = await storage.getAllTags();
+      res.json({ data: tags });
+    } catch (error) {
+      console.error("Failed to fetch tags:", error);
+      res.status(500).json({ error: "Failed to fetch tags" });
+    }
+  });
+
   // GET /api/case-types - List case types (optionally filtered by case origination)
   app.get("/api/case-types", requireAuth, async (req, res) => {
     try {

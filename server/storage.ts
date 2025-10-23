@@ -2133,6 +2133,24 @@ export class DatabaseStorage implements IStorage {
     return caseOrigination || undefined;
   }
 
+  // Get all unique tags from all cases
+  async getAllTags(): Promise<string[]> {
+    const result = await db
+      .select({ tags: cases.tags })
+      .from(cases)
+      .where(sql`${cases.tags} IS NOT NULL AND array_length(${cases.tags}, 1) > 0`);
+    
+    // Flatten and deduplicate tags
+    const allTags = new Set<string>();
+    result.forEach(row => {
+      if (row.tags && Array.isArray(row.tags)) {
+        row.tags.forEach(tag => allTags.add(tag));
+      }
+    });
+    
+    return Array.from(allTags).sort();
+  }
+
   async createCaseOrigination(insertCaseOrigination: InsertCaseOrigination): Promise<CaseOrigination> {
     const [caseOrigination] = await db
       .insert(caseOriginations)
