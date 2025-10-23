@@ -56,6 +56,8 @@ interface CaseListItem {
   assignedUserEmail?: string;
   assignedUserRole?: string;
   linkedCaseNumbers?: number[];
+  tags?: string[];
+  slaStatus?: "on_track" | "at_risk" | "breached" | "paused" | "not_applicable" | null;
 }
 
 interface CaseType {
@@ -105,6 +107,8 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [caseOriginationFilter, setCaseOriginationFilter] = useState<string>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("");
+  const [tagFilter, setTagFilter] = useState<string>("");
+  const [slaStatusFilter, setSlaStatusFilter] = useState<string>("");
   const [sortField, setSortField] = useState<string>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,6 +130,8 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   if (categoryFilter && categoryFilter !== "all") queryParams.set("categoryId", categoryFilter);
   if (caseOriginationFilter && caseOriginationFilter !== "all") queryParams.set("caseOriginationId", caseOriginationFilter);
   if (assigneeFilter && assigneeFilter !== "all") queryParams.set("assignedToUserId", assigneeFilter);
+  if (tagFilter && tagFilter !== "all") queryParams.set("tag", tagFilter);
+  if (slaStatusFilter && slaStatusFilter !== "all") queryParams.set("slaStatus", slaStatusFilter);
 
   // Fetch cases with filters
   const { data: casesData, isLoading, error, refetch } = useQuery<{
@@ -170,6 +176,15 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   const statuses = statusesData?.data?.filter(s => s.isActive) || [];
   const caseOriginations = caseOriginationsData?.data || [];
 
+  // Extract unique tags from all cases
+  const uniqueTags = Array.from(
+    new Set(
+      cases
+        .flatMap(c => c.tags || [])
+        .filter(tag => tag && tag.trim() !== "")
+    )
+  ).sort();
+
   // Filter categories based on selected case type
   const filteredCategories = caseTypeFilter
     ? categories.filter(cat => cat.caseTypeId === caseTypeFilter)
@@ -191,6 +206,8 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
     setCategoryFilter("all");
     setCaseOriginationFilter("all");
     setAssigneeFilter("all");
+    setTagFilter("all");
+    setSlaStatusFilter("all");
     setCurrentPage(1);
   };
 
@@ -206,7 +223,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   // Reset page when filters or sorting change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, priorityFilter, caseTypeFilter, categoryFilter, caseOriginationFilter, assigneeFilter, sortField, sortDirection]);
+  }, [searchTerm, statusFilter, priorityFilter, caseTypeFilter, categoryFilter, caseOriginationFilter, assigneeFilter, tagFilter, slaStatusFilter, sortField, sortDirection]);
 
   const getPageTitle = () => {
     switch (userRole) {
@@ -220,6 +237,31 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
   };
 
   const canCreateCase = userRole === "agent" || userRole === "admin";
+
+  // Helper function to render SLA status badge
+  const renderSLABadge = (slaStatus: CaseListItem["slaStatus"]) => {
+    if (!slaStatus || slaStatus === "not_applicable") {
+      return <span className="text-muted-foreground text-xs">N/A</span>;
+    }
+
+    const statusConfig = {
+      on_track: { label: "On Track", className: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" },
+      at_risk: { label: "At Risk", className: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" },
+      breached: { label: "Breached", className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20" },
+      paused: { label: "Paused", className: "bg-muted text-muted-foreground border-muted" },
+    };
+
+    const config = statusConfig[slaStatus];
+    if (!config) {
+      return <span className="text-muted-foreground text-xs">N/A</span>;
+    }
+
+    return (
+      <Badge variant="outline" className={config.className}>
+        {config.label}
+      </Badge>
+    );
+  };
 
   if (error) {
     return (
@@ -394,6 +436,33 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                   ))}
               </SelectContent>
             </Select>
+
+            <Select value={tagFilter} onValueChange={setTagFilter}>
+              <SelectTrigger data-testid="select-tag-filter">
+                <SelectValue placeholder="All Tags" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tags</SelectItem>
+                {uniqueTags.map((tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    {tag}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={slaStatusFilter} onValueChange={setSlaStatusFilter}>
+              <SelectTrigger data-testid="select-sla-status-filter">
+                <SelectValue placeholder="All SLA Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All SLA Statuses</SelectItem>
+                <SelectItem value="on_track">On Track</SelectItem>
+                <SelectItem value="at_risk">At Risk</SelectItem>
+                <SelectItem value="breached">Breached</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -428,7 +497,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Cases Found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter || priorityFilter || caseTypeFilter || categoryFilter || caseOriginationFilter || assigneeFilter
+                {searchTerm || statusFilter || priorityFilter || caseTypeFilter || categoryFilter || caseOriginationFilter || assigneeFilter || tagFilter || slaStatusFilter
                   ? "No cases match your current filters."
                   : "No cases have been created yet."
                 }
@@ -461,6 +530,7 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                     <TableHead>Type & Category</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
+                    <TableHead>SLA Status</TableHead>
                     <TableHead>Assignee</TableHead>
                     <TableHead>Linked Cases</TableHead>
                     <TableHead 
@@ -518,6 +588,9 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                       </TableCell>
                       <TableCell>
                         <PriorityBadge priority={caseItem.priorityValue as any} />
+                      </TableCell>
+                      <TableCell data-testid={`cell-sla-status-${caseItem.id}`}>
+                        {renderSLABadge(caseItem.slaStatus)}
                       </TableCell>
                       <TableCell>
                         {caseItem.assignedUserName ? (

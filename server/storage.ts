@@ -992,6 +992,8 @@ export class DatabaseStorage implements IStorage {
     caseOriginationId?: string;
     customerId?: string;
     assignedToUserId?: string;
+    tag?: string;
+    slaStatus?: string;
     search?: string;
     sortField?: string;
     sortDirection?: string;
@@ -1020,6 +1022,16 @@ export class DatabaseStorage implements IStorage {
         .from(priorityRules)
         .where(eq(priorityRules.priorityValue, filters.priorityValue));
       conditions.push(inArray(cases.priorityRuleId, priorityRuleIds));
+    }
+    
+    // Filter by tag
+    if (filters?.tag) {
+      conditions.push(sql`${filters.tag} = ANY(${cases.tags})`);
+    }
+    
+    // Filter by SLA status
+    if (filters?.slaStatus) {
+      conditions.push(eq(cases.slaStatus, filters.slaStatus as any));
     }
 
     // Add search functionality across multiple fields

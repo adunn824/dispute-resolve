@@ -153,6 +153,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         caseOriginationId: z.string().optional(),
         customerId: z.string().optional(),
         assignedToUserId: z.string().optional(),
+        tag: z.string().optional(),
+        slaStatus: z.string().optional(),
         search: z.string().optional(),
         detailed: z.coerce.boolean().default(false),
         sortField: z.enum(["createdAt", "customerName", "status", "priorityValue", "updatedAt"]).default("createdAt"),
