@@ -12,7 +12,7 @@ import { AuditTab } from "./tabs/AuditTab";
 import { CaseNotesTab } from "./tabs/CaseNotesTab";
 import { EmailHistoryTab } from "./tabs/EmailHistoryTab";
 import { LinkedCasesTab } from "./tabs/LinkedCasesTab";
-import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit, Mail, Paperclip, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Loader2, Settings, UserCheck, MessageSquare, Edit, Mail, Paperclip, Trash2, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -1112,6 +1112,7 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
 
       {/* Normal Case Overview (only when not pending intake) */}
       {!isPendingIntake && (
+        <>
         <Card>
         <CardHeader>
           <CardTitle>Case Overview</CardTitle>
@@ -1149,8 +1150,73 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
             <p className="text-sm text-muted-foreground">Case Details</p>
             <p className="text-sm mt-1">{caseDetails.details}</p>
           </div>
+          
+          {/* Tags Section */}
+          {caseDetails.tags && caseDetails.tags.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground mb-2">Tags</p>
+              <div className="flex flex-wrap gap-2">
+                {caseDetails.tags.map((tag: string, index: number) => (
+                  <Badge key={index} variant="secondary" data-testid={`tag-${index}`}>
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+      
+      {/* SLA Tracking Card */}
+      {caseDetails.slaPolicyId && caseDetails.slaDeadline && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              SLA Tracking
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Policy</p>
+                <p className="text-sm font-medium">{caseDetails.slaPolicyName || 'N/A'}</p>
+                {caseDetails.slaPolicyDescription && (
+                  <p className="text-xs text-muted-foreground mt-1">{caseDetails.slaPolicyDescription}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Deadline</p>
+                <p className="text-sm font-medium">
+                  {new Date(caseDetails.slaDeadline).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatDistanceToNow(new Date(caseDetails.slaDeadline), { addSuffix: true })}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Status</p>
+                {caseDetails.slaStatus === 'on_track' && (
+                  <Badge variant="default" className="bg-green-600" data-testid="sla-status-on-track">
+                    On Track
+                  </Badge>
+                )}
+                {caseDetails.slaStatus === 'at_risk' && (
+                  <Badge variant="default" className="bg-yellow-600" data-testid="sla-status-at-risk">
+                    At Risk
+                  </Badge>
+                )}
+                {caseDetails.slaStatus === 'breached' && (
+                  <Badge variant="destructive" data-testid="sla-status-breached">
+                    Breached
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      </>
       )}
 
       {/* Tabs (only when not pending intake) */}
