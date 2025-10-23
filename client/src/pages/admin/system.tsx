@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Server, 
   Database, 
@@ -20,7 +22,9 @@ import {
   Shield,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
+  Mail,
+  TestTube
 } from "lucide-react";
 
 type SystemHealth = {
@@ -56,6 +60,8 @@ type SystemConfig = {
 };
 
 export default function SystemManagement() {
+  const { toast } = useToast();
+  
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
     maintenance: false,
     debugMode: false,
@@ -63,6 +69,24 @@ export default function SystemManagement() {
     sessionTimeout: 30,
     maxFileSize: 10,
     allowRegistration: false,
+  });
+
+  // Mutation for generating test email intake cases
+  const seedEmailIntakeMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/seed-email-intake"),
+    onSuccess: (data: any) => {
+      toast({
+        title: "Test Emails Created",
+        description: data.message || `Successfully created ${data.data?.length || 3} test email intake cases`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create test email intake cases",
+        variant: "destructive",
+      });
+    },
   });
 
   // Mock system health data (in real app, this would come from API)
@@ -140,6 +164,7 @@ export default function SystemManagement() {
         <TabsList>
           <TabsTrigger value="health">System Health</TabsTrigger>
           <TabsTrigger value="config">Configuration</TabsTrigger>
+          <TabsTrigger value="dev-tools">Dev Tools</TabsTrigger>
           <TabsTrigger value="logs">System Logs</TabsTrigger>
         </TabsList>
 
@@ -347,6 +372,53 @@ export default function SystemManagement() {
                 <Button data-testid="button-save-config">
                   Save Configuration
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="dev-tools" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TestTube className="w-5 h-5" />
+                Development Tools
+              </CardTitle>
+              <CardDescription>
+                Tools for testing and debugging email intake and other features
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-start justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-5 h-5 text-muted-foreground" />
+                      <h3 className="font-medium">Generate Test Emails</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Create 3 sample email intake cases for testing the email intake workflow. 
+                      These will appear in the Email Intake portal ready for processing.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => seedEmailIntakeMutation.mutate()}
+                    disabled={seedEmailIntakeMutation.isPending}
+                    data-testid="button-seed-emails"
+                  >
+                    {seedEmailIntakeMutation.isPending ? "Creating..." : "Generate Test Emails"}
+                  </Button>
+                </div>
+
+                <Alert>
+                  <Info className="w-4 h-4" />
+                  <AlertTitle>Test Data</AlertTitle>
+                  <AlertDescription>
+                    Test emails include realistic complaint and dispute scenarios with different 
+                    content types, attachments indicators, and timestamps. They will be created 
+                    with pending_intake status.
+                  </AlertDescription>
+                </Alert>
               </div>
             </CardContent>
           </Card>
