@@ -1728,6 +1728,25 @@ export class DatabaseStorage implements IStorage {
       throw new Error('No case types available - please create at least one case type first');
     }
 
+    // Get or create "Email" case origination
+    let emailOrigination = await db
+      .select()
+      .from(caseOriginations)
+      .where(eq(caseOriginations.name, 'Email'))
+      .limit(1);
+
+    if (emailOrigination.length === 0) {
+      // Create Email origination if it doesn't exist
+      const [newOrigination] = await db
+        .insert(caseOriginations)
+        .values({
+          name: 'Email',
+          description: 'Cases received via email',
+        })
+        .returning();
+      emailOrigination = [newOrigination];
+    }
+
     // Get or create a default priority rule for the category
     let priorityRule = await db
       .select()
@@ -1757,6 +1776,7 @@ export class DatabaseStorage implements IStorage {
       .values({
         caseTypeId: availableCaseTypes[0].id,
         categoryId: availableCategories[0].id,
+        caseOriginationId: emailOrigination[0].id,
         priorityRuleId: priorityRule[0].id,
         customerId: customer.id,
         state: 'Unknown',
