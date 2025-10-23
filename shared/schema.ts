@@ -189,6 +189,12 @@ export const cases = pgTable("cases", {
   representativeEmail: text("representative_email"),
   representativePhone: text("representative_phone"),
   tags: text("tags").array().default(sql`'{}'`), // Array of strings for rule-applied tags
+  
+  // SLA tracking fields
+  slaPolicyId: varchar("sla_policy_id").references(() => slaPolicies.id),
+  slaDeadline: timestamp("sla_deadline"),
+  slaStatus: text("sla_status", { enum: ["on_track", "at_risk", "breached", "paused", "not_applicable"] }).default("not_applicable"),
+  
   configVersion: integer("config_version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
