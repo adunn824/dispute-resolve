@@ -373,3 +373,84 @@ export function findMatchingTagRules(rules: Array<{ id: string, tag: string, tag
   // Return unique tags
   return Array.from(new Set(matchingTags));
 }
+
+/**
+ * Finds the first matching SLA policy for the case data
+ */
+export function findMatchingSlaPolicy(
+  policies: Array<{ 
+    id: string, 
+    priority: string, 
+    responseTimeHours: number, 
+    resolutionTimeHours: number,
+    conditions: any 
+  }>, 
+  caseData: CaseData
+): { policyId: string, responseTimeHours: number, resolutionTimeHours: number } | null {
+  const priorityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+  
+  const matchingPolicies = policies
+    .filter(policy => {
+      try {
+        return RuleEvaluator.evaluate(policy.conditions as RuleConditions, caseData);
+      } catch (error) {
+        console.error(`Error evaluating SLA policy ${policy.id}:`, error);
+        return false;
+      }
+    })
+    .sort((a, b) => (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - (priorityOrder[a.priority as keyof typeof priorityOrder] || 0));
+
+  if (matchingPolicies.length > 0) {
+    const policy = matchingPolicies[0];
+    return {
+      policyId: policy.id,
+      responseTimeHours: policy.responseTimeHours,
+      resolutionTimeHours: policy.resolutionTimeHours
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Calculates SLA deadline based on creation time and resolution hours
+ */
+export function calculateSlaDeadline(createdAt: Date, resolutionTimeHours: number): Date {
+  const deadline = new Date(createdAt);
+  deadline.setHours(deadline.getHours() + resolutionTimeHours);
+  return deadline;
+}
+
+/**
+ * Calculates SLA status based on current time and deadline
+ */
+export function calculateSlaStatus(
+  deadline: Date | null, 
+  currentStatus: string
+): 'on_track' | 'at_risk' | 'breached' | 'paused' | 'not_applicable' {
+  if (!deadline) {
+    return 'not_applicable';
+  }
+
+  // If case is resolved, return not_applicable
+  if (currentStatus === 'resolved') {
+    return 'not_applicable';
+  }
+
+  const now = new Date();
+  const timeRemaining = deadline.getTime() - now.getTime();
+  const totalTime = deadline.getTime() - now.getTime() + (7 * 24 * 60 * 60 * 1000); // Assume 7 days total
+
+  // Breached: past deadline
+  if (timeRemaining < 0) {
+    return 'breached';
+  }
+
+  // At risk: less than 25% time remaining
+  const percentRemaining = timeRemaining / totalTime;
+  if (percentRemaining < 0.25) {
+    return 'at_risk';
+  }
+
+  return 'on_track';
+}
