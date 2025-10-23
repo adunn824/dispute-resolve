@@ -121,7 +121,7 @@ import {
 import { db } from "./db";
 import { eq, and, desc, asc, ilike, or, sql, inArray, gte, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { RuleEvaluator, findMatchingPriorityRule, findMatchingTagRules, type CaseData } from "./rule-engine";
+import { RuleEvaluator, findMatchingPriorityRule, findMatchingTagRules, findMatchingSlaPolicy, calculateSlaDeadline, calculateSlaStatus, type CaseData } from "./rule-engine";
 import session from "express-session";
 import ConnectPgSession from "connect-pg-simple";
 
@@ -809,6 +809,18 @@ export class DatabaseStorage implements IStorage {
         secondaryAssignedUserName: secondaryUser.name,
         secondaryAssignedUserEmail: secondaryUser.email,
         secondaryAssignedUserRole: secondaryUser.role,
+        
+        // Tags and SLA fields
+        tags: cases.tags,
+        slaPolicyId: cases.slaPolicyId,
+        slaDeadline: cases.slaDeadline,
+        slaStatus: cases.slaStatus,
+        
+        // SLA policy fields
+        slaPolicyName: slaPolicies.name,
+        slaPolicyDescription: slaPolicies.description,
+        slaPolicyResponseTimeHours: slaPolicies.responseTimeHours,
+        slaPolicyResolutionTimeHours: slaPolicies.resolutionTimeHours,
       })
       .from(cases)
       .leftJoin(customers, eq(cases.customerId, customers.id))
@@ -817,6 +829,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(caseOriginations, eq(cases.caseOriginationId, caseOriginations.id))
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(priorityRules, eq(cases.priorityRuleId, priorityRules.id))
+      .leftJoin(slaPolicies, eq(cases.slaPolicyId, slaPolicies.id))
       .leftJoin(primaryUser, eq(cases.assignedToUserId, primaryUser.id))
       .leftJoin(secondaryUser, eq(cases.secondaryAssignedToUserId, secondaryUser.id))
       .where(eq(cases.id, id))
@@ -1070,6 +1083,12 @@ export class DatabaseStorage implements IStorage {
         assignedUserEmail: users.email,
         assignedUserRole: users.role,
         
+        // Tags and SLA fields
+        tags: cases.tags,
+        slaPolicyId: cases.slaPolicyId,
+        slaDeadline: cases.slaDeadline,
+        slaStatus: cases.slaStatus,
+        
         // Linked cases - get case numbers as JSON array
         linkedCaseNumbers: sql<string[]>`
           COALESCE(
@@ -1235,13 +1254,38 @@ export class DatabaseStorage implements IStorage {
     // Remove duplicates
     finalTags = Array.from(new Set(finalTags));
 
-    // Create the case with evaluated priority and tags
+    // Load and evaluate SLA policies for this category
+    const slaPoliciesForCategory = await db
+      .select()
+      .from(slaPolicies)
+      .where(and(
+        eq(slaPolicies.categoryId, insertCase.categoryId),
+        eq(slaPolicies.isActive, true)
+      ));
+
+    let finalSlaPolicyId: string | null = null;
+    let finalSlaDeadline: Date | null = null;
+    let finalSlaStatus: 'on_track' | 'at_risk' | 'breached' | 'paused' | 'not_applicable' = 'not_applicable';
+
+    if (slaPoliciesForCategory.length > 0) {
+      const matchingSlaPolicy = findMatchingSlaPolicy(slaPoliciesForCategory, caseData);
+      if (matchingSlaPolicy) {
+        finalSlaPolicyId = matchingSlaPolicy.policyId;
+        finalSlaDeadline = calculateSlaDeadline(now, matchingSlaPolicy.resolutionTimeHours);
+        finalSlaStatus = calculateSlaStatus(finalSlaDeadline, insertCase.status);
+      }
+    }
+
+    // Create the case with evaluated priority, tags, and SLA
     const [caseRecord] = await db
       .insert(cases)
       .values({
         ...insertCase,
         priorityRuleId: finalPriorityRuleId,
         tags: finalTags,
+        slaPolicyId: finalSlaPolicyId,
+        slaDeadline: finalSlaDeadline,
+        slaStatus: finalSlaStatus,
         updatedAt: now
       })
       .returning();
