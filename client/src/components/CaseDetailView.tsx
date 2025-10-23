@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "../lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -727,68 +728,74 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         
         {/* Compact Assignment Dropdowns */}
         {!isPendingIntake && (
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-4 items-end">
             {/* Primary Assignment */}
-            {user && user.canAssign && !user.isViewOnly ? (
-              <Select
-                value={caseDetails.assignedToUserId || "unassigned"}
-                onValueChange={handlePrimaryAssignmentChange}
-                disabled={assignCaseMutation.isPending || isAuthLoading}
-                data-testid="select-primary-assignment"
-              >
-                <SelectTrigger className="w-[180px] h-9" data-testid="trigger-primary-assignment-dropdown">
-                  <SelectValue placeholder="Assignee 1" />
-                </SelectTrigger>
-                <SelectContent data-testid="content-primary-assignment-options">
-                  <SelectItem value="unassigned" data-testid="option-primary-unassigned">Unassigned</SelectItem>
-                  {assignees.map((assignee) => (
-                    <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-primary-assignee-${assignee.id}`}>
-                      <div className="flex items-center gap-2">
-                        <span>{assignee.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {assignee.role}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="text-sm px-3 py-1.5 bg-muted rounded-md" data-testid="text-primary-assignment-readonly">
-                Assignee 1: {caseDetails.assignedUserName || "Unassigned"}
-              </div>
-            )}
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Main Assignee</Label>
+              {user && user.canAssign && !user.isViewOnly ? (
+                <Select
+                  value={caseDetails.assignedToUserId || "unassigned"}
+                  onValueChange={handlePrimaryAssignmentChange}
+                  disabled={assignCaseMutation.isPending || isAuthLoading}
+                  data-testid="select-primary-assignment"
+                >
+                  <SelectTrigger className="w-[180px] h-9" data-testid="trigger-primary-assignment-dropdown">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent data-testid="content-primary-assignment-options">
+                    <SelectItem value="unassigned" data-testid="option-primary-unassigned">Unassigned</SelectItem>
+                    {assignees.map((assignee) => (
+                      <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-primary-assignee-${assignee.id}`}>
+                        <div className="flex items-center gap-2">
+                          <span>{assignee.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {assignee.role}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm px-3 py-1.5 bg-muted rounded-md h-9 flex items-center" data-testid="text-primary-assignment-readonly">
+                  {caseDetails.assignedUserName || "Unassigned"}
+                </div>
+              )}
+            </div>
             
             {/* Secondary Assignment */}
-            {user && user.canAssign && !user.isViewOnly ? (
-              <Select
-                value={caseDetails.secondaryAssignedToUserId || "unassigned"}
-                onValueChange={handleSecondaryAssignmentChange}
-                disabled={assignCaseMutation.isPending || isAuthLoading}
-                data-testid="select-secondary-assignment"
-              >
-                <SelectTrigger className="w-[180px] h-9" data-testid="trigger-secondary-assignment-dropdown">
-                  <SelectValue placeholder="Assignee 2" />
-                </SelectTrigger>
-                <SelectContent data-testid="content-secondary-assignment-options">
-                  <SelectItem value="unassigned" data-testid="option-secondary-unassigned">Unassigned</SelectItem>
-                  {assignees.map((assignee) => (
-                    <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-secondary-assignee-${assignee.id}`}>
-                      <div className="flex items-center gap-2">
-                        <span>{assignee.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {assignee.role}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="text-sm px-3 py-1.5 bg-muted rounded-md" data-testid="text-secondary-assignment-readonly">
-                Assignee 2: {caseDetails.secondaryAssignedUserName || "Unassigned"}
-              </div>
-            )}
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Alternate Assignee</Label>
+              {user && user.canAssign && !user.isViewOnly ? (
+                <Select
+                  value={caseDetails.secondaryAssignedToUserId || "unassigned"}
+                  onValueChange={handleSecondaryAssignmentChange}
+                  disabled={assignCaseMutation.isPending || isAuthLoading}
+                  data-testid="select-secondary-assignment"
+                >
+                  <SelectTrigger className="w-[180px] h-9" data-testid="trigger-secondary-assignment-dropdown">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent data-testid="content-secondary-assignment-options">
+                    <SelectItem value="unassigned" data-testid="option-secondary-unassigned">Unassigned</SelectItem>
+                    {assignees.map((assignee) => (
+                      <SelectItem key={assignee.id} value={assignee.id} data-testid={`option-secondary-assignee-${assignee.id}`}>
+                        <div className="flex items-center gap-2">
+                          <span>{assignee.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {assignee.role}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm px-3 py-1.5 bg-muted rounded-md h-9 flex items-center" data-testid="text-secondary-assignment-readonly">
+                  {caseDetails.secondaryAssignedUserName || "Unassigned"}
+                </div>
+              )}
+            </div>
             
             {assignCaseMutation.isPending && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
