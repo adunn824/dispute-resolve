@@ -2102,7 +2102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sla-policies", requireAuth, requireRole("compliance"), async (req, res) => {
     try {
       const policies = await storage.getAllSlaPolicies();
-      res.json(policies);
+      res.json({ data: policies });
     } catch (error) {
       console.error("Error fetching SLA policies:", error);
       res.status(500).json({ message: "Failed to fetch SLA policies" });
