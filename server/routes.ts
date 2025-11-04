@@ -24,6 +24,7 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import ExcelJS from "exceljs";
+import { RuleEvaluator, type CaseData } from "./rule-engine";
 
 // Simple authentication middleware that also populates req.dbUser
 const requireAuth = (req: any, res: any, next: any) => {
@@ -832,6 +833,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
+      // Evaluate email notification rules and send automated emails in background
+      try {
+        const enrichedCaseData = await storage.getCaseWithDetails(newCase.id);
+        if (enrichedCaseData) {
+          const activeEmailRules = (await storage.getAllEmailNotificationRules()).filter(r => r.isActive);
+          const emailPromises = activeEmailRules
+            .filter(rule => RuleEvaluator.evaluate(rule.conditions as any, enrichedCaseData as any))
+            .map(rule => sendAutomatedEmail(rule, enrichedCaseData, storage).catch(err => 
+              console.error(`Failed to send automated email for rule ${rule.name}:`, err)
+            ));
+          
+          // Don't await - let emails send in background
+          Promise.all(emailPromises).catch(err => console.error('Email notification errors:', err));
+        }
+      } catch (err) {
+        console.error('Error processing email notification rules:', err);
+      }
+      
       res.status(201).json({ data: newCase });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -903,6 +922,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           newStatus: updatedCase.status
         }
       });
+      
+      // Evaluate email notification rules and send automated emails in background
+      try {
+        const enrichedCaseData = await storage.getCaseWithDetails(id);
+        if (enrichedCaseData) {
+          const activeEmailRules = (await storage.getAllEmailNotificationRules()).filter(r => r.isActive);
+          const emailPromises = activeEmailRules
+            .filter(rule => RuleEvaluator.evaluate(rule.conditions as any, enrichedCaseData as any))
+            .map(rule => sendAutomatedEmail(rule, enrichedCaseData, storage).catch(err => 
+              console.error(`Failed to send automated email for rule ${rule.name}:`, err)
+            ));
+          
+          // Don't await - let emails send in background
+          Promise.all(emailPromises).catch(err => console.error('Email notification errors:', err));
+        }
+      } catch (err) {
+        console.error('Error processing email notification rules:', err);
+      }
       
       res.json({ data: updatedCase });
     } catch (error) {
@@ -2100,6 +2137,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting checklist assignment rule:", error);
       res.status(500).json({ error: "Failed to delete checklist assignment rule" });
+    }
+  });
+
+  // Email Notification Rules Management
+  app.get("/api/email-notification-rules", requireAuth, requireRole("compliance"), async (req, res) => {
+    try {
+      const rules = await storage.getAllEmailNotificationRules();
+      res.json({ data: rules });
+    } catch (error) {
+      console.error("Error fetching email notification rules:", error);
+      res.status(500).json({ error: "Failed to fetch email notification rules" });
+    }
+  });
+
+  app.post("/api/email-notification-rules", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1, "Name is required"),
+        description: z.string().optional(),
+        categoryId: z.string().nullable().optional(),
+        senderType: z.enum(["user", "lender"]),
+        senderId: z.string().min(1, "Sender is required"),
+        recipientEmails: z.string().min(1, "At least one recipient email is required"),
+        templateId: z.string().min(1, "Email template is required"),
+        conditions: z.any(),
+        active: z.boolean().optional(),
+      });
+
+      const validatedData = schema.parse(req.body);
+      
+      const rule = await storage.createEmailNotificationRule({
+        name: validatedData.name,
+        description: validatedData.description,
+        categoryId: validatedData.categoryId,
+        senderType: validatedData.senderType,
+        senderId: validatedData.senderId,
+        recipientEmails: validatedData.recipientEmails,
+        templateId: validatedData.templateId,
+        conditions: validatedData.conditions,
+        isActive: validatedData.active !== undefined ? validatedData.active : true,
+      });
+      
+      res.status(201).json({ data: rule });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Error creating email notification rule:", error);
+      res.status(500).json({ error: "Failed to create email notification rule" });
+    }
+  });
+
+  app.put("/api/email-notification-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const schema = z.object({
+        name: z.string().min(1).optional(),
+        description: z.string().optional(),
+        categoryId: z.string().nullable().optional(),
+        senderType: z.enum(["user", "lender"]).optional(),
+        senderId: z.string().optional(),
+        recipientEmails: z.string().optional(),
+        templateId: z.string().optional(),
+        conditions: z.any().optional(),
+        active: z.boolean().optional(),
+      });
+
+      const validatedData = schema.parse(req.body);
+      
+      const rule = await storage.updateEmailNotificationRule(id, {
+        name: validatedData.name,
+        description: validatedData.description,
+        categoryId: validatedData.categoryId,
+        senderType: validatedData.senderType,
+        senderId: validatedData.senderId,
+        recipientEmails: validatedData.recipientEmails,
+        templateId: validatedData.templateId,
+        conditions: validatedData.conditions,
+        isActive: validatedData.active,
+      });
+      
+      res.json({ data: rule });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Error updating email notification rule:", error);
+      res.status(500).json({ error: "Failed to update email notification rule" });
+    }
+  });
+
+  app.delete("/api/email-notification-rules/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteEmailNotificationRule(id);
+      res.json({ data: { message: "Email notification rule deleted successfully" } });
+    } catch (error) {
+      console.error("Error deleting email notification rule:", error);
+      res.status(500).json({ error: "Failed to delete email notification rule" });
     }
   });
 
@@ -3870,6 +4006,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const data = await response.json();
     return data.access_token;
   };
+
+  // Helper function to send automated emails based on email notification rules
+  async function sendAutomatedEmail(
+    rule: any,
+    caseData: any,
+    storage: any
+  ): Promise<void> {
+    try {
+      // 1. Fetch sender based on rule.senderType
+      let sender;
+      if (rule.senderType === "user") {
+        sender = await storage.getUser(rule.senderId);
+      } else if (rule.senderType === "lender") {
+        sender = await storage.getLender(rule.senderId);
+      } else {
+        console.error(`Unknown sender type: ${rule.senderType}`);
+        return;
+      }
+
+      if (!sender) {
+        console.error(`Sender not found for rule ${rule.name}: ${rule.senderId}`);
+        return;
+      }
+
+      // 2. Validate sender has email configured
+      if (!sender.outlookEmail || !sender.outlookClientId || !sender.outlookTenantId || !sender.outlookClientSecret) {
+        console.error(`Sender ${sender.id} does not have complete Outlook email configuration for rule ${rule.name}`);
+        return;
+      }
+
+      // 3. Fetch email template
+      const template = await storage.getEmailTemplate(rule.templateId);
+      if (!template) {
+        console.error(`Email template not found for rule ${rule.name}: ${rule.templateId}`);
+        return;
+      }
+
+      // 4. Render subject and body using existing renderEmailTemplate function
+      const renderedSubject = renderEmailTemplate(template.subject, caseData);
+      const renderedBody = renderEmailTemplate(template.body, caseData);
+
+      // 5. Parse rule.recipientEmails (comma-separated) into array
+      const recipientEmails = rule.recipientEmails
+        .split(',')
+        .map((email: string) => email.trim())
+        .filter((email: string) => email.length > 0);
+
+      if (recipientEmails.length === 0) {
+        console.error(`No recipient emails found for rule ${rule.name}`);
+        return;
+      }
+
+      // 6. Get access token using getMicrosoftGraphToken
+      const accessToken = await getMicrosoftGraphToken(sender);
+
+      // 7. Build message and send via Microsoft Graph API
+      const message = {
+        message: {
+          subject: renderedSubject,
+          body: {
+            contentType: "HTML",
+            content: renderedBody
+          },
+          toRecipients: recipientEmails.map((email: string) => ({
+            emailAddress: {
+              address: email
+            }
+          }))
+        },
+        saveToSentItems: true
+      };
+
+      const graphResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${sender.outlookEmail}/sendMail`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(message)
+        }
+      );
+
+      if (!graphResponse.ok) {
+        const errorData = await graphResponse.text();
+        console.error(`Failed to send automated email for rule ${rule.name}:`, errorData);
+        return;
+      }
+
+      // 8. Log action in audit logs
+      await storage.createAuditLog({
+        caseId: caseData.id,
+        actorUserId: null, // Automated action, no user actor
+        action: 'automated_email_sent',
+        details: {
+          ruleName: rule.name,
+          ruleId: rule.id,
+          recipients: recipientEmails,
+          subject: renderedSubject,
+          senderType: rule.senderType,
+          senderId: rule.senderId,
+          senderEmail: sender.outlookEmail
+        }
+      });
+
+      console.log(`Automated email sent successfully for rule ${rule.name} to ${recipientEmails.join(', ')}`);
+    } catch (error) {
+      // 9. Log errors without throwing (don't break case creation if email fails)
+      console.error(`Error sending automated email for rule ${rule.name}:`, error);
+    }
+  }
 
   // POST /api/cases/:id/send-email - Send email using case data and template
   app.post("/api/cases/:id/send-email", requireRole(['agent', 'admin']), async (req: any, res) => {

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Zap, Clock, Tag, TestTube, ListChecks } from "lucide-react";
+import { Plus, Edit, Trash2, Zap, Clock, Tag, TestTube, ListChecks, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -72,10 +72,26 @@ const checklistAssignmentRuleSchema = z.object({
   active: z.boolean().default(true),
 });
 
+const emailRuleSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
+  description: z.string().optional(),
+  senderType: z.enum(["user", "lender"]),
+  senderId: z.string().min(1, "Sender is required"),
+  recipientEmails: z.string().min(1, "Recipient emails are required"),
+  templateId: z.string().min(1, "Email template is required"),
+  conditions: z.array(z.object({
+    field: z.string(),
+    operator: z.string(),
+    value: z.any().optional()
+  })).min(1, "At least one condition is required"),
+  active: z.boolean().default(true),
+});
+
 type PriorityRuleForm = z.infer<typeof priorityRuleSchema>;
 type TagRuleForm = z.infer<typeof tagRuleSchema>;
 type SLAPolicyForm = z.infer<typeof slaPolicySchema>;
 type ChecklistAssignmentRuleForm = z.infer<typeof checklistAssignmentRuleSchema>;
+type EmailRuleForm = z.infer<typeof emailRuleSchema>;
 
 type PriorityRule = {
   id: string;
@@ -121,16 +137,50 @@ type ReusableTemplate = {
   isActive: boolean;
 };
 
+type EmailRule = {
+  id: string;
+  name: string;
+  description: string | null;
+  senderType: "user" | "lender";
+  senderId: string;
+  recipientEmails: string;
+  templateId: string;
+  conditions: string;
+  active: boolean;
+};
+
+type User = {
+  id: string;
+  name: string;
+  outlookEmail: string | null;
+  emailEnabled: boolean;
+};
+
+type Lender = {
+  id: string;
+  name: string;
+  outlookEmail: string | null;
+  emailEnabled: boolean;
+};
+
+type EmailTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+};
+
 export default function BusinessRulesManagement() {
   const [activeTab, setActiveTab] = useState("priority");
   const [editingPriorityRule, setEditingPriorityRule] = useState<any>(null);
   const [editingTagRule, setEditingTagRule] = useState<any>(null);
   const [editingSLAPolicy, setEditingSLAPolicy] = useState<any>(null);
   const [editingChecklistRule, setEditingChecklistRule] = useState<any>(null);
+  const [editingEmailRule, setEditingEmailRule] = useState<any>(null);
   const [showPriorityDialog, setShowPriorityDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [showSLADialog, setShowSLADialog] = useState(false);
   const [showChecklistDialog, setShowChecklistDialog] = useState(false);
+  const [showEmailRuleDialog, setShowEmailRuleDialog] = useState(false);
   const { toast } = useToast();
 
   // Fetch data
@@ -154,6 +204,32 @@ export default function BusinessRulesManagement() {
 
   const { data: reusableTemplates = [], isLoading: loadingTemplates } = useQuery<ReusableTemplate[]>({
     queryKey: ["/api/reusable-checklist-templates"],
+    select: (response: any) => response.data || response || [],
+  });
+
+  const { data: emailRules = [], isLoading: loadingEmailRules } = useQuery<EmailRule[]>({
+    queryKey: ["/api/email-notification-rules"],
+    select: (response: any) => response.data || response || [],
+  });
+
+  const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    select: (response: any) => {
+      const allUsers = response.users || response || [];
+      return allUsers.filter((user: User) => user.emailEnabled === true);
+    },
+  });
+
+  const { data: lenders = [], isLoading: loadingLenders } = useQuery<Lender[]>({
+    queryKey: ["/api/lenders"],
+    select: (response: any) => {
+      const allLenders = response.data || response || [];
+      return allLenders.filter((lender: Lender) => lender.emailEnabled === true);
+    },
+  });
+
+  const { data: emailTemplates = [], isLoading: loadingEmailTemplates } = useQuery<EmailTemplate[]>({
+    queryKey: ["/api/email-templates"],
     select: (response: any) => response.data || response || [],
   });
 
@@ -198,6 +274,20 @@ export default function BusinessRulesManagement() {
     defaultValues: {
       name: "",
       description: "",
+      templateId: "",
+      conditions: [{ field: "details", operator: "contains", value: "" }],
+      active: true,
+    },
+  });
+
+  const emailRuleForm = useForm<EmailRuleForm>({
+    resolver: zodResolver(emailRuleSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      senderType: "user",
+      senderId: "",
+      recipientEmails: "",
       templateId: "",
       conditions: [{ field: "details", operator: "contains", value: "" }],
       active: true,
@@ -402,6 +492,54 @@ export default function BusinessRulesManagement() {
     },
   });
 
+  // Email Rule mutations
+  const createEmailRuleMutation = useMutation({
+    mutationFn: (data: EmailRuleForm) => 
+      apiRequest("POST", "/api/email-notification-rules", {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-notification-rules"] });
+      setShowEmailRuleDialog(false);
+      emailRuleForm.reset();
+      toast({ title: "Success", description: "Email rule created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create email rule", variant: "destructive" });
+    },
+  });
+
+  const updateEmailRuleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: EmailRuleForm }) => 
+      apiRequest("PUT", `/api/email-notification-rules/${id}`, {
+        ...data,
+        conditions: JSON.stringify(data.conditions)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-notification-rules"] });
+      setShowEmailRuleDialog(false);
+      setEditingEmailRule(null);
+      emailRuleForm.reset();
+      toast({ title: "Success", description: "Email rule updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update email rule", variant: "destructive" });
+    },
+  });
+
+  const deleteEmailRuleMutation = useMutation({
+    mutationFn: (id: string) => 
+      apiRequest("DELETE", `/api/email-notification-rules/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-notification-rules"] });
+      toast({ title: "Success", description: "Email rule deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete email rule", variant: "destructive" });
+    },
+  });
+
   // Handlers
   const handleEditPriorityRule = (rule: any) => {
     setEditingPriorityRule(rule);
@@ -543,6 +681,41 @@ export default function BusinessRulesManagement() {
     }
   };
 
+  const handleEditEmailRule = (rule: any) => {
+    setEditingEmailRule(rule);
+    
+    // Parse conditions from JSON string to array
+    let parsedConditions;
+    try {
+      parsedConditions = typeof rule.conditions === 'string' 
+        ? JSON.parse(rule.conditions) 
+        : rule.conditions || [{ field: "details", operator: "contains", value: "" }];
+    } catch (error) {
+      console.error("Error parsing rule conditions:", error);
+      parsedConditions = [{ field: "details", operator: "contains", value: "" }];
+    }
+
+    emailRuleForm.reset({
+      name: rule.name,
+      description: rule.description || "",
+      senderType: rule.senderType,
+      senderId: rule.senderId,
+      recipientEmails: rule.recipientEmails,
+      templateId: rule.templateId,
+      conditions: parsedConditions,
+      active: rule.active,
+    });
+    setShowEmailRuleDialog(true);
+  };
+
+  const onEmailRuleSubmit = (data: EmailRuleForm) => {
+    if (editingEmailRule) {
+      updateEmailRuleMutation.mutate({ id: editingEmailRule.id, data });
+    } else {
+      createEmailRuleMutation.mutate(data);
+    }
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "critical": return "destructive";
@@ -579,6 +752,10 @@ export default function BusinessRulesManagement() {
           <TabsTrigger value="sla" data-testid="tab-sla-policies">
             <Clock className="w-4 h-4 mr-2" />
             SLA Policies
+          </TabsTrigger>
+          <TabsTrigger value="email" data-testid="tab-email-rules">
+            <Mail className="w-4 h-4 mr-2" />
+            Email Automation
           </TabsTrigger>
           <TabsTrigger value="test" data-testid="tab-rule-testing">
             <TestTube className="w-4 h-4 mr-2" />
@@ -1407,6 +1584,303 @@ export default function BusinessRulesManagement() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="email" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Email Notification Rules</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Configure automatic email notifications based on case conditions
+                </p>
+              </div>
+              <Dialog open={showEmailRuleDialog} onOpenChange={setShowEmailRuleDialog}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-email-rule">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Email Rule
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingEmailRule ? "Edit Email Notification Rule" : "Create Email Notification Rule"}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <Form {...emailRuleForm}>
+                    <form onSubmit={emailRuleForm.handleSubmit(onEmailRuleSubmit)} className="space-y-4">
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Rule Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Notify User on Case Assignment" {...field} data-testid="input-email-rule-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Brief description of when this email should be sent..." 
+                                {...field}
+                                data-testid="input-email-rule-description"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="senderType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sender Type</FormLabel>
+                            <Select onValueChange={(value) => {
+                              field.onChange(value);
+                              emailRuleForm.setValue("senderId", "");
+                            }} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-sender-type">
+                                  <SelectValue placeholder="Select sender type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="user">User</SelectItem>
+                                <SelectItem value="lender">Lender</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="senderId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sender</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-sender-id">
+                                  <SelectValue placeholder="Select sender" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {emailRuleForm.watch("senderType") === "user" && users.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name} ({user.outlookEmail || "No email"})
+                                  </SelectItem>
+                                ))}
+                                {emailRuleForm.watch("senderType") === "lender" && lenders.map((lender) => (
+                                  <SelectItem key={lender.id} value={lender.id}>
+                                    {lender.name} ({lender.outlookEmail || "No email"})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="recipientEmails"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Recipient Emails</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="email@example.com, another@example.com" 
+                                {...field}
+                                data-testid="input-recipient-emails"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="templateId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email Template</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-email-template">
+                                  <SelectValue placeholder="Select an email template" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {emailTemplates.map((template) => (
+                                  <SelectItem key={template.id} value={template.id}>
+                                    {template.name} - {template.subject}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="conditions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Conditions</FormLabel>
+                            <FormControl>
+                              <RuleBuilder
+                                conditions={field.value}
+                                onChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailRuleForm.control}
+                        name="active"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>Active</FormLabel>
+                            <FormControl>
+                              <Switch 
+                                checked={field.value} 
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-email-rule-active"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => {
+                            setShowEmailRuleDialog(false);
+                            setEditingEmailRule(null);
+                            emailRuleForm.reset();
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          data-testid="button-submit-email-rule"
+                          disabled={createEmailRuleMutation.isPending || updateEmailRuleMutation.isPending}
+                        >
+                          {editingEmailRule ? "Update" : "Create"} Rule
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              {loadingEmailRules ? (
+                <div className="text-center py-4">Loading email notification rules...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Sender</TableHead>
+                      <TableHead>Recipients</TableHead>
+                      <TableHead>Template</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {emailRules.map((rule) => {
+                      const template = emailTemplates.find(t => t.id === rule.templateId);
+                      let senderInfo = "Unknown";
+                      if (rule.senderType === "user") {
+                        const user = users.find(u => u.id === rule.senderId);
+                        if (user) senderInfo = `${user.name} (User)`;
+                      } else if (rule.senderType === "lender") {
+                        const lender = lenders.find(l => l.id === rule.senderId);
+                        if (lender) senderInfo = `${lender.name} (Lender)`;
+                      }
+                      
+                      return (
+                        <TableRow key={rule.id} data-testid={`row-email-rule-${rule.id}`}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{rule.name}</div>
+                              {rule.description && (
+                                <div className="text-sm text-muted-foreground">{rule.description}</div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{senderInfo}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {rule.recipientEmails}
+                          </TableCell>
+                          <TableCell>
+                            {template ? (
+                              <Badge variant="secondary">{template.name}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">Unknown Template</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={rule.active ? "default" : "outline"}>
+                              {rule.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditEmailRule(rule)}
+                                disabled={updateEmailRuleMutation.isPending}
+                                data-testid={`button-edit-email-rule-${rule.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteEmailRuleMutation.mutate(rule.id)}
+                                disabled={deleteEmailRuleMutation.isPending}
+                                data-testid={`button-delete-email-rule-${rule.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+              {!loadingEmailRules && emailRules.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No email notification rules configured. Create your first rule to automatically send emails based on case conditions.
+                </div>
               )}
             </CardContent>
           </Card>

@@ -452,6 +452,21 @@ export const checklistAssignmentRules = pgTable("checklist_assignment_rules", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const emailNotificationRules = pgTable("email_notification_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  senderType: text("sender_type", { enum: ["user", "lender"] }).notNull(),
+  senderId: varchar("sender_id").notNull(), // ID of user or lender with email configured
+  recipientEmails: text("recipient_emails").notNull(), // Comma-separated email addresses
+  templateId: varchar("template_id").notNull(),
+  conditions: json("conditions").notNull(), // JSON for structured conditions
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const resolutionConfigs = pgTable("resolution_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   categoryId: varchar("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
@@ -920,6 +935,12 @@ export const insertChecklistAssignmentRuleSchema = createInsertSchema(checklistA
   id: true,
 });
 
+export const insertEmailNotificationRuleSchema = createInsertSchema(emailNotificationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertResolutionConfigSchema = createInsertSchema(resolutionConfigs).omit({
   id: true,
 });
@@ -1036,6 +1057,9 @@ export type InsertTagRule = z.infer<typeof insertTagRuleSchema>;
 
 export type ChecklistAssignmentRule = typeof checklistAssignmentRules.$inferSelect;
 export type InsertChecklistAssignmentRule = z.infer<typeof insertChecklistAssignmentRuleSchema>;
+
+export type EmailNotificationRule = typeof emailNotificationRules.$inferSelect;
+export type InsertEmailNotificationRule = z.infer<typeof insertEmailNotificationRuleSchema>;
 
 export type ResolutionConfig = typeof resolutionConfigs.$inferSelect;
 export type InsertResolutionConfig = z.infer<typeof insertResolutionConfigSchema>;

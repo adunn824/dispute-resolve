@@ -18,6 +18,7 @@ import {
   reusableChecklistTemplates,
   reusableChecklistItems,
   checklistAssignmentRules,
+  emailNotificationRules,
   documentRequirements,
   priorityRules,
   tagRules,
@@ -79,6 +80,8 @@ import {
   type InsertReusableChecklistItem,
   type ChecklistAssignmentRule,
   type InsertChecklistAssignmentRule,
+  type EmailNotificationRule,
+  type InsertEmailNotificationRule,
   type DocumentRequirement,
   type InsertDocumentRequirement,
   type PriorityRule,
@@ -370,6 +373,10 @@ export interface IStorage {
   getAllPriorityRules(): Promise<PriorityRule[]>;
   getAllTagRules(): Promise<TagRule[]>;
   getAllSlaPolicies(): Promise<SlaPolicy[]>;
+  getAllEmailNotificationRules(): Promise<EmailNotificationRule[]>;
+  createEmailNotificationRule(rule: InsertEmailNotificationRule): Promise<EmailNotificationRule>;
+  updateEmailNotificationRule(id: string, updates: Partial<InsertEmailNotificationRule>): Promise<EmailNotificationRule>;
+  deleteEmailNotificationRule(id: string): Promise<void>;
   
   // Dashboard methods
   getDashboardStats(): Promise<DashboardStats>;
@@ -2969,6 +2976,31 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSlaPolicies(): Promise<SlaPolicy[]> {
     return await db.select().from(slaPolicies).orderBy(asc(slaPolicies.name));
+  }
+
+  async getAllEmailNotificationRules(): Promise<EmailNotificationRule[]> {
+    return await db.select().from(emailNotificationRules).orderBy(asc(emailNotificationRules.name));
+  }
+
+  async createEmailNotificationRule(insertRule: InsertEmailNotificationRule): Promise<EmailNotificationRule> {
+    const [rule] = await db
+      .insert(emailNotificationRules)
+      .values(insertRule)
+      .returning();
+    return rule;
+  }
+
+  async updateEmailNotificationRule(id: string, updates: Partial<InsertEmailNotificationRule>): Promise<EmailNotificationRule> {
+    const [rule] = await db
+      .update(emailNotificationRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(emailNotificationRules.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteEmailNotificationRule(id: string): Promise<void> {
+    await db.delete(emailNotificationRules).where(eq(emailNotificationRules.id, id));
   }
 
   // Dashboard methods
