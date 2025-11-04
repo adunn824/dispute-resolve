@@ -4263,6 +4263,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export performance metrics to Excel
+  app.get("/api/exports/performance", requireAuth, requireRole(["compliance", "admin"]), async (req, res) => {
+    try {
+      const { startDate, endDate, userId, lenderId } = req.query;
+
+      // Get all users for performance calculation
+      const allUsers = await storage.getAllUsers();
+      const activeUsers = allUsers.filter((u: any) => u.role === 'agent' || u.role === 'compliance');
+
+      // Apply user filter if provided
+      const users = userId ? activeUsers.filter((u: any) => u.id === userId) : activeUsers;
+
+      // Build date filters
+      const dateFilters: any = {};
+      if (startDate) dateFilters.startDate = startDate as string;
+      if (endDate) dateFilters.endDate = endDate as string;
+
+      // Collect performance metrics for each user
+      const performanceData = [];
+      
+      for (const user of users) {
+        // Get cases assigned to this user
+        const allCasesForUser = await storage.getCasesWithDetails({ assignedToUserId: user.id });
+        
+        // Filter by lender if provided
+        let casesForUser = lenderId 
+          ? allCasesForUser.filter((c: any) => c.lenderId === lenderId)
+          : allCasesForUser;
+
+        // Filter by date range if provided
+        if (startDate) {
+          casesForUser = casesForUser.filter((c: any) => 
+            new Date(c.createdAt) >= new Date(startDate as string)
+          );
+        }
+        if (endDate) {
+          casesForUser = casesForUser.filter((c: any) => 
+            new Date(c.createdAt) <= new Date(endDate as string)
+          );
+        }
+
+        const totalAssigned = casesForUser.length;
+        const resolvedCases = casesForUser.filter((c: any) => c.status === 'resolved' || c.status === 'closed');
+        const resolved = resolvedCases.length;
+        const completionRate = totalAssigned > 0 ? Math.round((resolved / totalAssigned) * 100) : 0;
+
+        // Calculate average resolution time
+        let avgResolutionHours = 0;
+        if (resolvedCases.length > 0) {
+          const totalHours = resolvedCases.reduce((sum: number, c: any) => {
+            if (c.resolvedAt && c.createdAt) {
+              const hours = (new Date(c.resolvedAt).getTime() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60);
+              return sum + hours;
+            }
+            return sum;
+          }, 0);
+          avgResolutionHours = Math.round(totalHours / resolvedCases.length);
+        }
+
+        // Calculate SLA compliance
+        const casesWithSLA = casesForUser.filter((c: any) => c.slaDeadline);
+        const slaCompliant = casesWithSLA.filter((c: any) => {
+          if (!c.slaDeadline) return false;
+          const deadline = new Date(c.slaDeadline);
+          const resolvedDate = c.resolvedAt ? new Date(c.resolvedAt) : new Date();
+          return resolvedDate <= deadline;
+        });
+        const slaComplianceRate = casesWithSLA.length > 0 
+          ? Math.round((slaCompliant.length / casesWithSLA.length) * 100)
+          : 0;
+
+        // Calculate case status breakdown
+        const activeCases = casesForUser.filter((c: any) => 
+          c.status !== 'resolved' && c.status !== 'closed'
+        ).length;
+        const pendingCases = casesForUser.filter((c: any) => c.status === 'pending').length;
+        const inProgressCases = casesForUser.filter((c: any) => c.status === 'in_progress').length;
+
+        performanceData.push({
+          agentName: user.name || user.email,
+          agentEmail: user.email,
+          role: user.role,
+          totalAssigned,
+          resolved,
+          activeCases,
+          pendingCases,
+          inProgressCases,
+          completionRate,
+          avgResolutionHours,
+          slaComplianceRate,
+          casesWithSLA: casesWithSLA.length,
+          slaCompliant: slaCompliant.length,
+          lenderRestriction: user.restrictedLenderId ? 'Yes' : 'No',
+          isViewOnly: user.isViewOnly ? 'Yes' : 'No',
+          canResolve: user.canResolve ? 'Yes' : 'No',
+          canAssign: user.canAssign ? 'Yes' : 'No'
+        });
+      }
+
+      // Sort by completion rate descending
+      performanceData.sort((a, b) => b.completionRate - a.completionRate);
+
+      // Create Excel workbook
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Performance Metrics');
+
+      // Define columns with proper widths
+      worksheet.columns = [
+        { header: 'Agent Name', key: 'agentName', width: 30 },
+        { header: 'Email', key: 'agentEmail', width: 35 },
+        { header: 'Role', key: 'role', width: 12 },
+        { header: 'Total Assigned', key: 'totalAssigned', width: 15 },
+        { header: 'Resolved', key: 'resolved', width: 12 },
+        { header: 'Active Cases', key: 'activeCases', width: 12 },
+        { header: 'Pending', key: 'pendingCases', width: 10 },
+        { header: 'In Progress', key: 'inProgressCases', width: 12 },
+        { header: 'Completion Rate', key: 'completionRate', width: 18 },
+        { header: 'Avg Resolution Hours', key: 'avgResolutionHours', width: 20 },
+        { header: 'SLA Compliance', key: 'slaComplianceRate', width: 18 },
+        { header: 'Cases with SLA', key: 'casesWithSLA', width: 15 },
+        { header: 'SLA Compliant', key: 'slaCompliant', width: 15 },
+        { header: 'Lender Restricted', key: 'lenderRestriction', width: 18 },
+        { header: 'View Only', key: 'isViewOnly', width: 12 },
+        { header: 'Can Resolve', key: 'canResolve', width: 12 },
+        { header: 'Can Assign', key: 'canAssign', width: 12 },
+      ];
+
+      // Style header row
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // Add data rows
+      performanceData.forEach((agent: any) => {
+        worksheet.addRow(agent);
+      });
+
+      // Format percentage columns (convert whole numbers to decimals for Excel)
+      worksheet.getColumn('completionRate').eachCell((cell, rowNumber) => {
+        if (rowNumber > 1 && typeof cell.value === 'number') {
+          cell.value = cell.value / 100; // Convert 75 to 0.75
+          cell.numFmt = '0%'; // Format as percentage
+        }
+      });
+      worksheet.getColumn('slaComplianceRate').eachCell((cell, rowNumber) => {
+        if (rowNumber > 1 && typeof cell.value === 'number') {
+          cell.value = cell.value / 100; // Convert 75 to 0.75
+          cell.numFmt = '0%'; // Format as percentage
+        }
+      });
+
+      // Auto-filter on all columns
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `Q1`
+      };
+
+      // Set response headers for file download
+      const fileName = `performance-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Write to response
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error exporting performance metrics:", error);
+      res.status(500).json({ error: "Failed to export performance metrics" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

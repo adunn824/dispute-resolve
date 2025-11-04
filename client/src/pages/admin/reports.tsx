@@ -19,6 +19,13 @@ export default function ReportsPage() {
   const [casesEndDate, setCasesEndDate] = useState<string>("");
   const [isExportingCases, setIsExportingCases] = useState(false);
 
+  // Performance Metrics Export State
+  const [perfUser, setPerfUser] = useState<string>("all");
+  const [perfLender, setPerfLender] = useState<string>("all");
+  const [perfStartDate, setPerfStartDate] = useState<string>("");
+  const [perfEndDate, setPerfEndDate] = useState<string>("");
+  const [isExportingPerformance, setIsExportingPerformance] = useState(false);
+
   // Fetch lenders for filter
   const { data: lendersData } = useQuery({
     queryKey: ['/api/lenders'],
@@ -32,6 +39,13 @@ export default function ReportsPage() {
     select: (response: any) => response.data?.filter((s: any) => s.isActive) || []
   });
   const statuses = statusesData || [];
+
+  // Fetch users for performance filter
+  const { data: usersData } = useQuery({
+    queryKey: ['/api/users'],
+    select: (response: any) => (response.data || []).filter((u: any) => u.role === 'agent' || u.role === 'compliance')
+  });
+  const users = usersData || [];
 
   const handleCasesExport = async () => {
     setIsExportingCases(true);
@@ -82,6 +96,57 @@ export default function ReportsPage() {
       });
     } finally {
       setIsExportingCases(false);
+    }
+  };
+
+  const handlePerformanceExport = async () => {
+    setIsExportingPerformance(true);
+    try {
+      // Build query params
+      const params = new URLSearchParams();
+      if (perfUser !== "all") params.append("userId", perfUser);
+      if (perfLender !== "all") params.append("lenderId", perfLender);
+      if (perfStartDate) params.append("startDate", perfStartDate);
+      if (perfEndDate) params.append("endDate", perfEndDate);
+
+      // Fetch the file
+      const response = await fetch(`/api/exports/performance?${params.toString()}`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to export performance metrics");
+      }
+
+      // Get filename from header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch ? filenameMatch[1] : `performance-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Export Successful",
+        description: `Performance metrics exported to ${filename}`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export performance metrics. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPerformance(false);
     }
   };
 
@@ -212,20 +277,85 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Placeholder for future exports - Performance Metrics */}
-        <Card className="flex flex-col opacity-60">
+        {/* Performance Metrics Export Card */}
+        <Card className="flex flex-col">
           <CardHeader>
             <div className="flex items-start justify-between">
-              <BarChart3 className="w-10 h-10 text-muted-foreground" />
+              <BarChart3 className="w-10 h-10 text-primary" />
             </div>
             <CardTitle className="mt-4">Performance Metrics</CardTitle>
             <CardDescription>
               Export aggregated performance data, resolution times, and SLA compliance rates
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-end">
-            <Button disabled className="w-full" variant="outline">
-              Coming Soon
+          <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="perf-start-date">Start Date</Label>
+                  <Input
+                    id="perf-start-date"
+                    type="date"
+                    value={perfStartDate}
+                    onChange={(e) => setPerfStartDate(e.target.value)}
+                    data-testid="input-perf-start-date"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="perf-end-date">End Date</Label>
+                  <Input
+                    id="perf-end-date"
+                    type="date"
+                    value={perfEndDate}
+                    onChange={(e) => setPerfEndDate(e.target.value)}
+                    data-testid="input-perf-end-date"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="perf-user-filter">Agent Filter</Label>
+                <Select value={perfUser} onValueChange={setPerfUser}>
+                  <SelectTrigger id="perf-user-filter" data-testid="select-perf-user-filter">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {users.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="perf-lender-filter">Lender Filter</Label>
+                <Select value={perfLender} onValueChange={setPerfLender}>
+                  <SelectTrigger id="perf-lender-filter" data-testid="select-perf-lender-filter">
+                    <SelectValue placeholder="All Lenders" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Lenders</SelectItem>
+                    {lenders.map((lender: any) => (
+                      <SelectItem key={lender.id} value={lender.id}>
+                        {lender.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button 
+              onClick={handlePerformanceExport}
+              disabled={isExportingPerformance}
+              className="w-full"
+              data-testid="button-export-performance"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {isExportingPerformance ? "Exporting..." : "Export to Excel"}
             </Button>
           </CardContent>
         </Card>
