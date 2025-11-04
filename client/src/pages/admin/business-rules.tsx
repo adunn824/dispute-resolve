@@ -1605,14 +1605,15 @@ export default function BusinessRulesManagement() {
                     Add Email Rule
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-[90vh]">
                   <DialogHeader>
                     <DialogTitle>
                       {editingEmailRule ? "Edit Email Notification Rule" : "Create Email Notification Rule"}
                     </DialogTitle>
                   </DialogHeader>
-                  <Form {...emailRuleForm}>
-                    <form onSubmit={emailRuleForm.handleSubmit(onEmailRuleSubmit)} className="space-y-4">
+                  <div className="overflow-y-auto max-h-[calc(90vh-8rem)] pr-2">
+                    <Form {...emailRuleForm}>
+                      <form onSubmit={emailRuleForm.handleSubmit(onEmailRuleSubmit)} className="space-y-4">
                       <FormField
                         control={emailRuleForm.control}
                         name="name"
@@ -1791,6 +1792,7 @@ export default function BusinessRulesManagement() {
                       </div>
                     </form>
                   </Form>
+                  </div>
                 </DialogContent>
               </Dialog>
             </CardHeader>
