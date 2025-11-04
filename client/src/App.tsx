@@ -31,7 +31,8 @@ import SystemManagement from "./pages/admin/system";
 import KnowledgeBaseManagement from "./pages/admin/KnowledgeBaseManagement";
 import EmailTemplatesManagement from "./pages/admin/email-templates";
 import DatabaseSync from "./pages/admin/database-sync";
-import ReportsPage from "./pages/compliance/reports";
+import ComplianceReportsPage from "./pages/compliance/reports";
+import AdminReportsPage from "./pages/admin/reports";
 import NotFound from "@/pages/not-found";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -169,6 +170,11 @@ function Router() {
           <DatabaseSync />
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/reports">
+        <ProtectedRoute requiredRole={["admin", "compliance"]}>
+          <AdminReportsPage />
+        </ProtectedRoute>
+      </Route>
       <Route path="/knowledge-base">
         <ProtectedRoute>
           <KnowledgeBasePage />
@@ -232,7 +238,7 @@ function Router() {
       </Route>
       <Route path="/compliance/reports">
         <ProtectedRoute requiredRole={["compliance", "admin"]}>
-          <ReportsPage />
+          <ComplianceReportsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/compliance/regulatory">
