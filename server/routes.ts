@@ -3030,7 +3030,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outlookTenantId: z.string().optional(),
         outlookClientSecret: z.string().optional(),
         outlookRedirectUri: z.string().optional(),
-      });
+        // SSO configuration fields
+        ssoRequired: z.boolean().optional(),
+        ssoProvider: z.enum(["microsoft", "google"]).optional(),
+      }).refine(
+        (data) => {
+          // If SSO is required, provider must be selected
+          if (data.ssoRequired && !data.ssoProvider) {
+            return false;
+          }
+          return true;
+        },
+        {
+          message: "SSO provider is required when SSO is enabled",
+          path: ["ssoProvider"],
+        }
+      );
 
       const validatedData = updateSchema.parse(req.body);
       
@@ -3091,6 +3106,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outlookTenantId: updatedUser.outlookTenantId,
         outlookClientSecret: updatedUser.outlookClientSecret ? "***REDACTED***" : null,
         outlookRedirectUri: updatedUser.outlookRedirectUri,
+        ssoRequired: updatedUser.ssoRequired,
+        ssoProvider: updatedUser.ssoProvider,
+        ssoIdentifier: updatedUser.ssoIdentifier,
+        ssoEmail: updatedUser.ssoEmail,
         createdAt: updatedUser.createdAt,
       });
     } catch (error) {
@@ -3159,7 +3178,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outlookTenantId: z.string().optional(),
         outlookClientSecret: z.string().optional(),
         outlookRedirectUri: z.string().optional(),
-      });
+        // SSO configuration fields
+        ssoRequired: z.boolean().default(false),
+        ssoProvider: z.enum(["microsoft", "google"]).optional(),
+      }).refine(
+        (data) => {
+          // If SSO is required, provider must be selected
+          if (data.ssoRequired && !data.ssoProvider) {
+            return false;
+          }
+          return true;
+        },
+        {
+          message: "SSO provider is required when SSO is enabled",
+          path: ["ssoProvider"],
+        }
+      );
 
       const validatedData = createSchema.parse(req.body);
       
@@ -3189,6 +3223,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outlookTenantId: validatedData.outlookTenantId || null,
         outlookClientSecret: validatedData.outlookClientSecret || null,
         outlookRedirectUri: validatedData.outlookRedirectUri || null,
+        ssoRequired: validatedData.ssoRequired,
+        ssoProvider: validatedData.ssoProvider || null,
       });
       
       res.status(201).json({
@@ -3211,6 +3247,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outlookTenantId: newUser.outlookTenantId,
         outlookClientSecret: newUser.outlookClientSecret ? "***REDACTED***" : null,
         outlookRedirectUri: newUser.outlookRedirectUri,
+        ssoRequired: newUser.ssoRequired,
+        ssoProvider: newUser.ssoProvider,
+        ssoIdentifier: newUser.ssoIdentifier,
+        ssoEmail: newUser.ssoEmail,
         createdAt: newUser.createdAt,
       });
     } catch (error) {

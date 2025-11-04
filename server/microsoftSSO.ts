@@ -43,7 +43,8 @@ function updateMicrosoftSession(
 
 async function linkOrCreateSsoUser(claims: any) {
   try {
-    console.log("Processing Microsoft SSO user with claims:", JSON.stringify(claims, null, 2));
+    // Log only non-PII metadata for debugging
+    console.log("Processing Microsoft SSO authentication (provider: microsoft)");
     
     const ssoEmail = claims["email"] || claims["preferred_username"];
     const ssoIdentifier = claims["sub"]; // Microsoft subject identifier
@@ -76,10 +77,11 @@ async function linkOrCreateSsoUser(claims: any) {
 
     // No existing user - check if we should auto-create
     // For now, we'll require manual user creation by admin
-    throw new Error(`No user account found for SSO email: ${ssoEmail}. Please contact administrator.`);
+    throw new Error("No user account found matching the SSO credentials. Please contact administrator.");
     
   } catch (error) {
-    console.error("Error processing Microsoft SSO user:", error);
+    // Log error without PII - error message already sanitized above
+    console.error("Error processing Microsoft SSO user");
     throw error;
   }
 }
@@ -133,6 +135,24 @@ export function setupMicrosoftSSO(app: Express) {
         console.error(`Failed to set up Microsoft SSO for ${domain}:`, err);
       });
     }
+  } else if (process.env.NODE_ENV === "development" && process.env.SSO_DEV_MODE === "true") {
+    // Dev mode fallback: register a default localhost strategy
+    const devDomain = "localhost";
+    getMicrosoftOidcConfig().then(config => {
+      const strategy = new Strategy(
+        {
+          name: `microsoft-sso:${devDomain}`,
+          config,
+          scope: "openid email profile offline_access",
+          callbackURL: process.env.MICROSOFT_REDIRECT_URI || `http://localhost:5000/api/auth/microsoft/callback`,
+        },
+        verify
+      );
+      passport.use(strategy);
+      console.log(`Microsoft SSO dev strategy registered for: ${devDomain}`);
+    }).catch(err => {
+      console.error(`Failed to set up Microsoft SSO dev strategy:`, err);
+    });
   }
 
   // Microsoft SSO login route
@@ -148,15 +168,21 @@ export function setupMicrosoftSSO(app: Express) {
     // Store username in session for account linking after callback
     req.session.ssoUsername = username;
 
-    // Development fallback for non-Replit domains
-    if (!process.env.REPLIT_DOMAINS || !process.env.REPLIT_DOMAINS.includes(req.hostname)) {
+    // Development/staging fallback: allow explicit dev mode bypass
+    const isDevMode = process.env.NODE_ENV === "development" && process.env.SSO_DEV_MODE === "true";
+    const hasReplitDomains = process.env.REPLIT_DOMAINS && process.env.REPLIT_DOMAINS.includes(req.hostname);
+    
+    if (!hasReplitDomains && !isDevMode) {
       return res.status(400).json({ 
         message: "Microsoft SSO only available on Replit platform",
-        dev_note: "This requires deployment on Replit for proper OIDC integration"
+        dev_note: "Set SSO_DEV_MODE=true in development to test SSO flow"
       });
     }
     
-    passport.authenticate(`microsoft-sso:${req.hostname}`, {
+    // Determine which strategy to use
+    const strategyName = isDevMode ? "microsoft-sso:localhost" : `microsoft-sso:${req.hostname}`;
+    
+    passport.authenticate(strategyName, {
       prompt: "select_account",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
@@ -165,9 +191,17 @@ export function setupMicrosoftSSO(app: Express) {
   // Microsoft SSO callback route
   app.get(
     "/api/auth/microsoft/callback",
-    passport.authenticate(`microsoft-sso:${process.env.REPLIT_DOMAINS?.split(",")[0]}`, { 
-      failureRedirect: "/login?error=sso_failed" 
-    }),
+    (req, res, next) => {
+      // Determine which strategy to use - match login route logic
+      const isDevMode = process.env.NODE_ENV === "development" && process.env.SSO_DEV_MODE === "true";
+      const strategyName = isDevMode 
+        ? "microsoft-sso:localhost" 
+        : `microsoft-sso:${req.hostname}`;
+      
+      passport.authenticate(strategyName, { 
+        failureRedirect: "/login?error=sso_failed" 
+      })(req, res, next);
+    },
     (req, res) => {
       // Clear SSO username from session
       delete req.session.ssoUsername;

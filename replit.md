@@ -19,7 +19,7 @@ Preferred communication style: Simple, everyday language.
 ### Technical Implementations
 - **Backend**: Node.js with Express.js and TypeScript.
 - **API**: RESTful with structured error handling.
-- **Authentication**: Replit OAuth for user authentication, with session-based management using `connect-pg-simple`.
+- **Authentication**: Dual authentication system supporting both Replit OAuth and Microsoft SSO (Azure AD). Session-based management using `connect-pg-simple`. Per-user SSO enforcement with toggleable requirement flags.
 - **Database ORM**: Drizzle ORM with PostgreSQL.
 - **State Management**: TanStack React Query for server state.
 - **Routing**: Wouter.

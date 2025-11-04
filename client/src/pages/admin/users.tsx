@@ -41,7 +41,23 @@ const userSchema = z.object({
   outlookTenantId: z.string().optional(),
   outlookClientSecret: z.string().optional(),
   outlookRedirectUri: z.string().optional(),
-});
+  
+  // SSO configuration fields
+  ssoRequired: z.boolean().default(false),
+  ssoProvider: z.enum(["microsoft", "google"]).optional(),
+}).refine(
+  (data) => {
+    // If SSO is required, provider must be selected
+    if (data.ssoRequired && !data.ssoProvider) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "SSO provider is required when SSO is enabled",
+    path: ["ssoProvider"], // Show error on ssoProvider field
+  }
+);
 
 type UserForm = z.infer<typeof userSchema>;
 
@@ -65,6 +81,10 @@ type User = {
   outlookTenantId?: string;
   outlookClientSecret?: string;
   outlookRedirectUri?: string;
+  ssoRequired?: boolean;
+  ssoProvider?: "microsoft" | "google";
+  ssoIdentifier?: string;
+  ssoEmail?: string;
   createdAt: string;
 };
 
@@ -106,6 +126,8 @@ export default function UsersManagement() {
       outlookTenantId: "",
       outlookClientSecret: "",
       outlookRedirectUri: "",
+      ssoRequired: false,
+      ssoProvider: undefined,
     },
   });
 
@@ -204,6 +226,8 @@ export default function UsersManagement() {
       outlookTenantId: user.outlookTenantId || "",
       outlookClientSecret: "", // Don't populate secret
       outlookRedirectUri: user.outlookRedirectUri || "",
+      ssoRequired: user.ssoRequired || false,
+      ssoProvider: user.ssoProvider || undefined,
     });
     setShowDialog(true);
   };
@@ -610,6 +634,88 @@ export default function UsersManagement() {
                           </FormItem>
                         )}
                       />
+                    </div>
+                  )}
+                </div>
+                
+                <Separator className="my-4" />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    <h3 className="text-sm font-medium">SSO Configuration</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Require this user to authenticate via Single Sign-On (Microsoft, Google)
+                  </p>
+                  
+                  <FormField
+                    control={form.control}
+                    name="ssoRequired"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Require SSO</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Force user to authenticate via SSO instead of username/password
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-sso-required"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {form.watch("ssoRequired") && (
+                    <div className="space-y-4 pl-4 border-l-2">
+                      <FormField
+                        control={form.control}
+                        name="ssoProvider"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>SSO Provider</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-sso-provider">
+                                  <SelectValue placeholder="Select SSO provider" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="microsoft">Microsoft Azure AD</SelectItem>
+                                <SelectItem value="google">Google</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="text-sm text-muted-foreground">
+                              Choose which SSO provider this user will authenticate with
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {editingUser && editingUser.ssoIdentifier && (
+                        <div className="space-y-2 p-3 bg-muted rounded-lg">
+                          <div className="text-sm">
+                            <span className="font-medium">SSO Identifier:</span>{" "}
+                            <code className="text-xs bg-background px-2 py-1 rounded">
+                              {editingUser.ssoIdentifier}
+                            </code>
+                          </div>
+                          {editingUser.ssoEmail && (
+                            <div className="text-sm">
+                              <span className="font-medium">SSO Email:</span>{" "}
+                              <span className="text-muted-foreground">{editingUser.ssoEmail}</span>
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-2">
+                            This user has already authenticated via SSO and their account is linked
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
