@@ -121,6 +121,12 @@ export const users = pgTable("users", {
   outlookClientSecret: text("outlook_client_secret"), // Azure app client secret
   outlookRedirectUri: text("outlook_redirect_uri"), // OAuth redirect URI
   
+  // SSO Authentication Configuration
+  ssoRequired: boolean("sso_required").notNull().default(false), // Force user to authenticate via SSO
+  ssoProvider: text("sso_provider", { enum: ["microsoft", "google"] }), // SSO provider (microsoft, google, etc.)
+  ssoIdentifier: text("sso_identifier"), // SSO subject/ID from provider for account linking
+  ssoEmail: text("sso_email"), // Email from SSO provider (for verification)
+  
   // Case assignment availability
   availabilityStatus: text("availability_status", { enum: ["available", "not_available"] }).notNull().default("available"),
   lastAssignedAt: timestamp("last_assigned_at"),

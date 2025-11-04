@@ -9,6 +9,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { checkSsoRequired } from "./microsoftSSO";
 
 declare global {
   namespace Express {
@@ -136,7 +137,8 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+  // Login with SSO check - reject if SSO is required for user
+  app.post("/api/login", checkSsoRequired, passport.authenticate("local"), (req, res) => {
     const user = req.user!;
     res.status(200).json({
       id: user.id,
@@ -149,6 +151,8 @@ export function setupAuth(app: Express) {
       canResolve: user.canResolve,
       canDelete: user.canDelete,
       canAssign: user.canAssign,
+      ssoRequired: user.ssoRequired,
+      ssoProvider: user.ssoProvider,
     });
   });
 

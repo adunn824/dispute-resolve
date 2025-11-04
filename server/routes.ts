@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, DatabaseStorage } from "./storage";
 import { setupAuth } from "./auth";
+import { setupMicrosoftSSO } from "./microsoftSSO";
 import { 
   insertCaseSchema, 
   insertCustomerSchema,
@@ -139,6 +140,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup authentication (sets up /api/register, /api/login, /api/logout, /api/user)
   setupAuth(app);
+  
+  // Setup Microsoft SSO authentication
+  setupMicrosoftSSO(app);
   
   // Case Management API Endpoints
   

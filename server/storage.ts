@@ -172,12 +172,14 @@ export interface IStorage {
   
   // User methods
   getUser(id: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserBySsoIdentifier(ssoIdentifier: string, ssoProvider: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   deleteUser(id: string): Promise<void>;
   upsertUser(user: UpsertUser): Promise<User>;
+  linkUserToSso(userId: string, ssoData: { ssoProvider: string; ssoIdentifier: string; ssoEmail: string }): Promise<User>;
   getNextAvailableUser(): Promise<User | null>;
   updateUserAvailability(userId: string, availabilityStatus: "available" | "not_available"): Promise<User>;
   
@@ -499,14 +501,43 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+  async getUserBySsoIdentifier(ssoIdentifier: string, ssoProvider: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(
+      and(
+        eq(users.ssoIdentifier, ssoIdentifier),
+        eq(users.ssoProvider, ssoProvider)
+      )
+    );
     return user || undefined;
+  }
+
+  async linkUserToSso(userId: string, ssoData: { ssoProvider: string; ssoIdentifier: string; ssoEmail: string }): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ssoProvider: ssoData.ssoProvider as "microsoft" | "google",
+        ssoIdentifier: ssoData.ssoIdentifier,
+        ssoEmail: ssoData.ssoEmail,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!user) {
+      throw new Error(`User not found: ${userId}`);
+    }
+
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
