@@ -22,6 +22,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
+import ExcelJS from "exceljs";
 
 // Simple authentication middleware that also populates req.dbUser
 const requireAuth = (req: any, res: any, next: any) => {
@@ -4161,6 +4162,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Database sync error:", error);
       res.status(500).json({ error: "Failed to sync database", details: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Export Endpoints
+  app.get("/api/exports/cases", requireAuth, requireRole(["compliance", "admin"]), async (req, res) => {
+    try {
+      const { startDate, endDate, status, priority, lenderId } = req.query;
+
+      // Build filters
+      const filters: any = {};
+      
+      // No date filtering at DB level - we'll show all cases and let user filter in Excel if needed
+      if (status) filters.status = status as string;
+      if (priority) filters.priorityValue = priority as string;
+      if (lenderId) filters.lenderId = lenderId as string;
+
+      // Get all cases with details
+      const casesData = await storage.getCasesWithDetails(filters);
+
+      // Create Excel workbook
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Cases Export');
+
+      // Define columns with proper widths
+      worksheet.columns = [
+        { header: 'Case Number', key: 'caseNumber', width: 15 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Priority', key: 'priority', width: 12 },
+        { header: 'Created Date', key: 'createdAt', width: 18 },
+        { header: 'Updated Date', key: 'updatedAt', width: 18 },
+        { header: 'Customer Name', key: 'customerName', width: 25 },
+        { header: 'Customer State', key: 'customerState', width: 15 },
+        { header: 'Lender', key: 'lenderName', width: 25 },
+        { header: 'Loan ID', key: 'loanId', width: 20 },
+        { header: 'Case Type', key: 'caseTypeName', width: 20 },
+        { header: 'Category', key: 'categoryName', width: 20 },
+        { header: 'Category Code', key: 'categoryCode', width: 15 },
+        { header: 'Origination', key: 'caseOriginationName', width: 20 },
+        { header: 'Assigned To', key: 'assignedUserName', width: 25 },
+        { header: 'Assigned Email', key: 'assignedUserEmail', width: 30 },
+        { header: 'Tags', key: 'tags', width: 30 },
+        { header: 'Details', key: 'details', width: 50 },
+        { header: 'SLA Status', key: 'slaStatus', width: 15 },
+        { header: 'SLA Deadline', key: 'slaDeadline', width: 18 },
+        { header: 'Linked Cases', key: 'linkedCaseNumbers', width: 30 },
+      ];
+
+      // Style header row
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // Add data rows
+      casesData.forEach((caseItem: any) => {
+        worksheet.addRow({
+          caseNumber: caseItem.caseNumber,
+          status: caseItem.status,
+          priority: caseItem.priorityValue || 'N/A',
+          createdAt: caseItem.createdAt ? new Date(caseItem.createdAt).toLocaleString() : '',
+          updatedAt: caseItem.updatedAt ? new Date(caseItem.updatedAt).toLocaleString() : '',
+          customerName: caseItem.customerName || '',
+          customerState: caseItem.customerState || caseItem.state || '',
+          lenderName: caseItem.lenderName || '',
+          loanId: caseItem.loanId || '',
+          caseTypeName: caseItem.caseTypeName || '',
+          categoryName: caseItem.categoryName || '',
+          categoryCode: caseItem.categoryCode || '',
+          caseOriginationName: caseItem.caseOriginationName || '',
+          assignedUserName: caseItem.assignedUserName || 'Unassigned',
+          assignedUserEmail: caseItem.assignedUserEmail || '',
+          tags: Array.isArray(caseItem.tags) ? caseItem.tags.join(', ') : '',
+          details: caseItem.details || '',
+          slaStatus: caseItem.slaStatus || '',
+          slaDeadline: caseItem.slaDeadline ? new Date(caseItem.slaDeadline).toLocaleString() : '',
+          linkedCaseNumbers: Array.isArray(caseItem.linkedCaseNumbers) ? caseItem.linkedCaseNumbers.join(', ') : '',
+        });
+      });
+
+      // Auto-filter on all columns
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `T1`
+      };
+
+      // Set response headers for file download
+      const fileName = `cases-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Write to response
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error exporting cases:", error);
+      res.status(500).json({ error: "Failed to export cases" });
     }
   });
 
