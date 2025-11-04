@@ -30,13 +30,14 @@ Preferred communication style: Simple, everyday language.
 - **Email Intake System**: Webhook-based email ingestion (`POST /api/email-intake`) automatically creates cases with a "pending_intake" status, storing email metadata and attachments for agent review and completion.
 - **Email Template System**: Admin-managed, reusable email templates with variable substitution for dynamic case data, categorized for different communication types (Lender, Customer, Internal, Other).
 - **Email History**: Dedicated "Emails" tab in case details displaying chronological communication history, including sender, recipients, subject, body preview, template usage, and attachments, sourced from audit logs.
+- **Email Notification Rules**: Automated email sending system triggered by case events. Rules define conditions for when emails should be sent, select sender (user or lender with configured Outlook integration), specify recipients, and choose email template. Rules are evaluated on case creation and updates, with asynchronous background email sending that doesn't block operations. All automated emails are logged in audit trails.
 - **Case Editing**: Comprehensive dialog for editing all case creation fields, with dynamic dropdowns, customer management (find/create), and audit trail logging.
 - **Database Sync System**: Admin interface (`/admin/database-sync`) to sync development database data to production, handling foreign key constraints, ensuring data integrity, and providing progress feedback.
 - **Case Linking**: Bidirectional relationship tracking between related cases with manual search linking and automatic potential match detection. Features normalized self-linking prevention, permission-based access control, audit trail logging, and navigation between linked cases via dedicated "Linked Cases" tab.
 
 ### Feature Specifications
 - **Dynamic Checklists**: Single, unified `reusableChecklistTemplates` system for all templates, automatically assigned based on category or business rules. Supports six field types (Checkbox, Dropdown, Text, Number, Date, File) with dynamic configuration. Rules require at least one condition to match (empty conditions do not auto-apply). Visual rule match display shows which templates are active and why, including per-condition evaluation results.
-- **Admin Panel**: Dynamic system for runtime configuration of case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations, SLA policies, value sets, and feature flags, including audit trails with rollback.
+- **Admin Panel**: Dynamic system for runtime configuration of case types, categories, checklist templates, assignment rules, priority rules, tag automation, resolution configurations, SLA policies, email notification rules, value sets, and feature flags, including audit trails with rollback.
 - **Resolution Options**: Fully configurable disposition, sub-disposition, and policy violation options managed via the admin interface.
 
 ### System Design Choices
