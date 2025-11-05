@@ -873,6 +873,16 @@ export class DatabaseStorage implements IStorage {
         // Customer fields
         customerName: customers.name,
         customerState: customers.state,
+        customerFirstName: customers.firstName,
+        customerLastName: customers.lastName,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        customerAddress1: customers.address1,
+        customerAddress2: customers.address2,
+        customerCity: customers.city,
+        customerZipCode: customers.zipCode,
+        customerNumber: customers.customerNumber,
+        accountNumber: customers.accountNumber,
         
         // Lender fields
         lenderName: lenders.name,
@@ -1166,6 +1176,16 @@ export class DatabaseStorage implements IStorage {
         // Customer fields
         customerName: customers.name,
         customerState: customers.state,
+        customerFirstName: customers.firstName,
+        customerLastName: customers.lastName,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        customerAddress1: customers.address1,
+        customerAddress2: customers.address2,
+        customerCity: customers.city,
+        customerZipCode: customers.zipCode,
+        customerNumber: customers.customerNumber,
+        accountNumber: customers.accountNumber,
         
         // Lender fields
         lenderName: lenders.name,

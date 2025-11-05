@@ -154,6 +154,16 @@ interface CaseDetailData {
   updatedAt: string;
   customerName: string;
   customerState: string;
+  customerFirstName?: string;
+  customerLastName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customerAddress1?: string;
+  customerAddress2?: string;
+  customerCity?: string;
+  customerZipCode?: string;
+  customerNumber?: string;
+  accountNumber?: string;
   caseTypeName: string;
   caseTypeColor?: string;
   caseOriginationId?: string;
@@ -1118,37 +1128,106 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
           <CardTitle>Case Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">{caseDetails.customerName}</p>
-                <p className="text-xs text-muted-foreground">Customer</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">{formatDistanceToNow(new Date(caseDetails.createdAt), { addSuffix: true })}</p>
-                <p className="text-xs text-muted-foreground">Created</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">{caseDetails.loanId || "N/A"}</p>
-                <p className="text-xs text-muted-foreground">Loan ID</p>
-              </div>
-            </div>
+          <div className="space-y-6">
+            {/* Customer Information Section */}
             <div>
-              <p className="text-sm font-medium">{caseDetails.customerState}</p>
-              <p className="text-xs text-muted-foreground">State</p>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Customer Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(caseDetails.customerFirstName || caseDetails.customerLastName) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Name</p>
+                    <p className="text-sm font-medium" data-testid="text-customer-name">
+                      {caseDetails.customerFirstName} {caseDetails.customerLastName}
+                    </p>
+                  </div>
+                )}
+                {!caseDetails.customerFirstName && !caseDetails.customerLastName && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Name</p>
+                    <p className="text-sm font-medium" data-testid="text-customer-name">
+                      {caseDetails.customerName}
+                    </p>
+                  </div>
+                )}
+                {caseDetails.customerEmail && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p className="text-sm font-medium" data-testid="text-customer-email">{caseDetails.customerEmail}</p>
+                  </div>
+                )}
+                {caseDetails.customerPhone && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Phone</p>
+                    <p className="text-sm font-medium" data-testid="text-customer-phone">{caseDetails.customerPhone}</p>
+                  </div>
+                )}
+                {caseDetails.customerNumber && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Customer Number</p>
+                    <p className="text-sm font-medium" data-testid="text-customer-number">{caseDetails.customerNumber}</p>
+                  </div>
+                )}
+                {caseDetails.accountNumber && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Number</p>
+                    <p className="text-sm font-medium" data-testid="text-account-number">{caseDetails.accountNumber}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-muted-foreground">State</p>
+                  <p className="text-sm font-medium" data-testid="text-customer-state">{caseDetails.customerState}</p>
+                </div>
+              </div>
+              
+              {/* Customer Address */}
+              {(caseDetails.customerAddress1 || caseDetails.customerCity || caseDetails.customerZipCode) && (
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground">Address</p>
+                  <div className="text-sm font-medium" data-testid="text-customer-address">
+                    {caseDetails.customerAddress1 && <div>{caseDetails.customerAddress1}</div>}
+                    {caseDetails.customerAddress2 && <div>{caseDetails.customerAddress2}</div>}
+                    {(caseDetails.customerCity || caseDetails.customerState || caseDetails.customerZipCode) && (
+                      <div>
+                        {caseDetails.customerCity && `${caseDetails.customerCity}, `}
+                        {caseDetails.customerState} {caseDetails.customerZipCode}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Case Information Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Case Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Created</p>
+                    <p className="text-sm font-medium">{formatDistanceToNow(new Date(caseDetails.createdAt), { addSuffix: true })}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Loan ID</p>
+                    <p className="text-sm font-medium">{caseDetails.loanId || "N/A"}</p>
+                  </div>
+                </div>
+                {caseDetails.lenderName && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Lender</p>
+                    <p className="text-sm font-medium">{caseDetails.lenderName}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
-          <div className="mt-4">
-            <p className="text-sm text-muted-foreground">Case Details</p>
-            <p className="text-sm mt-1">{caseDetails.details}</p>
+          <div className="mt-6">
+            <p className="text-sm font-semibold text-muted-foreground mb-2">Case Details</p>
+            <p className="text-sm">{caseDetails.details}</p>
           </div>
           
           {/* Tags Section */}
