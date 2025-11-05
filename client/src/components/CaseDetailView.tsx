@@ -35,7 +35,6 @@ const editCaseSchema = z.object({
   caseTypeId: z.string().min(1, "Case type is required"),
   categoryId: z.string().min(1, "Category is required"),
   customerName: z.string().min(1, "Customer name is required"),
-  loanId: z.string().optional(),
   lenderId: z.string().optional(),
   state: z.string().min(2, "State is required"),
   details: z.string().min(10, "Details must be at least 10 characters"),
@@ -77,7 +76,6 @@ const intakeCompletionSchema = z.object({
   categoryId: z.string().min(1, "Category is required"),
   priorityRuleId: z.string().min(1, "Priority rule is required"),
   lenderId: z.string().optional(),
-  loanId: z.string().optional(),
   details: z.string().min(10, "Details must be at least 10 characters"),
 });
 
@@ -138,7 +136,6 @@ interface CaseDetailData {
   customerId: string;
   assignedToUserId?: string;
   secondaryAssignedToUserId?: string;
-  loanId?: string;
   lenderName?: string;
   lenderId?: string;
   state: string;
@@ -526,7 +523,6 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       caseTypeId: caseDetails?.caseTypeId || "",
       categoryId: caseDetails?.categoryId || "",
       customerName: caseDetails?.customerName || "",
-      loanId: caseDetails?.loanId || "",
       lenderId: caseDetails?.lenderId || "",
       state: caseDetails?.customerState || "",
       details: caseDetails?.details || "",
@@ -549,7 +545,6 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       categoryId: "",
       priorityRuleId: "",
       lenderId: "",
-      loanId: "",
       details: caseDetails?.emailMetadata?.bodyPreview || "",
     },
   });
@@ -596,7 +591,6 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         caseTypeId: caseDetails.caseTypeId || "",
         categoryId: caseDetails.categoryId || "",
         customerName: caseDetails.customerName || "",
-        loanId: caseDetails.loanId || "",
         lenderId: caseDetails.lenderId || "",
         state: caseDetails.customerState || "",
         details: caseDetails.details || "",
@@ -681,7 +675,6 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       '{{caseType}}': caseData.caseTypeName || '',
       '{{category}}': caseData.categoryName || '',
       '{{state}}': caseData.customerState || '',
-      '{{loanId}}': caseData.loanId || 'N/A',
       '{{lenderName}}': caseData.lenderName || 'N/A',
       '{{details}}': caseData.details || '',
       '{{priority}}': caseData.priorityValue || '',
@@ -1049,46 +1042,30 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={intakeForm.control}
-                      name="lenderId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lender (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} data-testid="select-intake-lender">
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select lender" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {lenders.map((lender) => (
-                                <SelectItem key={lender.id} value={lender.id}>
-                                  {lender.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={intakeForm.control}
-                      name="loanId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Loan ID (Optional)</FormLabel>
+                  <FormField
+                    control={intakeForm.control}
+                    name="lenderId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Lender (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} data-testid="select-intake-lender">
                           <FormControl>
-                            <Input placeholder="Enter loan ID" {...field} data-testid="input-intake-loan-id" />
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select lender" />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                          <SelectContent>
+                            {lenders.map((lender) => (
+                              <SelectItem key={lender.id} value={lender.id}>
+                                {lender.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={intakeForm.control}
@@ -1212,13 +1189,6 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                   <div>
                     <p className="text-xs text-muted-foreground">Created</p>
                     <p className="text-sm font-medium">{formatDistanceToNow(new Date(caseDetails.createdAt), { addSuffix: true })}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Loan ID</p>
-                    <p className="text-sm font-medium">{caseDetails.loanId || "N/A"}</p>
                   </div>
                 </div>
                 {caseDetails.lenderName && (
@@ -1487,46 +1457,30 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="loanId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Loan ID (Optional)</FormLabel>
+                <FormField
+                  control={editForm.control}
+                  name="lenderId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lender (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
-                          <Input placeholder="Enter loan ID if applicable" {...field} data-testid="input-edit-loan-id" />
+                          <SelectTrigger data-testid="select-edit-lender">
+                            <SelectValue placeholder="Select lender" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={editForm.control}
-                    name="lenderId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lender (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-edit-lender">
-                              <SelectValue placeholder="Select lender" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {editLenders.map((lender) => (
-                              <SelectItem key={lender.id} value={lender.id}>
-                                {lender.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                        <SelectContent>
+                          {editLenders.map((lender) => (
+                            <SelectItem key={lender.id} value={lender.id}>
+                              {lender.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={editForm.control}

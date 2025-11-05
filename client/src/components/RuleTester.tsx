@@ -19,7 +19,6 @@ interface TestCase {
   customerName: string;
   customerState: string;
   details: string;
-  loanId?: string;
   lenderName?: string;
   state: string;
   status: 'open' | 'in_progress' | 'resolved';
@@ -115,7 +114,6 @@ export function RuleTester({ ruleType, categoryId }: RuleTesterProps) {
           customerName: selectedCase.customerName,
           customerState: selectedCase.customerState || selectedCase.state,
           details: selectedCase.details,
-          loanId: selectedCase.loanId,
           lenderName: selectedCase.lenderName,
           state: selectedCase.state,
           status: selectedCase.status,
@@ -312,23 +310,13 @@ export function RuleTester({ ruleType, categoryId }: RuleTesterProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Loan ID (Optional)</Label>
-                  <Input
-                    value={mockCaseData.loanId || ""}
-                    onChange={(e) => setMockCaseData(prev => ({ ...prev, loanId: e.target.value }))}
-                    data-testid="input-mock-loan-id"
-                  />
-                </div>
-                <div>
-                  <Label>Lender Name (Optional)</Label>
-                  <Input
-                    value={mockCaseData.lenderName || ""}
-                    onChange={(e) => setMockCaseData(prev => ({ ...prev, lenderName: e.target.value }))}
-                    data-testid="input-mock-lender-name"
-                  />
-                </div>
+              <div>
+                <Label>Lender Name (Optional)</Label>
+                <Input
+                  value={mockCaseData.lenderName || ""}
+                  onChange={(e) => setMockCaseData(prev => ({ ...prev, lenderName: e.target.value }))}
+                  data-testid="input-mock-lender-name"
+                />
               </div>
             </TabsContent>
           </Tabs>

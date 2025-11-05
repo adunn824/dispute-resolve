@@ -856,7 +856,6 @@ export class DatabaseStorage implements IStorage {
         customerId: cases.customerId,
         assignedToUserId: cases.assignedToUserId,
         secondaryAssignedToUserId: cases.secondaryAssignedToUserId,
-        loanId: cases.loanId,
         lenderId: cases.lenderId,
         state: cases.state,
         details: cases.details,
@@ -948,7 +947,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         details: cases.details,
-        loanId: cases.loanId,
         lenderName: lenders.name,
         state: cases.state,
         status: cases.status,
@@ -984,7 +982,6 @@ export class DatabaseStorage implements IStorage {
     // Map nullable fields to non-null values required by CaseData interface
     return {
       details: row.details,
-      loanId: row.loanId ?? null,
       lenderName: row.lenderName ?? null,
       state: row.state,
       status: row.status,
@@ -1147,7 +1144,6 @@ export class DatabaseStorage implements IStorage {
         or(
           sql`LOWER(${customers.name}) LIKE ${searchTerm}`,
           sql`LOWER(${cases.details}) LIKE ${searchTerm}`,
-          sql`LOWER(${cases.loanId}) LIKE ${searchTerm}`,
           sql`LOWER(${caseTypes.name}) LIKE ${searchTerm}`,
           sql`LOWER(${categories.name}) LIKE ${searchTerm}`,
           sql`LOWER(${lenders.name}) LIKE ${searchTerm}`
@@ -1165,7 +1161,6 @@ export class DatabaseStorage implements IStorage {
         priorityRuleId: cases.priorityRuleId,
         customerId: cases.customerId,
         assignedToUserId: cases.assignedToUserId,
-        loanId: cases.loanId,
         lenderId: cases.lenderId,
         state: cases.state,
         details: cases.details,
@@ -1317,7 +1312,6 @@ export class DatabaseStorage implements IStorage {
     const now = new Date();
     const caseData: CaseData = {
       details: insertCase.details,
-      loanId: insertCase.loanId || null,
       lenderName: lenderName,
       state: insertCase.state,
       status: insertCase.status || 'open',
@@ -1436,7 +1430,7 @@ export class DatabaseStorage implements IStorage {
     // Check if significant fields changed that might affect rule evaluation
     const significantFieldsChanged = [
       'details', 'state', 'status', 'hasRepresentative', 'representativeCompanyName',
-      'lenderId', 'loanId', 'categoryId', 'customerId'
+      'lenderId', 'categoryId', 'customerId'
     ].some(field => updates[field as keyof InsertCase] !== undefined);
 
     let finalUpdates = { ...updates, updatedAt: new Date() };
@@ -1482,7 +1476,6 @@ export class DatabaseStorage implements IStorage {
         // Prepare case data for rule evaluation
         const caseData: CaseData = {
           details: mergedCaseData.details,
-          loanId: mergedCaseData.loanId || null,
           lenderName: lenderName,
           state: mergedCaseData.state,
           status: mergedCaseData.status,
@@ -1723,17 +1716,11 @@ export class DatabaseStorage implements IStorage {
 
     // Find potential matching cases based on:
     // 1. Same customer
-    // 2. Same loan ID (if exists)
-    // 3. Similar contact information (email/phone from customer or case)
+    // 2. Similar contact information (email/phone from customer or case)
     const conditions = [];
 
     // Same customer
     conditions.push(eq(cases.customerId, currentCase.customerId));
-
-    // Same loan ID (if it exists)
-    if (currentCase.loanId) {
-      conditions.push(eq(cases.loanId, currentCase.loanId));
-    }
 
     // Exclude the current case
     const potentialMatches = await db
@@ -1783,7 +1770,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(cases.caseNumber, caseNumber))
         .limit(limit);
     } else {
-      // Search by customer name or loan ID (partial match)
+      // Search by customer name (partial match)
       results = await db
         .select({
           case: cases,
@@ -1794,10 +1781,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(customers, eq(cases.customerId, customers.id))
         .leftJoin(lenders, eq(cases.lenderId, lenders.id))
         .where(
-          or(
-            sql`${customers.name} ILIKE ${`%${trimmedQuery}%`}`,
-            sql`${cases.loanId} ILIKE ${`%${trimmedQuery}%`}`
-          )
+          sql`${customers.name} ILIKE ${`%${trimmedQuery}%`}`
         )
         .orderBy(desc(cases.createdAt))
         .limit(limit);

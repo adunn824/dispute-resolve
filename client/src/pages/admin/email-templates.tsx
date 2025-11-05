@@ -52,7 +52,6 @@ const TEMPLATE_VARIABLES = [
   { variable: "{{customerName}}", description: "Customer name" },
   { variable: "{{customerState}}", description: "Customer state" },
   { variable: "{{lenderName}}", description: "Lender name" },
-  { variable: "{{loanId}}", description: "Loan ID" },
   { variable: "{{caseType}}", description: "Case type" },
   { variable: "{{category}}", description: "Category" },
   { variable: "{{status}}", description: "Case status" },

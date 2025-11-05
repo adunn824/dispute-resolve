@@ -154,7 +154,6 @@ export default function SearchPage({ userRole = "agent" }: SearchPageProps) {
                   <SelectItem value="customer">Customer Name</SelectItem>
                   <SelectItem value="description">Case Description</SelectItem>
                   <SelectItem value="caseId">Case ID</SelectItem>
-                  <SelectItem value="loanId">Loan ID</SelectItem>
                 </SelectContent>
               </Select>
             </div>

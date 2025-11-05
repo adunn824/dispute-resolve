@@ -29,7 +29,6 @@ const caseSchema = z.object({
   zipCode: z.string().optional(),
   customerNumber: z.string().optional(),
   accountNumber: z.string().optional(),
-  loanId: z.string().optional(),
   lenderId: z.string().optional(),
   details: z.string().min(10, "Details must be at least 10 characters"),
   hasRepresentative: z.boolean().optional().default(false),
@@ -156,7 +155,6 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
       zipCode: "",
       customerNumber: "",
       accountNumber: "",
-      loanId: "",
       lenderId: "",
       details: "",
       hasRepresentative: false,
@@ -202,7 +200,6 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
     const normalizedData = {
       ...data,
       lenderId: data.lenderId && data.lenderId.trim() !== "" ? data.lenderId : undefined,
-      loanId: data.loanId && data.loanId.trim() !== "" ? data.loanId : undefined,
     };
     createCaseMutation.mutate(normalizedData);
   };
@@ -524,52 +521,36 @@ export function CaseIntakeForm({ onSubmit }: CaseIntakeFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="loanId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Loan ID (Optional)</FormLabel>
+            <FormField
+              control={form.control}
+              name="lenderId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lender (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} data-testid="select-lender">
                     <FormControl>
-                      <Input placeholder="Enter loan ID if applicable" {...field} data-testid="input-loan-id" />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select lender" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="lenderId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Lender (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} data-testid="select-lender">
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select lender" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {loadingLenders ? (
-                          <SelectItem value="loading" disabled>Loading lenders...</SelectItem>
-                        ) : lenders.length === 0 ? (
-                          <SelectItem value="none" disabled>No lenders available</SelectItem>
-                        ) : (
-                          lenders.map((lender) => (
-                            <SelectItem key={lender.id} value={lender.id}>
-                              {lender.name}{lender.dba ? ` (${lender.dba})` : ""}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      {loadingLenders ? (
+                        <SelectItem value="loading" disabled>Loading lenders...</SelectItem>
+                      ) : lenders.length === 0 ? (
+                        <SelectItem value="none" disabled>No lenders available</SelectItem>
+                      ) : (
+                        lenders.map((lender) => (
+                          <SelectItem key={lender.id} value={lender.id}>
+                            {lender.name}{lender.dba ? ` (${lender.dba})` : ""}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

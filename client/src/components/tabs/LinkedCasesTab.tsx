@@ -245,7 +245,6 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
                             </div>
                             <div className="ml-6 text-sm text-muted-foreground">
                               {result.customerName && <div>Customer: {result.customerName}</div>}
-                              {result.loanId && <div>Loan: {result.loanId}</div>}
                             </div>
                           </CommandItem>
                         ))}
@@ -312,11 +311,6 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
                         <Badge variant={getStatusBadgeVariant(match.status)} data-testid={`badge-status-${match.id}`}>
                           {match.status}
                         </Badge>
-                        {match.loanId && (
-                          <Badge variant="outline" data-testid={`badge-loan-${match.id}`}>
-                            Loan: {match.loanId}
-                          </Badge>
-                        )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate" data-testid={`text-details-${match.id}`}>
                         {match.details}
@@ -391,11 +385,6 @@ export function LinkedCasesTab({ caseId }: LinkedCasesTabProps) {
                         <Badge variant="outline" data-testid={`badge-link-type-${linkedCase.id}`}>
                           {linkedCase.linkType}
                         </Badge>
-                        {linkedCase.loanId && (
-                          <Badge variant="outline" data-testid={`badge-linked-loan-${linkedCase.id}`}>
-                            Loan: {linkedCase.loanId}
-                          </Badge>
-                        )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate mb-1" data-testid={`text-linked-details-${linkedCase.id}`}>
                         {linkedCase.details}

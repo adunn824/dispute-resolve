@@ -35,7 +35,6 @@ interface CaseListItem {
   categoryId: string;
   customerId: string;
   assignedToUserId?: string;
-  loanId?: string;
   state: string;
   details: string;
   status: string;
@@ -557,7 +556,6 @@ export function CaseListPage({ userRole = "agent" }: CaseListPageProps) {
                           </div>
                           <div className="text-sm text-muted-foreground">
                             {caseItem.customerState}
-                            {caseItem.loanId && ` • Loan: ${caseItem.loanId}`}
                           </div>
                         </div>
                       </TableCell>

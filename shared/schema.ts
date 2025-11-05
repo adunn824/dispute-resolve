@@ -34,7 +34,6 @@ export type RuleConditions = {
 export const RULE_FIELDS = {
   // Case basic fields
   'details': { type: 'text', label: 'Complaint Details', description: 'The complaint description text' },
-  'loanId': { type: 'text', label: 'Loan ID', description: 'Loan identifier' },
   'state': { type: 'text', label: 'Customer State', description: 'Customer state abbreviation' },
   'status': { type: 'reference', label: 'Case Status', description: 'Current case status', endpoint: '/api/statuses', labelField: 'name', valueField: 'code' },
   'hasRepresentative': { type: 'boolean', label: 'Has Representative', description: 'Whether customer has POA/Attorney' },
@@ -179,7 +178,6 @@ export const cases = pgTable("cases", {
   customerId: varchar("customer_id").notNull().references(() => customers.id),
   assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
   secondaryAssignedToUserId: varchar("secondary_assigned_to_user_id").references(() => users.id),
-  loanId: text("loan_id"),
   lenderId: varchar("lender_id").references(() => lenders.id),
   state: text("state").notNull(),
   details: text("details").notNull(),

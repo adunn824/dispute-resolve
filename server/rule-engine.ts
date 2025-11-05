@@ -4,7 +4,6 @@ import { RuleCondition, RuleConditions, RULE_FIELDS } from "@shared/schema";
 export interface CaseData {
   // Case basic fields
   details: string;
-  loanId?: string | null;
   lenderName?: string | null;
   state: string;
   status: string; // Status code from statuses table (e.g., 'open', 'in_progress', 'resolved', 'pending_intake')

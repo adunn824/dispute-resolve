@@ -109,7 +109,6 @@ const intakeSchema = z.object({
   zipCode: z.string().optional(),
   customerNumber: z.string().optional(),
   accountNumber: z.string().optional(),
-  loanId: z.string().optional(),
   lenderId: z.string().optional(),
   details: z.string().min(10, "Details must be at least 10 characters"),
 });
@@ -163,7 +162,6 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
       zipCode: "",
       customerNumber: "",
       accountNumber: "",
-      loanId: "",
       lenderId: "",
       details: caseItem.emailMetadata?.body || caseItem.emailMetadata?.bodyPreview || caseItem.details || "",
     },
@@ -640,46 +638,30 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
                 <div className="border-t pt-4">
                   <h4 className="text-sm font-semibold mb-4">Loan Information</h4>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="loanId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Loan ID (Optional)</FormLabel>
+                  <FormField
+                    control={form.control}
+                    name="lenderId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Lender (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} data-testid={`select-lender-${caseItem.caseNumber}`}>
                           <FormControl>
-                            <Input placeholder="Enter loan ID" {...field} data-testid={`input-loan-${caseItem.caseNumber}`} />
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select lender" />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="lenderId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lender (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} data-testid={`select-lender-${caseItem.caseNumber}`}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select lender" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {lendersData?.data?.map((lender) => (
-                                <SelectItem key={lender.id} value={lender.id}>
-                                  {lender.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                          <SelectContent>
+                            {lendersData?.data?.map((lender) => (
+                              <SelectItem key={lender.id} value={lender.id}>
+                                {lender.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <FormField
