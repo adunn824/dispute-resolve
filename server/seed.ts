@@ -299,7 +299,6 @@ async function seed() {
       categoryId: categoryRecords.find(c => c.code === "COMP_SVC")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "COMP_SVC")!.id && pr.priorityValue === "Medium")!.id,
       customerId: customerRecords[0].id,
-      loanId: "LOAN001",
       state: "CA",
       details: "Customer reports poor service quality during recent interaction. Multiple representatives were unable to resolve the issue efficiently.",
       status: "open"
@@ -310,7 +309,6 @@ async function seed() {
       categoryId: categoryRecords.find(c => c.code === "DISP_TXN")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "DISP_TXN")!.id && pr.priorityValue === "BK24")!.id,
       customerId: customerRecords[1].id,
-      loanId: "LOAN002",
       state: "NY",
       details: "Customer disputes unauthorized transaction on account. Claims no knowledge of the charge and requests immediate investigation.",
       status: "pending"
@@ -331,7 +329,6 @@ async function seed() {
       categoryId: categoryRecords.find(c => c.code === "COMP_BILL")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "COMP_BILL")!.id && pr.priorityValue === "High")!.id,
       customerId: customerRecords[3].id,
-      loanId: "LOAN003",
       state: "WA",
       details: "Customer received incorrect billing statement. Charges do not match agreed terms from contract.",
       status: "resolved"
@@ -342,7 +339,6 @@ async function seed() {
       categoryId: categoryRecords.find(c => c.code === "DISP_BILL")!.id,
       priorityRuleId: allPriorityRules.find(pr => pr.categoryId === categoryRecords.find(c => c.code === "DISP_BILL")!.id && pr.priorityValue === "High")!.id,
       customerId: customerRecords[4].id,
-      loanId: "LOAN004",
       state: "FL",
       details: "Customer disputes late fees applied to account. Claims payment was made on time with supporting documentation.",
       status: "open"
