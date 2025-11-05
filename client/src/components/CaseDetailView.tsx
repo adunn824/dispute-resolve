@@ -179,6 +179,12 @@ interface CaseDetailData {
   secondaryAssignedUserName?: string;
   secondaryAssignedUserEmail?: string;
   secondaryAssignedUserRole?: string;
+  tags?: string[];
+  slaPolicyId?: string;
+  slaDeadline?: string;
+  slaStatus?: string;
+  slaPolicyName?: string;
+  slaPolicyDescription?: string;
   emailMetadata?: EmailMetadata;
 }
 
