@@ -898,8 +898,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized - user session invalid" });
       }
 
-      // Handle customer name separately since it's not a case field
-      const { customerName, ...caseUpdates } = req.body;
+      // Handle customer fields separately since they're not case fields
+      const { 
+        customerFirstName, 
+        customerLastName, 
+        customerEmail, 
+        customerPhone, 
+        customerAddress1, 
+        customerAddress2, 
+        customerCity, 
+        customerZipCode,
+        ...caseUpdates 
+      } = req.body;
       const updates = insertCaseSchema.partial().parse(caseUpdates);
       
       // Check if case exists
@@ -912,23 +922,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       checkUserPermissions.canModify(req.user);
       checkUserPermissions.hasLenderAccess(req.user, existingCase.lenderId);
       
-      // Handle customer name update if provided
-      if (customerName) {
-        // Find or create customer with new name
-        const existingCustomers = await storage.findCustomerByName(customerName);
-        const matchingCustomer = existingCustomers.find(c => 
-          c.name === customerName && c.state === (updates.state || existingCase.state)
-        );
+      // Handle customer information update if provided
+      if (customerFirstName && customerLastName) {
+        // Update the existing customer record
+        const customerUpdates: any = {
+          firstName: customerFirstName,
+          lastName: customerLastName,
+          name: `${customerFirstName} ${customerLastName}`, // Legacy field
+          state: updates.state || existingCase.state,
+        };
         
-        if (matchingCustomer) {
-          updates.customerId = matchingCustomer.id;
-        } else {
-          const newCustomer = await storage.createCustomer({
-            name: customerName,
-            state: updates.state || existingCase.state,
-          });
-          updates.customerId = newCustomer.id;
-        }
+        if (customerEmail !== undefined) customerUpdates.email = customerEmail;
+        if (customerPhone !== undefined) customerUpdates.phone = customerPhone;
+        if (customerAddress1 !== undefined) customerUpdates.address1 = customerAddress1;
+        if (customerAddress2 !== undefined) customerUpdates.address2 = customerAddress2;
+        if (customerCity !== undefined) customerUpdates.city = customerCity;
+        if (customerZipCode !== undefined) customerUpdates.zipCode = customerZipCode;
+        
+        await storage.updateCustomer(existingCase.customerId, customerUpdates);
       }
       
       const updatedCase = await storage.updateCase(id, updates);
@@ -939,7 +950,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actorUserId: req.dbUser.id,
         action: "case_updated", 
         details: { 
-          updates: { ...updates, customerName }, 
+          updates: { 
+            ...updates, 
+            customerFirstName, 
+            customerLastName, 
+            customerEmail, 
+            customerPhone, 
+            customerAddress1, 
+            customerAddress2, 
+            customerCity, 
+            customerZipCode 
+          }, 
           previousStatus: existingCase.status, 
           newStatus: updatedCase.status
         }

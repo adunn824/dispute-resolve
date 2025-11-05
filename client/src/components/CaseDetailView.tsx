@@ -34,7 +34,14 @@ const editCaseSchema = z.object({
   caseOriginationId: z.string().min(1, "Case origination is required"),
   caseTypeId: z.string().min(1, "Case type is required"),
   categoryId: z.string().min(1, "Category is required"),
-  customerName: z.string().min(1, "Customer name is required"),
+  customerFirstName: z.string().min(1, "First name is required"),
+  customerLastName: z.string().min(1, "Last name is required"),
+  customerEmail: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
+  customerPhone: z.string().optional(),
+  customerAddress1: z.string().optional(),
+  customerAddress2: z.string().optional(),
+  customerCity: z.string().optional(),
+  customerZipCode: z.string().optional(),
   lenderId: z.string().optional(),
   state: z.string().min(2, "State is required"),
   details: z.string().min(10, "Details must be at least 10 characters"),
@@ -522,7 +529,14 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
       caseOriginationId: caseDetails?.caseOriginationId || "",
       caseTypeId: caseDetails?.caseTypeId || "",
       categoryId: caseDetails?.categoryId || "",
-      customerName: caseDetails?.customerName || "",
+      customerFirstName: caseDetails?.customerFirstName || "",
+      customerLastName: caseDetails?.customerLastName || "",
+      customerEmail: caseDetails?.customerEmail || "",
+      customerPhone: caseDetails?.customerPhone || "",
+      customerAddress1: caseDetails?.customerAddress1 || "",
+      customerAddress2: caseDetails?.customerAddress2 || "",
+      customerCity: caseDetails?.customerCity || "",
+      customerZipCode: caseDetails?.customerZipCode || "",
       lenderId: caseDetails?.lenderId || "",
       state: caseDetails?.customerState || "",
       details: caseDetails?.details || "",
@@ -590,7 +604,14 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
         caseOriginationId: caseDetails.caseOriginationId || "",
         caseTypeId: caseDetails.caseTypeId || "",
         categoryId: caseDetails.categoryId || "",
-        customerName: caseDetails.customerName || "",
+        customerFirstName: caseDetails.customerFirstName || "",
+        customerLastName: caseDetails.customerLastName || "",
+        customerEmail: caseDetails.customerEmail || "",
+        customerPhone: caseDetails.customerPhone || "",
+        customerAddress1: caseDetails.customerAddress1 || "",
+        customerAddress2: caseDetails.customerAddress2 || "",
+        customerCity: caseDetails.customerCity || "",
+        customerZipCode: caseDetails.customerZipCode || "",
         lenderId: caseDetails.lenderId || "",
         state: caseDetails.customerState || "",
         details: caseDetails.details || "",
@@ -1443,25 +1464,171 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                   )}
                 />
 
-                <FormField
-                  control={editForm.control}
-                  name="customerName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Customer Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter customer name" {...field} data-testid="input-edit-customer-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                {/* Customer Information Section */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-4">Customer Information</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={editForm.control}
+                      name="customerFirstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter first name" {...field} data-testid="input-edit-customer-first-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="customerLastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter last name" {...field} data-testid="input-edit-customer-last-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <FormField
+                      control={editForm.control}
+                      name="customerEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="customer@example.com" {...field} data-testid="input-edit-customer-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="customerPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(555) 123-4567" {...field} data-testid="input-edit-customer-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={editForm.control}
+                    name="customerAddress1"
+                    render={({ field }) => (
+                      <FormItem className="mt-4">
+                        <FormLabel>Address Line 1</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123 Main Street" {...field} data-testid="input-edit-customer-address1" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="customerAddress2"
+                    render={({ field }) => (
+                      <FormItem className="mt-4">
+                        <FormLabel>Address Line 2</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Apt 4B" {...field} data-testid="input-edit-customer-address2" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <FormField
+                      control={editForm.control}
+                      name="customerCity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Boston" {...field} data-testid="input-edit-customer-city" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-edit-state">
+                                <SelectValue placeholder="Select state" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {usStates.map((state) => (
+                                <SelectItem key={state} value={state}>
+                                  {state}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="customerZipCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Zip Code</FormLabel>
+                          <FormControl>
+                            <Input placeholder="02101" {...field} data-testid="input-edit-customer-zip" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {caseDetails?.customerNumber && (
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      Customer Number: {caseDetails.customerNumber}
+                    </div>
                   )}
-                />
+
+                  {caseDetails?.accountNumber && (
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      Account Number: {caseDetails.accountNumber}
+                    </div>
+                  )}
+                </div>
 
                 <FormField
                   control={editForm.control}
                   name="lenderId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="mt-4">
                       <FormLabel>Lender (Optional)</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
@@ -1473,31 +1640,6 @@ export function CaseDetailView({ caseId, onBack }: CaseDetailViewProps) {
                           {editLenders.map((lender) => (
                             <SelectItem key={lender.id} value={lender.id}>
                               {lender.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="state"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Customer State</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-edit-state">
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {usStates.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state}
                             </SelectItem>
                           ))}
                         </SelectContent>
