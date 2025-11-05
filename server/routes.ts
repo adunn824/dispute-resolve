@@ -683,8 +683,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         caseOriginationId: z.string().min(1, "Case origination is required"),
         caseTypeId: z.string().min(1, "Case type is required"),
         categoryId: z.string().min(1, "Category is required"),
-        customerName: z.string().min(1, "Customer name is required"),
-        customerState: z.string().min(2, "State is required"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        email: z.string().email("Valid email is required").min(1, "Email is required"),
+        phone: z.string().min(1, "Phone is required"),
+        address1: z.string().min(1, "Address is required"),
+        address2: z.string().optional(),
+        city: z.string().min(1, "City is required"),
+        state: z.string().min(2, "State is required"),
+        zipCode: z.string().min(1, "ZIP code is required"),
+        customerNumber: z.string().optional(),
+        accountNumber: z.string().optional(),
+        lenderId: z.string().optional(),
         loanId: z.string().optional(),
         lenderName: z.string().optional(),
         details: z.string().min(10, "Details must be at least 10 characters"),
@@ -700,17 +710,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Step 1: Find or create customer
       let customer;
-      const existingCustomers = await storage.findCustomerByName(intakeData.customerName);
-      const matchingCustomer = existingCustomers.find(c => 
-        c.name === intakeData.customerName && c.state === intakeData.customerState
+      const existingCustomersByEmail = await storage.findCustomerByEmail(intakeData.email, intakeData.lenderId);
+      const matchingCustomer = existingCustomersByEmail.find(c => 
+        c.firstName === intakeData.firstName && 
+        c.lastName === intakeData.lastName &&
+        c.email === intakeData.email
       );
       
       if (matchingCustomer) {
         customer = matchingCustomer;
       } else {
         customer = await storage.createCustomer({
-          name: intakeData.customerName,
-          state: intakeData.customerState,
+          firstName: intakeData.firstName,
+          lastName: intakeData.lastName,
+          name: `${intakeData.firstName} ${intakeData.lastName}`, // Legacy field for backward compatibility
+          email: intakeData.email,
+          phone: intakeData.phone,
+          address1: intakeData.address1,
+          address2: intakeData.address2 || null,
+          city: intakeData.city,
+          state: intakeData.state,
+          zipCode: intakeData.zipCode,
+          customerNumber: intakeData.customerNumber || null,
+          accountNumber: intakeData.accountNumber || null,
+          lenderId: intakeData.lenderId || null,
         });
       }
       
@@ -752,7 +775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: customer.id,
         loanId: intakeData.loanId || null,
         lenderName: intakeData.lenderName || null,
-        state: intakeData.customerState,
+        lenderId: intakeData.lenderId || null,
+        state: intakeData.state,
         details: intakeData.details,
         status: "open" as const,
         assignedToUserId: nextUser?.id || null,
@@ -780,8 +804,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: { 
           caseId: newCase.id, 
           initialStatus: newCase.status,
-          customerName: intakeData.customerName,
-          customerState: intakeData.customerState,
+          customerName: `${intakeData.firstName} ${intakeData.lastName}`,
+          customerState: intakeData.state,
           priority: selectedPriorityRule.priorityValue,
           autoAssigned: !!nextUser,
           assignedToUserId: newCase.assignedToUserId
@@ -1054,10 +1078,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         caseOriginationId: z.string().min(1, "Case origination is required"),
         caseTypeId: z.string().min(1, "Case type is required"),
         categoryId: z.string().min(1, "Category is required"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        email: z.string().email("Valid email is required").min(1, "Email is required"),
+        phone: z.string().min(1, "Phone is required"),
+        address1: z.string().min(1, "Address is required"),
+        address2: z.string().optional(),
+        city: z.string().min(1, "City is required"),
+        state: z.string().min(2, "State is required"),
+        zipCode: z.string().min(1, "ZIP code is required"),
+        customerNumber: z.string().optional(),
+        accountNumber: z.string().optional(),
         lenderId: z.string().optional(),
         loanId: z.string().optional(),
-        customerName: z.string().min(1, "Customer name is required"),
-        customerState: z.string().min(2, "State is required"),
         details: z.string().optional(),
       });
 
@@ -1074,17 +1107,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update customer info if needed
       let customerId = existingCase.customerId;
-      const existingCustomers = await storage.findCustomerByName(intakeData.customerName);
-      const matchingCustomer = existingCustomers.find(c => 
-        c.name === intakeData.customerName && c.state === intakeData.customerState
+      const existingCustomersByEmail = await storage.findCustomerByEmail(intakeData.email, intakeData.lenderId);
+      const matchingCustomer = existingCustomersByEmail.find(c => 
+        c.firstName === intakeData.firstName && 
+        c.lastName === intakeData.lastName &&
+        c.email === intakeData.email
       );
       
       if (matchingCustomer) {
         customerId = matchingCustomer.id;
       } else {
         const newCustomer = await storage.createCustomer({
-          name: intakeData.customerName,
-          state: intakeData.customerState,
+          firstName: intakeData.firstName,
+          lastName: intakeData.lastName,
+          name: `${intakeData.firstName} ${intakeData.lastName}`, // Legacy field for backward compatibility
+          email: intakeData.email,
+          phone: intakeData.phone,
+          address1: intakeData.address1,
+          address2: intakeData.address2 || null,
+          city: intakeData.city,
+          state: intakeData.state,
+          zipCode: intakeData.zipCode,
+          customerNumber: intakeData.customerNumber || null,
+          accountNumber: intakeData.accountNumber || null,
+          lenderId: intakeData.lenderId || null,
         });
         customerId = newCustomer.id;
       }
@@ -1122,7 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId,
         lenderId: intakeData.lenderId || existingCase.lenderId,
         loanId: intakeData.loanId || existingCase.loanId,
-        state: intakeData.customerState,
+        state: intakeData.state,
         details: intakeData.details || existingCase.details,
         assignedToUserId: nextUser?.id || existingCase.assignedToUserId,
       };
@@ -1240,6 +1286,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Failed to create customer:", error);
       res.status(500).json({ error: "Failed to create customer" });
+    }
+  });
+
+  // GET /api/customers/lookup - Lookup customer by various identifiers (for external API integration)
+  app.get("/api/customers/lookup", requireAuth, async (req, res) => {
+    try {
+      const querySchema = z.object({
+        email: z.string().email().optional(),
+        phone: z.string().optional(),
+        accountNumber: z.string().optional(),
+        customerNumber: z.string().optional(),
+        lenderId: z.string().optional(),
+      });
+
+      const query = querySchema.parse(req.query);
+      
+      // Require at least one search parameter
+      if (!query.email && !query.phone && !query.accountNumber && !query.customerNumber) {
+        return res.status(400).json({ 
+          error: "At least one search parameter is required (email, phone, accountNumber, or customerNumber)" 
+        });
+      }
+
+      let customers: any[] = [];
+
+      // Search by email
+      if (query.email) {
+        customers = await storage.findCustomerByEmail(query.email, query.lenderId);
+      }
+      // Search by phone
+      else if (query.phone) {
+        customers = await storage.findCustomerByPhone(query.phone, query.lenderId);
+      }
+      // Search by account number (unique lookup)
+      else if (query.accountNumber) {
+        const customer = await storage.findCustomerByAccountNumber(query.accountNumber, query.lenderId);
+        customers = customer ? [customer] : [];
+      }
+      // Search by customer number (unique lookup)
+      else if (query.customerNumber) {
+        const customer = await storage.findCustomerByCustomerNumber(query.customerNumber, query.lenderId);
+        customers = customer ? [customer] : [];
+      }
+
+      res.json({ 
+        data: customers,
+        count: customers.length 
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid query parameters", details: error.errors });
+      }
+      console.error("Failed to lookup customer:", error);
+      res.status(500).json({ error: "Failed to lookup customer" });
     }
   });
 

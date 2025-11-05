@@ -42,8 +42,14 @@ interface EmailIntakeCase {
   status: string;
   details: string;
   emailMetadata?: {
-    from: string;
-    to?: string;
+    from?: {
+      name?: string;
+      email: string;
+    };
+    to?: Array<{
+      name?: string;
+      email: string;
+    }>;
     subject?: string;
     receivedDate?: string;
     messageId?: string;
@@ -92,8 +98,17 @@ const intakeSchema = z.object({
   caseOriginationId: z.string().min(1, "Case origination is required"),
   caseTypeId: z.string().min(1, "Case type is required"),
   categoryId: z.string().min(1, "Category is required"),
-  customerName: z.string().min(1, "Customer name is required"),
-  customerState: z.string().min(2, "State is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  address1: z.string().optional(),
+  address2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().min(2, "State is required"),
+  zipCode: z.string().optional(),
+  customerNumber: z.string().optional(),
+  accountNumber: z.string().optional(),
   loanId: z.string().optional(),
   lenderId: z.string().optional(),
   details: z.string().min(10, "Details must be at least 10 characters"),
@@ -101,20 +116,53 @@ const intakeSchema = z.object({
 
 type IntakeFormData = z.infer<typeof intakeSchema>;
 
+// Helper function to parse name into first and last name
+function parseName(fullName: string): { firstName: string; lastName: string } {
+  if (!fullName || fullName.trim() === "") {
+    return { firstName: "", lastName: "" };
+  }
+  
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: "" };
+  }
+  
+  const firstName = parts[0];
+  const lastName = parts.slice(1).join(" ");
+  return { firstName, lastName };
+}
+
 function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; onComplete: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedOriginationId, setSelectedOriginationId] = useState<string | null>(null);
   const [selectedCaseTypeId, setSelectedCaseTypeId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Parse the customer name and email from email metadata
+  // emailMetadata.from is an object with { name?: string, email: string }
+  const fromField = caseItem.emailMetadata?.from;
+  const extractedName = fromField?.name || "";
+  const extractedEmail = fromField?.email || "";
+  
+  const parsedName = parseName(extractedName);
+  
   const form = useForm<IntakeFormData>({
     resolver: zodResolver(intakeSchema),
     defaultValues: {
       caseOriginationId: "",
       caseTypeId: "",
       categoryId: "",
-      customerName: caseItem.emailMetadata?.from?.name || "",
-      customerState: "",
+      firstName: parsedName.firstName,
+      lastName: parsedName.lastName,
+      email: extractedEmail,
+      phone: "",
+      address1: "",
+      address2: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      customerNumber: "",
+      accountNumber: "",
       loanId: "",
       lenderId: "",
       details: caseItem.emailMetadata?.body || caseItem.emailMetadata?.bodyPreview || caseItem.details || "",
@@ -207,7 +255,9 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
               <div className="flex gap-2">
                 <span className="text-muted-foreground">From:</span>
                 <span className="font-medium">
-                  {caseItem.emailMetadata?.from?.name || caseItem.emailMetadata?.from?.email || "Unknown"}
+                  {caseItem.emailMetadata?.from 
+                    ? (caseItem.emailMetadata.from.name || caseItem.emailMetadata.from.email)
+                    : "Unknown"}
                 </span>
               </div>
               {caseItem.emailMetadata?.to && (
@@ -216,7 +266,7 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
                   <span className="font-medium">
                     {Array.isArray(caseItem.emailMetadata.to) 
                       ? caseItem.emailMetadata.to.map(t => t.name || t.email).join(', ')
-                      : caseItem.emailMetadata.to}
+                      : "Unknown"}
                   </span>
                 </div>
               )}
@@ -402,86 +452,234 @@ function EmailCaseItem({ caseItem, onComplete }: { caseItem: EmailIntakeCase; on
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="customerName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Customer Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter customer name" {...field} data-testid={`input-name-${caseItem.caseNumber}`} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                {/* Customer Information Section */}
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-semibold mb-4">Customer Information</h4>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter first name" {...field} data-testid={`input-first-name-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="customerState"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State</FormLabel>
-                        <Select onValueChange={field.onChange} data-testid={`select-state-${caseItem.caseNumber}`}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select state" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {usStates.map((state) => (
-                              <SelectItem key={state} value={state}>
-                                {state}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter last name" {...field} data-testid={`input-last-name-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="Enter email address" {...field} data-testid={`input-email-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone</FormLabel>
+                            <FormControl>
+                              <Input type="tel" placeholder="Enter phone number" {...field} data-testid={`input-phone-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="customerNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Customer ID</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter customer ID" {...field} data-testid={`input-customer-number-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="accountNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Account Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter account number" {...field} data-testid={`input-account-number-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-4 pt-2">
+                      <h5 className="text-sm font-medium text-muted-foreground">Address</h5>
+                      
+                      <FormField
+                        control={form.control}
+                        name="address1"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Street Address</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter street address" {...field} data-testid={`input-address1-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="address2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address Line 2</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Apt, suite, etc. (optional)" {...field} data-testid={`input-address2-${caseItem.caseNumber}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Enter city" {...field} data-testid={`input-city-${caseItem.caseNumber}`} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="state"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State *</FormLabel>
+                              <Select onValueChange={field.onChange} data-testid={`select-state-${caseItem.caseNumber}`}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select state" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {usStates.map((state) => (
+                                    <SelectItem key={state} value={state}>
+                                      {state}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="zipCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ZIP Code</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Enter ZIP" {...field} data-testid={`input-zip-code-${caseItem.caseNumber}`} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="loanId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Loan ID (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter loan ID" {...field} data-testid={`input-loan-${caseItem.caseNumber}`} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lenderId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lender (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} data-testid={`select-lender-${caseItem.caseNumber}`}>
+                {/* Loan Information Section */}
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-semibold mb-4">Loan Information</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="loanId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Loan ID (Optional)</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select lender" />
-                            </SelectTrigger>
+                            <Input placeholder="Enter loan ID" {...field} data-testid={`input-loan-${caseItem.caseNumber}`} />
                           </FormControl>
-                          <SelectContent>
-                            {lendersData?.data?.map((lender) => (
-                              <SelectItem key={lender.id} value={lender.id}>
-                                {lender.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="lenderId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lender (Optional)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} data-testid={`select-lender-${caseItem.caseNumber}`}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select lender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {lendersData?.data?.map((lender) => (
+                                <SelectItem key={lender.id} value={lender.id}>
+                                  {lender.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 <FormField

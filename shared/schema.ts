@@ -82,6 +82,9 @@ export const lenders = pgTable("lenders", {
   email: text("email"),
   phone: text("phone"),
   
+  // Customer email domain mapping for automatic lender identification
+  emailDomains: text("email_domains").array(), // e.g., ['@regionalbank.com', '@regional.com']
+  
   // Email intake configuration for Outlook/Microsoft 365
   emailIntakeEnabled: boolean("email_intake_enabled").notNull().default(false),
   outlookEmail: text("outlook_email"), // The mailbox email address to monitor
@@ -137,9 +140,31 @@ export const users = pgTable("users", {
 
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  externalId: text("external_id"),
-  name: text("name").notNull(),
-  state: text("state").notNull(),
+  
+  // Legacy fields (kept for backward compatibility)
+  name: text("name"), // Deprecated: use firstName + lastName instead
+  externalId: text("external_id"), // Deprecated: use accountNumber instead
+  
+  // Customer identification
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  customerNumber: text("customer_number"), // Customer ID in external system
+  accountNumber: text("account_number"), // Account number in external system
+  
+  // Contact information
+  email: text("email"),
+  phone: text("phone"),
+  
+  // Address
+  address1: text("address_1"),
+  address2: text("address_2"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  
+  // Lender association
+  lenderId: varchar("lender_id").references(() => lenders.id),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

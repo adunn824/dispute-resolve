@@ -190,7 +190,12 @@ export interface IStorage {
   getCustomer(id: string): Promise<Customer | undefined>;
   getCustomers(filters?: { limit?: number; offset?: number }): Promise<Customer[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, updates: Partial<InsertCustomer>): Promise<Customer>;
   findCustomerByName(name: string): Promise<Customer[]>;
+  findCustomerByEmail(email: string, lenderId?: string): Promise<Customer[]>;
+  findCustomerByPhone(phone: string, lenderId?: string): Promise<Customer[]>;
+  findCustomerByAccountNumber(accountNumber: string, lenderId?: string): Promise<Customer | undefined>;
+  findCustomerByCustomerNumber(customerNumber: string, lenderId?: string): Promise<Customer | undefined>;
   
   // Lender methods
   getLenders(): Promise<Lender[]>;
@@ -737,7 +742,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findCustomerByName(name: string): Promise<Customer[]> {
-    return await db.select().from(customers).where(ilike(customers.name, `%${name}%`));
+    // Search in both name field (legacy) and firstName/lastName
+    return await db.select().from(customers).where(
+      or(
+        ilike(customers.name, `%${name}%`),
+        ilike(customers.firstName, `%${name}%`),
+        ilike(customers.lastName, `%${name}%`)
+      )
+    );
+  }
+
+  async updateCustomer(id: string, updates: Partial<InsertCustomer>): Promise<Customer> {
+    const [customer] = await db
+      .update(customers)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(customers.id, id))
+      .returning();
+    return customer;
+  }
+
+  async findCustomerByEmail(email: string, lenderId?: string): Promise<Customer[]> {
+    const conditions = [eq(customers.email, email)];
+    if (lenderId) {
+      conditions.push(eq(customers.lenderId, lenderId));
+    }
+    return await db.select().from(customers).where(and(...conditions));
+  }
+
+  async findCustomerByPhone(phone: string, lenderId?: string): Promise<Customer[]> {
+    const conditions = [eq(customers.phone, phone)];
+    if (lenderId) {
+      conditions.push(eq(customers.lenderId, lenderId));
+    }
+    return await db.select().from(customers).where(and(...conditions));
+  }
+
+  async findCustomerByAccountNumber(accountNumber: string, lenderId?: string): Promise<Customer | undefined> {
+    const conditions = [eq(customers.accountNumber, accountNumber)];
+    if (lenderId) {
+      conditions.push(eq(customers.lenderId, lenderId));
+    }
+    const [customer] = await db.select().from(customers).where(and(...conditions));
+    return customer || undefined;
+  }
+
+  async findCustomerByCustomerNumber(customerNumber: string, lenderId?: string): Promise<Customer | undefined> {
+    const conditions = [eq(customers.customerNumber, customerNumber)];
+    if (lenderId) {
+      conditions.push(eq(customers.lenderId, lenderId));
+    }
+    const [customer] = await db.select().from(customers).where(and(...conditions));
+    return customer || undefined;
   }
 
   // Lender methods

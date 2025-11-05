@@ -27,6 +27,7 @@ const lenderSchema = z.object({
   contactPerson: z.string().max(255, "Contact person must be 255 characters or less").optional(),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone: z.string().max(50, "Phone must be 50 characters or less").optional(),
+  emailDomains: z.string().optional(),
   
   // Email intake configuration
   emailIntakeEnabled: z.boolean().default(false),
@@ -47,6 +48,7 @@ type Lender = {
   contactPerson?: string | null;
   email?: string | null;
   phone?: string | null;
+  emailDomains?: string[] | null;
   emailIntakeEnabled: boolean;
   outlookEmail?: string | null;
   outlookClientId?: string | null;
@@ -79,6 +81,7 @@ export default function LendersManagement() {
       contactPerson: "",
       email: "",
       phone: "",
+      emailDomains: "",
       emailIntakeEnabled: false,
       outlookEmail: "",
       outlookClientId: "",
@@ -165,6 +168,7 @@ export default function LendersManagement() {
       contactPerson: "",
       email: "",
       phone: "",
+      emailDomains: "",
       emailIntakeEnabled: false,
       outlookEmail: "",
       outlookClientId: "",
@@ -184,6 +188,7 @@ export default function LendersManagement() {
       contactPerson: lender.contactPerson || "",
       email: lender.email || "",
       phone: lender.phone || "",
+      emailDomains: lender.emailDomains?.join(", ") || "",
       emailIntakeEnabled: lender.emailIntakeEnabled || false,
       outlookEmail: lender.outlookEmail || "",
       outlookClientId: lender.outlookClientId || "",
@@ -196,10 +201,19 @@ export default function LendersManagement() {
   };
 
   const handleSubmit = (data: LenderForm) => {
+    const emailDomainsArray = data.emailDomains
+      ? data.emailDomains.split(",").map(domain => domain.trim()).filter(domain => domain.length > 0)
+      : [];
+    
+    const submitData = {
+      ...data,
+      emailDomains: emailDomainsArray.length > 0 ? emailDomainsArray : undefined,
+    };
+
     if (editingLender) {
-      updateMutation.mutate({ id: editingLender.id, data });
+      updateMutation.mutate({ id: editingLender.id, data: submitData as any });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(submitData as any);
     }
   };
 
@@ -411,6 +425,23 @@ export default function LendersManagement() {
                       <FormControl>
                         <Input type="email" placeholder="contact@lender.com" {...field} data-testid="input-email" />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="emailDomains"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer Email Domains</FormLabel>
+                      <FormControl>
+                        <Input placeholder="@example.com, @example.org" {...field} data-testid="input-email-domains" />
+                      </FormControl>
+                      <FormDescription>
+                        Email domains to automatically identify this lender's customers (comma-separated)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
