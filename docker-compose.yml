@@ -1,0 +1,97 @@
+# Docker Compose for local development and testing
+# This simulates the AWS production environment locally
+
+version: '3.9'
+
+services:
+  # Main application (React frontend + Express backend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: complaint-management-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Application
+      NODE_ENV: production
+      PORT: 5000
+      
+      # Database (use external Neon PostgreSQL or local postgres service)
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/complaints}
+      
+      # Session
+      SESSION_SECRET: ${SESSION_SECRET:-dev-secret-change-in-production}
+      
+      # Object Storage (Replit/GCS or AWS S3)
+      PUBLIC_OBJECT_SEARCH_PATHS: ${PUBLIC_OBJECT_SEARCH_PATHS:-}
+      PRIVATE_OBJECT_DIR: ${PRIVATE_OBJECT_DIR:-}
+      
+      # Authentication
+      REPLIT_DOMAINS: ${REPLIT_DOMAINS:-localhost:5000}
+      REPL_ID: ${REPL_ID:-local}
+      
+      # Microsoft SSO (Optional)
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-}
+      MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI:-http://localhost:5000/api/auth/microsoft/callback}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (optional - for local testing only)
+  # In production, use external Neon PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: complaint-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-complaints}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+
+# Usage:
+# 1. Local testing with containerized PostgreSQL:
+#    docker-compose up --build
+#
+# 2. Connect to external Neon PostgreSQL:
+#    DATABASE_URL=postgresql://user:pass@host/db docker-compose up app
+#
+# 3. View logs:
+#    docker-compose logs -f app
+#
+# 4. Stop services:
+#    docker-compose down
+#
+# 5. Remove volumes (fresh start):
+#    docker-compose down -v

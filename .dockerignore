@@ -1,0 +1,79 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Build outputs (will be generated during build)
+dist
+build
+.cache
+.vite
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env*.local
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+.circleci
+
+# Documentation (include in image if needed, excluded for now)
+*.md
+docs
+
+# Replit specific
+.replit
+replit.nix
+.config
+.upm
+
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+__mocks__
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Attached assets (if not needed in production)
+attached_assets

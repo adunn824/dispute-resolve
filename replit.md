@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **File Management**: Integrated with Replit Object Storage (Google Cloud Storage backed) for document uploads/downloads with ACL-based access control. Files are stored privately with owner-based permissions, enforcing authorization at both case-level and object-level.
 - **Audit Logging**: Comprehensive tracking of user actions and system changes for compliance.
 - **Data Validation**: Zod schemas used for type safety and validation across the platform.
+- **Containerization**: Docker-ready with multi-stage builds for AWS deployment. Optimized Dockerfile (~150MB image) with health checks, non-root user security, and production-grade configuration. Supports AWS ECS Fargate, App Runner, and EKS deployments with external PostgreSQL (Neon/RDS) and object storage (S3/GCS) integration.
 
 ## External Dependencies
 
@@ -62,6 +63,12 @@ Preferred communication style: Simple, everyday language.
 
 ### Development Services
 - **Build Tools**: Vite (frontend), ESBuild (server).
+
+### Deployment
+- **Platform**: Currently deployed on Replit with built-in hosting and database.
+- **Container Support**: Docker-ready with comprehensive AWS deployment guides (ECS Fargate, App Runner, EKS).
+- **Portability**: Can be deployed to any container platform (AWS, GCP, Azure, self-hosted) with external PostgreSQL and object storage.
+- **Health Monitoring**: Built-in `/health` endpoint for load balancer health checks and container orchestration.
 
 ### Planned Integrations
 - **Email Services**: For automated notifications.

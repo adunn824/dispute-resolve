@@ -145,6 +145,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Microsoft SSO authentication
   setupMicrosoftSSO(app);
   
+  // Health check endpoint for Docker/AWS load balancer health monitoring
+  // Does not require authentication
+  app.get("/health", (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development"
+    });
+  });
+  
   // Case Management API Endpoints
   
   // GET /api/cases - List cases with filtering and pagination
